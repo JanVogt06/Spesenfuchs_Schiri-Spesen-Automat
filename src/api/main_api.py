@@ -28,6 +28,7 @@ if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
 # .env laden, bevor Module importiert werden, die Secrets beim Import lesen
+from core import config
 from core.config import load_environment
 
 load_environment()
@@ -646,7 +647,7 @@ async def health_check():
     return {
         "status": "online",
         "service": "Spesenfuchs API",
-        "version": "1.1.1",
+        "version": config.APP_VERSION,
         "matches": count_distinct_matches()
     }
 

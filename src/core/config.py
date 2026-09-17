@@ -33,6 +33,11 @@ _GENERATED_SECRETS = {
 }
 
 
+# Anwendungsversion. Beim Release mit dem Git-Tag mitziehen (Tag v1.3.0 ->
+# "1.3.0"); der Health-Endpunkt meldet genau diesen Wert.
+APP_VERSION = "1.3.0"
+
+
 def get_data_dir() -> Path:
     """Basisverzeichnis fuer alle veraenderlichen Daten."""
     return Path(os.getenv("DATA_DIR") or PROJECT_ROOT / "data")
