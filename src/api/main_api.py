@@ -240,7 +240,8 @@ def run_generation_process(
         matches_data, _ = scrape_matches_with_session(
             session_path,
             username=dfb_username,
-            password=dfb_password
+            password=dfb_password,
+            user_id=user_id
         )
 
         # matches_data ist jetzt immer eine Liste (kann leer sein)

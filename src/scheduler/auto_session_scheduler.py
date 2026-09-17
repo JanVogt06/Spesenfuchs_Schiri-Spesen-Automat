@@ -70,7 +70,8 @@ def run_generation_for_user(
         matches_data, _ = scrape_matches_with_session(
             session_path,
             username=dfb_username,
-            password=dfb_password
+            password=dfb_password,
+            user_id=user_id
         )
 
         if not matches_data:

@@ -13,18 +13,68 @@ from core.config import load_environment
 load_environment()
 
 from scraper.dfb_scraper import DFBScraper
-from generator.docx_generator import SpesenGenerator
+from generator.docx_generator import SpesenGenerator, KM_SATZ_EURO
+from generator.spesen_calculator import calculate_spesen
+from db.matches import upsert_match, mark_missing_matches, build_match_key
 from utils.session_manager import SessionManager
 from utils.logger import setup_logger
+from utils.match_utils import extract_iso_date_from_anpfiff
 from utils.pdf_converter import convert_docx_files_to_pdf
 
 logger = setup_logger("main")
 
 
+def persist_matches(user_id: int, matches_data: List[dict]) -> int:
+    """
+    Schreibt ein Scrape-Ergebnis in die Datenbank.
+
+    Die Spesensaetze und der km-Satz werden hier eingefroren: sie gelten ab
+    dem ersten Sehen eines Spiels und werden bei spaeteren Scrapes nicht mehr
+    angefasst, damit eine Aenderung der Spesenordnung keine bereits
+    abgegebene Abrechnung rueckwirkend umschreibt.
+
+    Spiele, die nicht mehr in der Ansetzung stehen, werden markiert statt
+    geloescht - sonst wuerden eingetragene Kilometer mit verschwinden.
+
+    Returns:
+        Anzahl gespeicherter Spiele.
+    """
+    seen_keys = []
+    saved = 0
+
+    for match_data in matches_data:
+        try:
+            spiel_info = match_data.get('spiel_info', {}) or {}
+            spielstaette = match_data.get('spielstaette', {}) or {}
+            datum = extract_iso_date_from_anpfiff(spiel_info.get('anpfiff', ''))
+
+            sr_spesen, sra_spesen = calculate_spesen(
+                spiel_info.get('spielklasse', ''),
+                spiel_info.get('mannschaftsart', '')
+            )
+
+            upsert_match(user_id, match_data, datum, sr_spesen, sra_spesen, KM_SATZ_EURO)
+            seen_keys.append(build_match_key(spiel_info, spielstaette, datum))
+            saved += 1
+
+        except Exception as e:
+            logger.error(f"Spiel konnte nicht gespeichert werden: {e}")
+            continue
+
+    if seen_keys:
+        markiert = mark_missing_matches(user_id, seen_keys)
+        if markiert:
+            logger.info(f"{markiert} Spiele nicht mehr in der Ansetzung - markiert")
+
+    logger.info(f"{saved}/{len(matches_data)} Spiele in der Datenbank")
+    return saved
+
+
 def scrape_matches_with_session(
     session_path: Path = None,
     username: Optional[str] = None,
-    password: Optional[str] = None
+    password: Optional[str] = None,
+    user_id: Optional[int] = None
 ) -> Tuple[Optional[List[dict]], Optional[Path]]:
     """
     Scrapt alle Spiele und speichert die Daten in einer Session.
@@ -33,6 +83,7 @@ def scrape_matches_with_session(
         session_path: Optional - spezifischer Session-Pfad
         username: DFB.net Benutzername (falls None, wird aus ENV geladen - nur für Entwicklung)
         password: DFB.net Passwort (falls None, wird aus ENV geladen - nur für Entwicklung)
+        user_id: Optional - schreibt die Spiele in die Datenbank
 
     Returns:
         Tuple (matches_data, session_path)
@@ -91,6 +142,15 @@ def scrape_matches_with_session(
                 json.dump(all_matches, f, ensure_ascii=False, indent=2)
 
             logger.info(f"Daten gespeichert in: {output_file}")
+
+            # Die Datenbank ist die kuenftige Quelle der Wahrheit; das JSON
+            # bedient den Lesepfad noch, bis er umgestellt ist.
+            if user_id is not None:
+                try:
+                    persist_matches(user_id, all_matches)
+                except Exception as e:
+                    logger.error(f"Spiele konnten nicht in die Datenbank geschrieben werden: {e}")
+
             logger.info(f"Erfolgreich {len(all_matches)} Spiele gescrapt")
 
             return all_matches, session_path
