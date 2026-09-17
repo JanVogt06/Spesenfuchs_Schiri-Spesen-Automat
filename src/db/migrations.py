@@ -92,10 +92,134 @@ def _migration_002_wal(conn: sqlite3.Connection) -> None:
     conn.execute("PRAGMA journal_mode = WAL")
 
 
+def _migration_003_matches(conn: sqlite3.Connection) -> None:
+    """
+    Die gescrapten Spiele selbst. Bisher lagen sie nur als spesen_data.json in
+    den Session-Ordnern; ab hier sind sie die Quelle der Wahrheit.
+
+    Zwei Entwurfsentscheidungen, die nicht offensichtlich sind:
+
+    1. `match_key` statt eines natuerlichen Schluessels aus den Spalten.
+       DFBnet liefert (noch) keine Spielnummer, die Identitaet ist also
+       Heim + Gast + Datum. Sobald die Spielnummer verfuegbar ist, wird sie
+       einfach der neue match_key - Fremdschluessel auf `matches.id` bleiben
+       unberuehrt. Turnier-Ansetzungen ohne Teams bekommen einen Schluessel
+       aus Spielstaette und Anpfiff, sonst wuerden mehrere Turniere am selben
+       Tag kollidieren.
+
+    2. `match_officials` ist ein Schnappschuss pro Spiel, keine Personen-
+       Tabelle. Zwei Schiedsrichter koennen denselben Namen tragen, und eine
+       Adressaenderung mitten in der Saison darf die Anschrift in einer
+       bereits abgegebenen Abrechnung nicht rueckwirkend aendern.
+
+    Aus demselben Grund werden auch die Spesensaetze und der km-Satz beim
+    Scrapen eingefroren statt bei jedem Rendern neu berechnet.
+    """
+    conn.executescript("""
+        CREATE TABLE matches (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+
+            -- Identitaet
+            match_key TEXT NOT NULL,
+            spielnummer TEXT,
+
+            -- Spiel-Info (Schnappschuss des Scrapes)
+            heim_team TEXT NOT NULL DEFAULT '',
+            gast_team TEXT NOT NULL DEFAULT '',
+            datum TEXT NOT NULL,
+            anpfiff TEXT,
+            mannschaftsart TEXT,
+            spielklasse TEXT,
+            staffel TEXT,
+            spieltag TEXT,
+
+            -- Spielstaette (Schnappschuss)
+            staette_name TEXT,
+            staette_adresse TEXT,
+            staette_platz_typ TEXT,
+
+            -- Eingefrorene Saetze, damit Dokumente reproduzierbar bleiben
+            sr_spesen REAL,
+            sra_spesen REAL,
+            km_satz REAL NOT NULL,
+
+            -- Lebenszyklus
+            first_seen_at TEXT NOT NULL,
+            scraped_at TEXT NOT NULL,
+            missing_since TEXT,
+
+            UNIQUE (user_id, match_key),
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        );
+
+        CREATE INDEX idx_matches_user_datum ON matches (user_id, datum);
+
+        CREATE TABLE match_officials (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            match_id INTEGER NOT NULL,
+            rolle TEXT NOT NULL,
+            seq INTEGER NOT NULL,
+            name TEXT,
+            telefon TEXT,
+            email TEXT,
+            strasse TEXT,
+            plz_ort TEXT,
+            UNIQUE (match_id, rolle, seq),
+            FOREIGN KEY (match_id) REFERENCES matches (id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE official_expenses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            match_id INTEGER NOT NULL,
+            rolle TEXT NOT NULL,
+            seq INTEGER NOT NULL,
+            km REAL,
+            oevm REAL,
+            updated_at TEXT NOT NULL,
+            UNIQUE (match_id, rolle, seq),
+            FOREIGN KEY (match_id) REFERENCES matches (id) ON DELETE CASCADE
+        );
+    """)
+
+
+def _migration_004_scrape_runs(conn: sqlite3.Connection) -> None:
+    """
+    Ersetzt die metadata.json im Session-Ordner. Der Scraper laeuft in einem
+    eigenen Prozess (Playwright vertraegt sich nicht mit dem asyncio-Loop),
+    schrieb seinen Fortschritt bisher in diese Datei und die API las sie fuer
+    den 2-Sekunden-Poll wieder aus. Diese Zeile ist jetzt der Kanal.
+
+    error_code traegt weiterhin die Werte, auf die das Frontend prueft
+    (DFB_CREDENTIALS_INVALID leitet den User in die Einstellungen).
+    """
+    conn.executescript("""
+        CREATE TABLE scrape_runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            status TEXT NOT NULL,
+            step TEXT,
+            current_item INTEGER NOT NULL DEFAULT 0,
+            total_items INTEGER NOT NULL DEFAULT 0,
+            matches_found INTEGER,
+            error_code TEXT,
+            error_message TEXT,
+            started_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            finished_at TEXT,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        );
+
+        CREATE INDEX idx_scrape_runs_user_started ON scrape_runs (user_id, started_at DESC);
+    """)
+
+
 # (Version, Beschreibung, Funktion) - aufsteigend, Luecken sind nicht erlaubt.
 MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "baseline schema", _migration_001_baseline),
     (2, "wal journal mode", _migration_002_wal),
+    (3, "matches, officials and expenses", _migration_003_matches),
+    (4, "scrape runs replace session metadata", _migration_004_scrape_runs),
 ]
 
 
