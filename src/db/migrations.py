@@ -9,8 +9,13 @@ also ist das Backup die Rueckfallebene.
 
 Neue Migration hinzufuegen: Funktion schreiben und unten in MIGRATIONS mit der
 naechsten freien Nummer eintragen. Bestehende Schritte werden nie geaendert.
+
+Beim Deploy gilt: erst die neue Version starten, dann alte Daten wegraeumen.
+Der Backfill aus den Session-Ordnern laeuft genau einmal und bricht ab, wenn
+die Ordner fehlen, obwohl die Datenbank Sessions kennt.
 """
 import json
+import os
 import shutil
 import sqlite3
 from datetime import datetime, UTC
@@ -285,6 +290,21 @@ def _migration_006_backfill_from_sessions(conn: sqlite3.Connection) -> None:
 
     output_dir = config.get_data_dir() / "output"
     if not output_dir.exists():
+        # Hat diese Datenbank jemals Sessions gehabt, muessen auch deren Ordner
+        # da sein. Fehlen sie, zeigt DATA_DIR woandershin oder das Verzeichnis
+        # wurde zu frueh geloescht - in beiden Faellen waere der Backfill danach
+        # dauerhaft als erledigt vermerkt und die Historie aller Nutzer weg.
+        # Lieber laut abbrechen als still ueberspringen.
+        altlast = conn.execute("SELECT COUNT(*) AS n FROM sessions").fetchone()["n"]
+
+        if altlast and not os.getenv("SKIP_SESSION_BACKFILL"):
+            raise RuntimeError(
+                f"{output_dir} fehlt, obwohl {altlast} Sessions in der Datenbank stehen. "
+                "Die Spiele koennen nicht uebernommen werden. Pruefe DATA_DIR und lege das "
+                "Verzeichnis zurueck. Ist der Verlust gewollt, den Start einmalig mit "
+                "SKIP_SESSION_BACKFILL=1 wiederholen."
+            )
+
         logger.info("Kein output-Verzeichnis - nichts zu uebernehmen")
         return
 
