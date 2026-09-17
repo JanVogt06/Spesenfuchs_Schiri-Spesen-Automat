@@ -28,8 +28,22 @@ export function Datenschutz() {
                     <ul className="list-inside list-disc space-y-1 text-sm text-muted-foreground">
                         <li>Benutzername und Passwort (gehashed mit PBKDF2)</li>
                         <li>DFBnet-Zugangsdaten (verschlüsselt mit Fernet)</li>
-                        <li>Aus DFBnet abgerufene Spieldaten</li>
+                        <li>Aus DFBnet abgerufene Spieldaten: Paarung, Anstoß, Spielklasse und Spielstätte</li>
+                        <li>
+                            Die zum jeweiligen Spiel angesetzten Unparteiischen mit Name, Anschrift,
+                            Telefonnummer und E-Mail-Adresse, so wie DFBnet sie zum Zeitpunkt des Abrufs
+                            ausweist. Diese Angaben stammen aus deiner Ansetzung und betreffen auch
+                            Personen, die den Dienst selbst nicht nutzen. Name und Anschrift werden für
+                            die Abrechnung benötigt, Telefon und E-Mail dienen ausschließlich der
+                            Anzeige in deiner Spielübersicht und stehen in keinem Dokument.
+                        </li>
+                        <li>Von dir eingetragene Kilometer und Kosten für öffentliche Verkehrsmittel</li>
                     </ul>
+                    <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                        Erzeugte Abrechnungen werden nicht gespeichert. Sie entstehen bei jedem Download
+                        neu aus den genannten Daten. Die Daten zu einem Spiel bleiben gespeichert, bis du
+                        ihre Löschung verlangst oder deinen Account löschst.
+                    </p>
                 </>
             ),
         },
@@ -38,8 +52,10 @@ export function Datenschutz() {
             title: 'Datensicherheit',
             content: (
                 <p className="text-sm leading-relaxed text-muted-foreground">
-                    Alle sensiblen Daten werden verschlüsselt gespeichert. Die Übertragung erfolgt ausschließlich über HTTPS.
-                    Deine Daten werden nicht an Dritte weitergegeben und ausschließlich zur Generierung deiner Spesenberichte verwendet.
+                    Zugangsdaten werden verschlüsselt gespeichert, Passwörter nur als Hash. Die Übertragung
+                    erfolgt ausschließlich über HTTPS. Deine Daten werden nicht an Dritte weitergegeben und
+                    ausschließlich zur Erstellung deiner Spesenabrechnungen verwendet. Spieldaten sind
+                    immer nur für den Account sichtbar, zu dessen Ansetzung sie gehören.
                 </p>
             ),
         },
@@ -49,7 +65,11 @@ export function Datenschutz() {
             content: (
                 <p className="text-sm leading-relaxed text-muted-foreground">
                     Du hast jederzeit das Recht auf Auskunft, Berichtigung und Löschung deiner Daten.
-                    Kontaktiere uns dazu einfach per E-Mail. Bei Löschung deines Accounts werden alle zugehörigen Daten entfernt.
+                    Kontaktiere uns dazu einfach per E-Mail. Bei Löschung deines Accounts werden alle
+                    zugehörigen Daten entfernt, einschließlich der zu deinen Spielen gespeicherten
+                    Angaben zu Unparteiischen. Wer als Unparteiischer in einer Ansetzung auftaucht,
+                    ohne den Dienst selbst zu nutzen, kann die Löschung dieser Angaben ebenfalls per
+                    E-Mail verlangen.
                 </p>
             ),
         },

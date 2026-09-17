@@ -110,7 +110,7 @@ export function LandingPage() {
         },
         {
             question: 'Wie lange dauert die Generierung?',
-            answer: 'Eine manuelle Session dauert je nach Anzahl der Spiele 1-6 Minuten. ' +
+            answer: 'Ein manueller Abruf dauert je nach Anzahl der Spiele 1-6 Minuten. ' +
                 'Da jede Nacht um 3 Uhr automatisch ein Lauf für alle Nutzer startet, sind deine Abrechnungen ' +
                 'in der Regel schon fertig, bevor du sie brauchst.',
         },

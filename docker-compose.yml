@@ -12,7 +12,7 @@ services:
     environment:
       - TZ=${TZ:-Europe/Berlin}
     volumes:
-      # Secrets (.env), Datenbank (app.db) und generierte Dokumente (output/)
+      # Secrets (.env) und Datenbank (app.db)
       - ./data:/data
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/api/health').read()"]

@@ -2,9 +2,9 @@
 
 **Schiri-Spesen-Automat.** Erstellt Schiedsrichter-Spesenabrechnungen automatisch aus den eigenen
 DFB.net-Ansetzungen. Einmal die DFB.net-Zugangsdaten hinterlegen, danach holt
-die Anwendung jede Nacht die aktuellen Ansetzungen und legt für jedes Spiel eine
-fertige Abrechnung als DOCX und PDF ab — inklusive Fahrtkosten, wenn die
-Kilometer im Rechner eingetragen sind.
+die Anwendung jede Nacht die aktuellen Ansetzungen in die Datenbank. Die
+Abrechnung als DOCX oder PDF entsteht beim Download — inklusive Fahrtkosten,
+wenn die Kilometer im Rechner eingetragen sind.
 
 Self-hosted: ein Container, eine `docker-compose.yml`, ein `data`-Ordner.
 
@@ -65,8 +65,11 @@ neben der Compose-Datei — es übersteht Neustarts und Updates:
 | Pfad | Inhalt |
 | --- | --- |
 | `data/.env` | `JWT_SECRET_KEY` und `ENCRYPTION_KEY` |
-| `data/app.db` | Nutzer, Sessions, gespeicherte Fahrtkosten, Login- und Download-Log |
-| `data/output/` | Ein Ordner pro Session mit DOCX, PDF und `metadata.json` |
+| `data/app.db` | Nutzer, Spiele, Unparteiische, Fahrtkosten, Abruf-Protokoll, Login- und Download-Log |
+
+Erzeugte Dokumente werden nicht gespeichert: sie entstehen bei jedem Download
+neu aus den Daten in `app.db`. Ein Backup der Datenbank ist damit ein
+vollständiges Backup.
 
 Fehlt `data/.env` beim Start, erzeugt die Anwendung beide Schlüssel selbst und
 schreibt sie dorthin. Eine vorhandene Datei wird nie verändert.
@@ -85,13 +88,24 @@ docker compose start
 ```
 
 Einzelne Pfade lassen sich per Umgebungsvariable verlegen (`DATA_DIR`,
-`ENV_FILE`, `DATABASE_PATH`, `OUTPUT_DIR`); nötig ist das im Normalfall nicht.
+`ENV_FILE`, `DATABASE_PATH`); nötig ist das im Normalfall nicht.
+
+Zwei Stellschrauben für den Download-Pfad: `PDF_MAX_CONCURRENCY` (Standard 2)
+begrenzt, wie viele LibreOffice-Prozesse gleichzeitig laufen dürfen — jeder
+belegt 150–300 MB. `MAX_BULK_DOWNLOAD` (Standard 50) begrenzt, wie viele Spiele
+in einem ZIP stecken dürfen.
 
 ## Aktualisieren
 
 ```bash
 docker compose pull && docker compose up -d
 ```
+
+Schemaänderungen laufen beim Start automatisch. Vor dem ersten Schritt legt die
+Anwendung eine Kopie von `app.db` daneben (`app.db.v<version>.<zeit>.bak`).
+Beim Sprung auf die datenbankgestützte Version werden die Spiele aus den alten
+`data/output/`-Ordnern einmalig übernommen; danach wird das Verzeichnis nicht
+mehr gebraucht und kann nach einer Sicherung gelöscht werden.
 
 Der `data`-Ordner wird dabei nicht angefasst.
 
@@ -173,19 +187,23 @@ Daten vom Server nach `./data` holen: [`sync_from_server.sh`](sync_from_server.s
 
 Die DOCX→PDF-Konvertierung braucht LibreOffice; im Container ist
 `libreoffice-writer` enthalten, lokal muss es installiert sein — ohne
-LibreOffice entstehen nur die DOCX-Dateien.
+LibreOffice funktioniert nur der DOCX-Download.
+
+Das DOCX entsteht in rund 25 ms, die PDF-Konvertierung kostet 2–6 Sekunden.
+Der Kaltstart von LibreOffice dominiert dabei, deshalb ist ein Sammel-Download
+mehrerer Spiele kaum teurer als ein einzelner.
 
 ## Layout
 
 | Pfad | Zweck |
 | --- | --- |
-| `src/main.py` | Einstiegspunkt, Scraping- und Generierungs-Ablauf |
+| `src/main.py` | Einstiegspunkt und Scraping-Ablauf |
 | `src/api/` | FastAPI-Endpunkte und Authentifizierung |
 | `src/core/config.py` | Pfade und Secrets (`DATA_DIR` und Ableitungen) |
 | `src/scraper/` | DFB.net-Scraper (Playwright) |
-| `src/generator/` | DOCX-Erzeugung und Spesenberechnung |
-| `src/scheduler/` | Nächtlicher Lauf um 3:00 (Europe/Berlin) |
-| `src/db/database.py` | SQLite-Zugriff |
+| `src/generator/` | DOCX-Erzeugung (im Speicher) und Spesenberechnung |
+| `src/scheduler/` | Nächtlicher Abruf um 3:00 (Europe/Berlin) |
+| `src/db/` | SQLite-Zugriff; `migrations.py` führt das Schema über `PRAGMA user_version` nach |
 | `frontend/` | React-Oberfläche (Vite), wird ins Image gebaut |
 | `Dockerfile` | Image mit Frontend-Build, Playwright und LibreOffice |
 | `docker-compose.yml` | Service, Port, Volume und Health Check — ohne Build, direkt server-tauglich |

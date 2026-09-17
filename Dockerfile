@@ -67,8 +67,8 @@ COPY --from=frontend-builder /frontend/dist ./frontend/dist
 
 # Alles Veränderliche liegt unter /data, damit ein einziges Volume genügt:
 #   /data/.env     Secrets (JWT_SECRET_KEY, ENCRYPTION_KEY)
-#   /data/app.db   SQLite-Datenbank (User, Sessions, Fahrtkosten)
-#   /data/output/  Session-Ordner mit DOCX/PDF
+#   /data/app.db   SQLite-Datenbank (User, Spiele, Unparteiische, Fahrtkosten)
+# Dokumente werden nicht abgelegt - sie entstehen beim Download.
 ENV DATA_DIR=/data \
     FRONTEND_DIR=/app/frontend/dist \
     API_HOST=0.0.0.0 \
