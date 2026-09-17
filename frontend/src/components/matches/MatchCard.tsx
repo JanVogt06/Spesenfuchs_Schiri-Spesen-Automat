@@ -37,11 +37,16 @@ interface MatchCardProps {
     match: MatchData & { _spesen?: SpesenInfo };
     index: number;
     filename: string;
-    onDownload: (filename: string) => void;
+    onDownload: (fileFormat: 'docx' | 'pdf') => void;
     downloadingFilename: string | null;
+    selected?: boolean;
+    onToggleSelected?: () => void;
 }
 
-export function MatchCard({match, index, filename, onDownload, downloadingFilename}: MatchCardProps) {
+export function MatchCard({
+                              match, index, filename, onDownload, downloadingFilename,
+                              selected, onToggleSelected,
+                          }: MatchCardProps) {
     const [isExpanded, setIsExpanded] = useState(false);
     const pdfFilename = filename.replace(/\.docx$/i, '.pdf');
 
@@ -57,14 +62,9 @@ export function MatchCard({match, index, filename, onDownload, downloadingFilena
     const [isSaving, setIsSaving] = useState(false);
     const [saveMessage, setSaveMessage] = useState('');
     const [saveError, setSaveError] = useState('');
-    const [pdfAvailable, setPdfAvailable] = useState(!!match._pdf_available);
 
     const handleSaveExpenses = async () => {
-        const sessionId = match._session_id;
-        const datum = match._datum;
-        const heim = match.spiel_info?.heim_team;
-        const gast = match.spiel_info?.gast_team;
-        if (!sessionId || !datum || !heim || !gast) {
+        if (!match._id) {
             setSaveError('Spieldaten unvollständig, speichern nicht möglich.');
             return;
         }
@@ -84,9 +84,8 @@ export function MatchCard({match, index, filename, onDownload, downloadingFilena
         setSaveError('');
         setSaveMessage('');
         try {
-            const result = await saveMatchExpenses(sessionId, heim, gast, datum, expenses);
-            setPdfAvailable(result.pdf_available);
-            setSaveMessage('Gespeichert – Dokument wurde neu generiert.');
+            await saveMatchExpenses(match._id, expenses);
+            setSaveMessage('Gespeichert – steht beim nächsten Download im Dokument.');
             setTimeout(() => setSaveMessage(''), 4000);
         } catch (err) {
             console.error('Fehler beim Speichern der Fahrtkosten:', err);
@@ -468,6 +467,15 @@ export function MatchCard({match, index, filename, onDownload, downloadingFilena
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0 flex-1">
                         <div className="mb-1 flex flex-wrap items-center gap-2">
+                            {onToggleSelected && (
+                                <input
+                                    type="checkbox"
+                                    checked={!!selected}
+                                    onChange={onToggleSelected}
+                                    aria-label={`${getMatchTitle()} für Sammel-Download auswählen`}
+                                    className="size-4 shrink-0 accent-foreground"
+                                />
+                            )}
                             <CardTitle className="break-words text-sm sm:text-base">
                                 {getMatchTitle()}
                             </CardTitle>
@@ -480,7 +488,7 @@ export function MatchCard({match, index, filename, onDownload, downloadingFilena
                     </div>
                     <div className="flex gap-2 self-start">
                         <Button
-                            onClick={() => onDownload(filename)}
+                            onClick={() => onDownload('docx')}
                             disabled={downloadingFilename === filename}
                             size="sm"
                             variant="outline"
@@ -489,18 +497,16 @@ export function MatchCard({match, index, filename, onDownload, downloadingFilena
                             <Download className="size-3.5"/>
                             {downloadingFilename === filename ? 'Lade...' : 'DOCX'}
                         </Button>
-                        {pdfAvailable && (
-                            <Button
-                                onClick={() => onDownload(pdfFilename)}
-                                disabled={downloadingFilename === pdfFilename}
-                                variant="outline"
-                                size="sm"
-                                className="whitespace-nowrap"
-                            >
-                                <Download className="size-3.5"/>
-                                {downloadingFilename === pdfFilename ? 'Lade...' : 'PDF'}
-                            </Button>
-                        )}
+                        <Button
+                            onClick={() => onDownload('pdf')}
+                            disabled={downloadingFilename === pdfFilename}
+                            variant="outline"
+                            size="sm"
+                            className="whitespace-nowrap"
+                        >
+                            <Download className="size-3.5"/>
+                            {downloadingFilename === pdfFilename ? 'Erstelle...' : 'PDF'}
+                        </Button>
                         <Button
                             onClick={() => setIsExpanded(!isExpanded)}
                             variant="ghost"

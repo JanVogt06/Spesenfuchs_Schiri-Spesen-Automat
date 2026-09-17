@@ -23,7 +23,7 @@ export function LandingPage() {
     // Live-Anzahl der generierten Dokumente laden
     useEffect(() => {
         api.get('/api/stats/public')
-            .then((response) => setDocCount(response.data.documents_generated))
+            .then((response) => setDocCount(response.data.matches_total))
             .catch(() => {
                 // Fallback bleibt bei statischer Anzeige
             });

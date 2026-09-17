@@ -217,10 +217,17 @@ def _add_spesen_to_match(match: dict) -> dict:
     }
 
     if is_punktspiel:
-        sr_spesen, sra_spesen = calculate_spesen(
-            spiel_info.get('spielklasse', ''),
-            mannschaftsart
-        )
+        # Stammt das Spiel aus der Datenbank, sind die Saetze dort beim ersten
+        # Scrape eingefroren worden. Die Anzeige muss dasselbe zeigen wie das
+        # spaeter erzeugte Dokument - sonst weicht die Karte von der
+        # Abrechnung ab, sobald sich die Spesenordnung aendert.
+        if 'sr_spesen' in match or 'sra_spesen' in match:
+            sr_spesen, sra_spesen = match.get('sr_spesen'), match.get('sra_spesen')
+        else:
+            sr_spesen, sra_spesen = calculate_spesen(
+                spiel_info.get('spielklasse', ''),
+                mannschaftsart
+            )
 
         if sr_spesen is not None:
             spesen_info['sr'] = sr_spesen
@@ -497,98 +504,35 @@ async def get_user_sessions_list(current_user: dict = Depends(get_current_user))
 @app.get("/api/matches")
 async def get_all_user_matches(current_user: dict = Depends(get_current_user)):
     """
-    Gibt alle Spiele des Users zurück (dedupliziert über alle Sessions).
+    Alle Spiele des Users, direkt aus der Datenbank.
+
+    Frueher wurden dafuer bei jedem Aufruf saemtliche Session-Ordner des Users
+    eingelesen und die Spiele ueber (Heim, Gast, Datum) dedupliziert - bei
+    knapp 3000 Ordnern der teuerste Endpunkt der Anwendung. Die Deduplizierung
+    passiert jetzt schon beim Scrapen ueber den match_key.
     """
-    user_id = current_user['id']
+    matches = get_matches_for_user(current_user['id'])
 
-    try:
-        db_sessions = get_user_sessions(user_id)
-        logger.info(f"Lade Matches für User {user_id}, {len(db_sessions)} Sessions gefunden")
+    for match in matches:
+        _decorate_match(match)
 
-        # Gespeicherte Fahrtkosten/OeVM des Users
-        expenses_map = {
-            (e['heim_team'], e['gast_team'], e['datum']): e
-            for e in get_all_match_expenses_for_user(user_id)
-        }
+    return matches
 
-        all_matches_dict = {}
 
-        for db_session in db_sessions:
-            session_id = db_session['session_id']
-            session_path = session_manager.get_session_by_id(session_id)
-
-            if not session_path or not session_path.exists():
-                logger.warning(f"Session-Pfad nicht gefunden: {session_id}")
-                continue
-
-            matches_file = session_path / "spesen_data.json"
-            if not matches_file.exists():
-                logger.warning(f"spesen_data.json nicht gefunden in {session_id}")
-                continue
-
-            try:
-                with open(matches_file, 'r', encoding='utf-8') as f:
-                    session_matches = json.load(f)
-
-                logger.info(f"Session {session_id}: {len(session_matches)} Spiele geladen")
-
-                for match in session_matches:
-                    spiel_info = match.get('spiel_info', {})
-                    heim = spiel_info.get('heim_team', '')
-                    gast = spiel_info.get('gast_team', '')
-
-                    if not heim or not gast:
-                        logger.warning(f"Spiel ohne Heim/Gast-Team in {session_id}")
-                        continue
-
-                    # Generiere Dateinamen mit zentraler Helper-Funktion
-                    filename = generate_filename_from_match(match)
-
-                    # Prüfe ob Datei existiert
-                    file_path = session_path / filename
-                    if not file_path.exists():
-                        logger.warning(f"Datei nicht gefunden: {filename} in {session_id}")
-                        continue
-
-                    # Extrahiere Datum für Deduplizierung und Sortierung
-                    datum = extract_iso_date_from_anpfiff(spiel_info.get('anpfiff', ''))
-                    key = (heim, gast, datum)
-
-                    # Deduplizierung: Neuere Session gewinnt
-                    if key not in all_matches_dict or db_session['created_at'] > all_matches_dict[key]['_created_at']:
-                        match['_session_id'] = session_id
-                        match['_datum'] = datum
-                        match['_created_at'] = db_session['created_at']
-                        match['_filename'] = filename
-                        match['_pdf_available'] = file_path.with_suffix('.pdf').exists()
-                        match['_expenses'] = expenses_map.get(key)
-                        # Spesen hinzufügen
-                        _add_spesen_to_match(match)
-                        all_matches_dict[key] = match
-
-            except Exception as e:
-                logger.error(f"Fehler beim Lesen von {matches_file}: {e}")
-                logger.error(traceback.format_exc())
-                continue
-
-        # Konvertiere zu Liste und sortiere nach Datum (neueste zuerst)
-        matches_list = list(all_matches_dict.values())
-        matches_list.sort(key=lambda x: x['_datum'], reverse=True)
-
-        logger.info(f"Gesamt: {len(matches_list)} deduplizierte Spiele für User {user_id}")
-        return JSONResponse(content=matches_list)
-
-    except Exception as e:
-        logger.error(f"Fehler beim Laden aller Matches: {e}")
-        logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=str(e))
+def _decorate_match(match: dict) -> dict:
+    """Ergaenzt ein Spiel um die Felder, die das Frontend erwartet."""
+    match['_id'] = match['id']
+    match['_datum'] = match['datum']
+    match['_filename'] = generate_filename_from_match(match)
+    match['_expenses'] = match.get('expenses')
+    match['_missing_since'] = match.get('missing_since')
+    _add_spesen_to_match(match)
+    return match
 
 
 class MatchExpensesRequest(BaseModel):
-    session_id: str
-    heim_team: str
-    gast_team: str
-    datum: str  # ISO-Datum (YYYY-MM-DD)
+    """Fahrtkosten und OeVM eines Spiels"""
+    match_id: int
     sr_km: Optional[float] = None
     sr_oevm: Optional[float] = None
     sra1_km: Optional[float] = None
@@ -603,72 +547,37 @@ async def save_match_expenses(
         current_user: dict = Depends(get_current_user)
 ):
     """
-    Speichert Fahrtkosten (km) und OeVM fuer ein Spiel und generiert
-    das Dokument (DOCX + PDF) sofort neu.
+    Speichert Fahrtkosten (km) und OeVM fuer ein Spiel.
+
+    Frueher wurde hier das Dokument sofort neu geschrieben - synchron im
+    async-Handler, inklusive LibreOffice-Aufruf. Das entfaellt: Dokumente
+    entstehen erst beim Download und tragen den Wert dann automatisch.
     """
     user_id = current_user['id']
+    match = _owned_match(request.match_id, user_id)
 
-    # Session pruefen
-    db_session = db_get_session_by_id(request.session_id)
-    if not db_session:
-        raise NotFoundError("Session nicht gefunden")
-    if db_session['user_id'] != user_id:
-        raise AuthorizationError("Diese Session gehört einem anderen User")
-
-    session_path = session_manager.get_session_by_id(request.session_id)
-    if not session_path:
-        raise NotFoundError("Session nicht gefunden")
-
-    # Werte validieren
+    # Nur die Felder anfassen, die der Client wirklich geschickt hat. Wuerden
+    # fehlende Felder aus den Pydantic-Defaults als None aufgefuellt, loeschte
+    # ein Teil-Update die Werte der anderen Rollen mit. Ein ausdruecklich als
+    # null gesendetes Feld leert den Eintrag dagegen weiterhin.
     expense_keys = ['sr_km', 'sr_oevm', 'sra1_km', 'sra1_oevm', 'sra2_km', 'sra2_oevm']
-    expenses = {key: getattr(request, key) for key in expense_keys}
-    for key, value in expenses.items():
+    expenses = {}
+    for key in expense_keys:
+        if key not in request.model_fields_set:
+            continue
+        value = getattr(request, key)
         if value is not None and (value < 0 or value > 99999):
-            raise HTTPException(status_code=400, detail=f"Ungültiger Wert für {key}")
+            raise HTTPException(status_code=400, detail=f"Ungueltiger Wert fuer {key}")
+        expenses[key] = value
 
-    # In DB speichern (ueberlebt naechtliche Neu-Scrapes)
-    upsert_match_expenses(user_id, request.heim_team, request.gast_team, request.datum, expenses)
-
-    # Match in den Session-Daten finden
-    data_file = session_path / "spesen_data.json"
-    if not data_file.exists():
-        raise NotFoundError("Spieldaten der Session nicht gefunden")
-
-    with open(data_file, 'r', encoding='utf-8') as f:
-        matches_data = json.load(f)
-
-    match = next(
-        (m for m in matches_data
-         if m.get('spiel_info', {}).get('heim_team') == request.heim_team
-         and m.get('spiel_info', {}).get('gast_team') == request.gast_team
-         and extract_iso_date_from_anpfiff(m.get('spiel_info', {}).get('anpfiff', '')) == request.datum),
-        None
-    )
-    if not match:
-        raise NotFoundError("Spiel in dieser Session nicht gefunden")
-
-    # Dokument sofort neu generieren
-    try:
-        template_path = Path(__file__).parent.parent / "data" / "Spesenabrechnung_Vorlage.docx"
-        generator = SpesenGenerator(template_path, session_path)
-        docx_path = generator.generate_document(match, expenses=expenses)
-    except Exception as e:
-        logger.error(f"Fehler beim Neu-Generieren des Dokuments: {e}")
-        logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail="Dokument konnte nicht neu generiert werden")
-
-    # PDF neu erzeugen (best-effort)
-    pdf_available = False
-    try:
-        results = convert_docx_files_to_pdf([docx_path])
-        pdf_available = results.get(docx_path, False)
-    except Exception as e:
-        logger.error(f"PDF-Konvertierung fehlgeschlagen: {e}")
+    set_official_expenses(match['id'], expenses)
+    aktualisiert = _decorate_match(get_match(match['id']))
 
     return {
         "success": True,
-        "filename": docx_path.name,
-        "pdf_available": pdf_available,
+        "filename": aktualisiert['_filename'],
+        "expenses": aktualisiert['_expenses'],
+        "spesen": aktualisiert['_spesen'],
     }
 
 
@@ -1193,15 +1102,20 @@ async def health_check():
 @app.get("/api/stats/public")
 async def get_public_stats():
     """
-    Oeffentliche Statistiken fuer die Landingpage (kein Login noetig).
-    Zaehlt live die generierten DOCX-Dokumente im Output-Verzeichnis.
+    Oeffentliche Statistik fuer die Landingpage (kein Login noetig).
+
+    Gezaehlt werden jetzt verschiedene SPIELE, nicht Dateien auf der Platte.
+    Die alte Zahl war die Anzahl aller je geschriebenen DOCX - durch die
+    naechtlichen Laeufe lag dieselbe Abrechnung dort rund 19-mal. Ein Spiel,
+    das mehrere Unparteiische aus der Nutzerbasis leiten, zaehlt ebenfalls
+    nur einmal: der match_key ist userunabhaengig.
     """
     try:
-        count = sum(1 for _ in session_manager.base_output_dir.glob("*/*.docx"))
+        count = count_distinct_matches()
     except Exception as e:
-        logger.error(f"Fehler beim Zaehlen der Dokumente: {e}")
+        logger.error(f"Fehler beim Zaehlen der Spiele: {e}")
         count = 0
-    return {"documents_generated": count}
+    return {"matches_total": count}
 
 
 # ===== Frontend Routes =====
