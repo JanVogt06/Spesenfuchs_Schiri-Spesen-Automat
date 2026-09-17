@@ -33,11 +33,10 @@ from core.config import load_environment
 load_environment()
 
 from scheduler import get_scheduler
-from main import scrape_matches_with_session, generate_documents_in_session
-from utils.session_manager import SessionManager
+from main import scrape_matches
 from utils.logger import setup_logger
-from utils.match_utils import generate_filename_from_match, extract_iso_date_from_anpfiff
-from utils.pdf_converter import convert_docx_files_to_pdf, convert_docx_bytes_to_pdf
+from utils.match_utils import generate_filename_from_match
+from utils.pdf_converter import convert_docx_bytes_to_pdf
 from generator.docx_generator import SpesenGenerator
 from generator.spesen_calculator import calculate_spesen, format_spesen
 from db.scrape_runs import (
@@ -54,14 +53,7 @@ from db.matches import (
 )
 from db.database import (
     init_database,
-    create_session as db_create_session,
-    update_session_status as db_update_session_status,
-    get_user_sessions,
-    get_session_by_id as db_get_session_by_id,
-    upsert_match_expenses,
-    get_match_expenses,
-    get_all_match_expenses_for_user,
-    log_download
+    log_download,
 )
 from api.auth import router as auth_router, get_current_user
 from core.errors import (
@@ -145,9 +137,6 @@ async def serve_favicon():
         return FileResponse(str(icon_path), media_type="image/png")
     raise HTTPException(status_code=404, detail="Icon not found")
 
-# Session Manager global
-session_manager = SessionManager()
-
 # Vorlagenpfad und Generator fuer den Download-Pfad. Der Generator haelt keinen
 # Zustand und braucht kein Ausgabeverzeichnis - er liefert Bytes.
 TEMPLATE_PATH = src_path / "data" / "Spesenabrechnung_Vorlage.docx"
@@ -170,16 +159,6 @@ app.include_router(auth_router)
 class GenerateRequest(BaseModel):
     """Request für Spesen-Generierung"""
     pass  # Credentials werden aus User-Profil geladen
-
-
-class SessionResponse(BaseModel):
-    """Response mit Session-Informationen"""
-    session_id: str
-    status: str
-    files: List[Dict]
-    download_all_url: str
-    created_at: str
-    progress: Optional[Dict] = None
 
 
 # ===== Helper Functions =====
@@ -251,148 +230,94 @@ def _add_spesen_to_match(match: dict) -> dict:
     return match
 
 
-# ===== Generation Process =====
+# ===== Scrape-Prozess =====
 
-def run_generation_process(
-        session_path: Path,
-        session_id: str,
-        dfb_username: str,
-        dfb_password: str,
-        user_id: int = None,
-        run_id: int = None
-):
+def run_scrape_process(dfb_username: str, dfb_password: str, user_id: int, run_id: int):
     """
-    Führt die Generierung in einem separaten Prozess aus.
+    Fuehrt den Scrape in einem eigenen Prozess aus.
 
-    Der Fortschritt wird in die Tabelle scrape_runs geschrieben - das ist der
-    Kanal, ueber den die API den Poll des Frontends bedient. Die
-    Session-Metadaten werden parallel weitergefuehrt, bis der Lesepfad
-    umgestellt ist.
+    Der eigene Prozess ist noetig, weil Playwright nicht im asyncio-Loop der
+    API laufen kann. Der Fortschritt wandert ueber die Tabelle scrape_runs
+    zurueck - frueher war das eine metadata.json im Session-Ordner.
+
+    Dokumente werden hier nicht mehr erzeugt: sie entstehen beim Download.
     """
     from utils.logger import setup_logger
     from core.errors import DFBCredentialsInvalidError
 
-    process_logger = setup_logger("generation_process")
-    sm = SessionManager()
+    process_logger = setup_logger("scrape_process")
 
     try:
-        process_logger.info(f"Starte Generierung für Session {session_path.name}")
-
-        sm.update_session_metadata(
-            session_path,
-            status="scraping",
-            progress={"current": 0, "total": 0, "step": "Scraping gestartet..."}
-        )
-        db_update_session_status(session_id, "scraping")
+        process_logger.info(f"[User {user_id}] Starte Scrape")
         update_run(run_id, status="scraping", step="Scraping gestartet...")
 
-        matches_data, _ = scrape_matches_with_session(
-            session_path,
+        def fortschritt(current, total, step):
+            update_run(run_id, status="scraping", step=step, current=current, total=total)
+
+        matches = scrape_matches(
             username=dfb_username,
             password=dfb_password,
-            user_id=user_id
+            user_id=user_id,
+            progress_callback=fortschritt,
         )
 
-        # matches_data ist jetzt immer eine Liste (kann leer sein)
-        if matches_data is None:
-            matches_data = []
-
-        if len(matches_data) > 0:
-            sm.update_session_metadata(
-                session_path,
-                status="generating",
-                progress={"current": 0, "total": len(matches_data), "step": "Erstelle Dokumente..."}
-            )
-            db_update_session_status(session_id, "generating")
-            update_run(run_id, status="generating", step="Erstelle Dokumente...",
-                       current=0, total=len(matches_data), matches_found=len(matches_data))
-
-            generate_documents_in_session(matches_data, session_path, user_id)
-
-            sm.update_session_metadata(session_path, status="completed")
-            db_update_session_status(session_id, "completed")
-            update_run(run_id, status="completed", step="Fertig!",
-                       current=len(matches_data), total=len(matches_data),
-                       matches_found=len(matches_data), finished=True)
-
-            process_logger.info(f"Session {session_path.name} erfolgreich abgeschlossen mit {len(matches_data)} Spielen")
-        else:
-            # 0 Spiele ist OK (z.B. Winterpause) - trotzdem als "completed" markieren
-            sm.update_session_metadata(
-                session_path,
-                status="completed",
-                progress={"current": 0, "total": 0, "step": "Keine Spiele gefunden"}
-            )
-            db_update_session_status(session_id, "completed")
-            update_run(run_id, status="completed", step="Keine Spiele gefunden",
-                       matches_found=0, finished=True)
-
-            process_logger.info(f"Session {session_path.name} abgeschlossen - keine Spiele vorhanden (Winterpause?)")
+        anzahl = len(matches)
+        update_run(
+            run_id,
+            status="completed",
+            step="Fertig!" if anzahl else "Keine Spiele gefunden",
+            current=anzahl,
+            total=anzahl,
+            matches_found=anzahl,
+            finished=True,
+        )
+        process_logger.info(f"[User {user_id}] Scrape abgeschlossen: {anzahl} Spiele")
 
     except DFBCredentialsInvalidError as e:
-        # SPEZIFISCH: DFB-Credentials ungültig
-        process_logger.error(f"DFB-Login fehlgeschlagen: {e.message}")
-        sm.update_session_metadata(
-            session_path,
+        process_logger.error(f"[User {user_id}] DFB-Login fehlgeschlagen: {e.message}")
+        update_run(
+            run_id,
             status="failed",
-            progress={
-                "current": 0,
-                "total": 0,
-                "step": "Fehler",
-                "error_code": "DFB_CREDENTIALS_INVALID",
-                "error_message": "Die DFBnet-Zugangsdaten sind ungültig. Bitte prüfe Benutzername und Passwort in den Einstellungen."
-            }
+            step="Fehler",
+            error_code="DFB_CREDENTIALS_INVALID",
+            error_message="Die DFBnet-Zugangsdaten sind ungültig. Bitte prüfe Benutzername "
+                          "und Passwort in den Einstellungen.",
+            finished=True,
         )
-        db_update_session_status(session_id, "failed")
-        update_run(run_id, status="failed", step="Fehler",
-                   error_code="DFB_CREDENTIALS_INVALID",
-                   error_message="Die DFBnet-Zugangsdaten sind ungültig. Bitte prüfe Benutzername und Passwort in den Einstellungen.",
-                   finished=True)
 
     except Exception as e:
-        # GENERISCH: Anderer Fehler
-        process_logger.error(f"Fehler in Session {session_path.name}: {e}")
-        sm.update_session_metadata(
-            session_path,
+        process_logger.error(f"[User {user_id}] Fehler beim Scrape: {e}")
+        update_run(
+            run_id,
             status="failed",
-            progress={
-                "current": 0,
-                "total": 0,
-                "step": "Fehler",
-                "error_code": "GENERATION_ERROR",
-                "error_message": "Bei der Generierung ist ein Fehler aufgetreten."
-            }
+            step="Fehler",
+            error_code="GENERATION_ERROR",
+            error_message="Beim Abrufen der Spiele ist ein Fehler aufgetreten.",
+            finished=True,
         )
-        db_update_session_status(session_id, "failed")
-        update_run(run_id, status="failed", step="Fehler",
-                   error_code="GENERATION_ERROR",
-                   error_message="Bei der Generierung ist ein Fehler aufgetreten.",
-                   finished=True)
 
 
-@app.post("/api/generate", response_model=SessionResponse)
+@app.post("/api/generate")
 async def generate_spesen(
     request: GenerateRequest,
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Startet die Spesen-Generierung in einer neuen Session.
-    Nur fuer eingeloggte User.
-    DFB-Credentials werden automatisch aus User-Profil geladen.
+    Startet einen neuen Abruf der Ansetzungen.
+
+    Es entsteht kein Ordner und keine Datei mehr - nur eine Zeile in
+    scrape_runs, die das Frontend pollt, und danach Spiele in der Datenbank.
     """
     user_id = current_user['id']
-    logger.info(f"User {current_user['email']} startet Generierung")
+    logger.info(f"User {current_user['email']} startet Abruf")
 
-    # Lade DFB-Credentials aus DB
     from db.database import get_dfb_credentials
     from core.encryption import decrypt_credential
 
     dfb_creds = get_dfb_credentials(user_id)
-
     if not dfb_creds:
         raise CredentialsMissingError()
 
-    # Entschluesseln
     dfb_username = decrypt_credential(dfb_creds['dfb_username_encrypted'])
     dfb_password = decrypt_credential(dfb_creds['dfb_password_encrypted'])
 
@@ -400,31 +325,21 @@ async def generate_spesen(
     # der Poll des Frontends am alten Lauf fest
     fail_stale_runs()
 
-    # Neue Session erstellen
-    session_path = session_manager.create_session()
-    session_id = session_path.name
-
-    # Session in DB speichern mit User-Verknuepfung
-    db_create_session(session_id, user_id)
     run_id = start_run(user_id)
 
-    # Generierung in eigenem Prozess starten (fuer Playwright-Kompatibilitaet)
-    # Credentials werden direkt als Parameter übergeben (nicht über ENV!)
+    # Credentials werden direkt als Parameter uebergeben (nicht ueber ENV!)
     process = multiprocessing.Process(
-        target=run_generation_process,
-        args=(session_path, session_id, dfb_username, dfb_password, user_id, run_id),
+        target=run_scrape_process,
+        args=(dfb_username, dfb_password, user_id, run_id),
         daemon=True
     )
     process.start()
 
-    return SessionResponse(
-        session_id=session_id,
-        status="in_progress",
-        files=[],
-        download_all_url=f"/api/download/{session_id}/all",
-        created_at=datetime.now().isoformat(),
-        progress={"current": 0, "total": 0, "step": "Starte..."}
-    )
+    return {
+        "run_id": run_id,
+        "status": "pending",
+        "progress": {"current": 0, "total": 0, "step": "Starte..."},
+    }
 
 
 @app.get("/api/scrape/status")
@@ -458,47 +373,6 @@ async def get_scrape_status(current_user: dict = Depends(get_current_user)):
             "error_message": run['error_message'],
         },
     }
-
-
-@app.get("/api/sessions", response_model=List[SessionResponse])
-async def get_user_sessions_list(current_user: dict = Depends(get_current_user)):
-    """
-    Gibt alle Sessions des eingeloggten Users zurueck.
-    """
-    user_id = current_user['id']
-
-    # Hole Sessions aus DB
-    db_sessions = get_user_sessions(user_id)
-
-    # Erweitere mit Dateisystem-Infos
-    response_sessions = []
-    for db_session in db_sessions:
-        session_id = db_session['session_id']
-        session_path = session_manager.get_session_by_id(session_id)
-
-        if not session_path:
-            continue
-
-        # Lade Metadata aus Dateisystem
-        metadata_path = session_path / "metadata.json"
-        if metadata_path.exists():
-            with open(metadata_path, 'r', encoding='utf-8') as f:
-                metadata = json.load(f)
-        else:
-            metadata = {}
-
-        files = session_manager.get_session_files(session_path)
-
-        response_sessions.append(SessionResponse(
-            session_id=session_id,
-            status=db_session['status'],
-            files=files,
-            download_all_url=f"/api/download/{session_id}/all",
-            created_at=db_session['created_at'],
-            progress=metadata.get("progress")
-        ))
-
-    return response_sessions
 
 
 @app.get("/api/matches")
@@ -579,109 +453,6 @@ async def save_match_expenses(
         "expenses": aktualisiert['_expenses'],
         "spesen": aktualisiert['_spesen'],
     }
-
-
-@app.get("/api/session/{session_id}", response_model=SessionResponse)
-async def get_session_status(
-    session_id: str,
-    current_user: dict = Depends(get_current_user)
-):
-    """
-    Gibt den Status einer Session zurueck.
-    """
-    user_id = current_user['id']
-
-    # Pruefe ob Session dem User gehoert
-    db_session = db_get_session_by_id(session_id)
-
-    if not db_session:
-        raise NotFoundError("Session nicht gefunden")
-
-    if db_session['user_id'] != user_id:
-        raise AuthorizationError("Diese Session gehört einem anderen User")
-
-    # Hole Dateisystem-Infos
-    session_path = session_manager.get_session_by_id(session_id)
-
-    if not session_path:
-        raise NotFoundError("Session-Dateien nicht gefunden")
-
-    metadata_path = session_path / "metadata.json"
-    if metadata_path.exists():
-        with open(metadata_path, 'r', encoding='utf-8') as f:
-            metadata = json.load(f)
-    else:
-        metadata = {}
-
-    files = session_manager.get_session_files(session_path)
-
-    return SessionResponse(
-        session_id=session_id,
-        status=db_session['status'],
-        files=files,
-        download_all_url=f"/api/download/{session_id}/all",
-        created_at=db_session['created_at'],
-        progress=metadata.get("progress")
-    )
-
-
-@app.get("/api/session/{session_id}/matches")
-async def get_session_matches(
-        session_id: str,
-        current_user: dict = Depends(get_current_user)
-):
-    """
-    Gibt die kompletten Match-Daten einer Session zurück.
-    Inkludiert die korrekten Dateinamen für Downloads.
-    """
-    user_id = current_user['id']
-
-    db_session = db_get_session_by_id(session_id)
-    if not db_session:
-        raise NotFoundError("Session nicht gefunden")
-
-    if db_session['user_id'] != user_id:
-        raise AuthorizationError("Diese Session gehört einem anderen User")
-
-    session_path = session_manager.get_session_by_id(session_id)
-    if not session_path:
-        raise NotFoundError("Session nicht gefunden")
-
-    data_file = session_path / "spesen_data.json"
-    if not data_file.exists():
-        return []
-
-    try:
-        with open(data_file, 'r', encoding='utf-8') as f:
-            matches_data = json.load(f)
-
-        # Gespeicherte Fahrtkosten/OeVM des Users
-        expenses_map = {
-            (e['heim_team'], e['gast_team'], e['datum']): e
-            for e in get_all_match_expenses_for_user(user_id)
-        }
-
-        # Füge Dateinamen und Spesen zu jedem Match hinzu
-        for match in matches_data:
-            filename = generate_filename_from_match(match)
-            spiel_info = match.get('spiel_info', {})
-            match['_filename'] = filename
-            match['_session_id'] = session_id
-            match['_pdf_available'] = (session_path / filename).with_suffix('.pdf').exists()
-            match['_datum'] = extract_iso_date_from_anpfiff(spiel_info.get('anpfiff', ''))
-            match['_expenses'] = expenses_map.get((
-                spiel_info.get('heim_team', ''),
-                spiel_info.get('gast_team', ''),
-                match['_datum'],
-            ))
-            # Spesen hinzufügen
-            _add_spesen_to_match(match)
-
-        return matches_data
-
-    except Exception as e:
-        logger.error(f"Fehler beim Laden der Match-Daten: {e}")
-        raise APIError(f"Fehler beim Laden der Match-Daten: {str(e)}")
 
 
 # ===== Download-Endpunkte: Dokumente entstehen bei jedem Abruf neu =====
@@ -844,248 +615,29 @@ async def download_matches_as_zip(
     )
 
 
-# WICHTIG: ZIP-Download MUSS VOR dem Einzelfile-Download kommen!
-# Sonst matched FastAPI /all als filename
-@app.get("/api/download/{session_id}/all")
-async def download_all_as_zip(
-    session_id: str,
-    current_user: dict = Depends(get_current_user)
-):
-    """
-    Download aller Dateien einer Session als ZIP.
-    WICHTIG: Dieser Endpoint MUSS vor download_file() stehen!
-    """
-    user_id = current_user['id']
-
-    # Pruefe ob Session dem User gehoert
-    db_session = db_get_session_by_id(session_id)
-
-    if not db_session:
-        raise NotFoundError("Session nicht gefunden")
-
-    if db_session['user_id'] != user_id:
-        raise AuthorizationError("Diese Session gehört einem anderen User")
-
-    logger.info("=" * 80)
-    logger.info(f"ZIP-Download START fuer Session: {session_id}")
-    logger.info(f"SessionManager base_output_dir: {session_manager.base_output_dir}")
-
-    session_path = session_manager.get_session_by_id(session_id)
-
-    if not session_path:
-        logger.error(f"Session nicht gefunden: {session_id}")
-        expected_path = session_manager.base_output_dir / session_id
-        logger.error(f"Erwarteter Pfad: {expected_path}")
-        logger.error(f"Existiert: {expected_path.exists()}")
-        raise HTTPException(status_code=404, detail="Session nicht gefunden")
-
-    logger.info(f"Session-Pfad: {session_path}")
-    logger.info(f"Existiert: {session_path.exists()}")
-
-    # Liste Dateien auf
-    if session_path.exists():
-        all_files = list(session_path.iterdir())
-        logger.info(f"Dateien im Ordner: {[f.name for f in all_files]}")
-
-    # Finde DOCX-Dateien
-    docx_files = list(session_path.glob("*.docx"))
-    logger.info(f"Gefundene DOCX-Dateien: {len(docx_files)}")
-
-    if not docx_files:
-        logger.error("Keine DOCX-Dateien gefunden!")
-
-        # Pruefe Status
-        status = db_session['status']
-        logger.error(f"Session-Status: {status}")
-
-        if status in ["pending", "in_progress", "scraping", "generating"]:
-            raise HTTPException(
-                status_code=425,
-                detail=f"Dokumente werden noch erstellt (Status: {status})"
-            )
-        elif status == "failed":
-            raise HTTPException(
-                status_code=500,
-                detail="Die Dokument-Generierung ist fehlgeschlagen"
-            )
-
-        raise HTTPException(status_code=404, detail="Keine DOCX-Dateien gefunden")
-
-    zip_filename = f"spesen_{session_id}.zip"
-    zip_path = session_path / zip_filename
-
-    logger.info(f"Erstelle ZIP: {zip_path}")
-
-    try:
-        with zipfile.ZipFile(str(zip_path), 'w', zipfile.ZIP_DEFLATED) as zipf:
-            for docx in docx_files:
-                zipf.write(str(docx), docx.name)
-                logger.info(f"  Added: {docx.name}")
-
-        if not zip_path.exists():
-            raise HTTPException(status_code=500, detail="ZIP-Erstellung fehlgeschlagen")
-
-        zip_size = zip_path.stat().st_size
-        logger.info(f"ZIP erstellt: {zip_size} bytes")
-        logger.info("=" * 80)
-
-        # Download protokollieren (best-effort, blockiert den Download nie)
-        try:
-            log_download(user_id, zip_filename, 'zip', session_id=session_id)
-        except Exception as e:
-            logger.error(f"Download-Logging fehlgeschlagen: {e}")
-
-        return FileResponse(
-            path=str(zip_path),
-            filename=f"spesen_{datetime.now().strftime('%Y%m%d')}.zip",
-            media_type="application/zip"
-        )
-
-    except Exception as e:
-        logger.error(f"ZIP-Fehler: {e}")
-        logger.error(traceback.format_exc())
-        raise HTTPException(
-            status_code=500,
-            detail=f"Fehler beim Erstellen der ZIP: {str(e)}"
-        )
-
-
-@app.get("/api/download/{session_id}/{filename}")
-async def download_file(
-    session_id: str,
-    filename: str,
-    current_user: dict = Depends(get_current_user)
-):
-    """
-    Download einer einzelnen Datei aus einer Session.
-    WICHTIG: Dieser Endpoint MUSS nach download_all_as_zip() stehen!
-    """
-    user_id = current_user['id']
-
-    # Pruefe ob Session dem User gehoert
-    db_session = db_get_session_by_id(session_id)
-
-    if not db_session:
-        raise NotFoundError("Session nicht gefunden")
-
-    if db_session['user_id'] != user_id:
-        raise AuthorizationError("Diese Session gehört einem anderen User")
-
-    session_path = session_manager.get_session_by_id(session_id)
-
-    if not session_path:
-        raise NotFoundError("Session nicht gefunden")
-
-    file_path = session_path / filename
-
-    if not file_path.exists():
-        raise NotFoundError("Datei nicht gefunden")
-
-    if filename.endswith('.docx'):
-        media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    elif filename.endswith('.pdf'):
-        media_type = "application/pdf"
-    elif filename.endswith('.json'):
-        media_type = "application/json"
-    else:
-        media_type = "application/octet-stream"
-
-    # Download protokollieren (best-effort, blockiert den Download nie)
-    try:
-        file_type = filename.rsplit('.', 1)[-1].lower() if '.' in filename else 'unbekannt'
-        log_download(user_id, filename, file_type, session_id=session_id)
-    except Exception as e:
-        logger.error(f"Download-Logging fehlgeschlagen: {e}")
-
-    return FileResponse(
-        path=file_path,
-        filename=filename,
-        media_type=media_type
-    )
-
-
 @app.post("/api/scheduler/trigger")
 async def trigger_scheduler_now(current_user: dict = Depends(get_current_user)):
     """
-    Triggert die automatische Session-Erstellung sofort (für Admin/Testzwecke).
-    Erfordert Authentifizierung.
+    Startet den naechtlichen Abruf sofort (fuer Testzwecke).
 
-    ACHTUNG: Startet Session-Erstellung für ALLE User!
+    ACHTUNG: betrifft ALLE User.
     """
     logger.info(f"Manueller Scheduler-Trigger durch User {current_user['email']}")
 
     scheduler = get_scheduler()
-
-    # Starte in Background Task (nicht blockierend)
-    import asyncio
-    asyncio.create_task(scheduler.trigger_now())
+    asyncio.create_task(scheduler.scrape_all_users())
 
     return {
         "success": True,
-        "message": "Automatische Session-Erstellung wurde gestartet",
+        "message": "Automatischer Abruf wurde gestartet",
         "note": "Die Verarbeitung läuft im Hintergrund und kann einige Minuten dauern"
     }
 
 
 @app.get("/api/scheduler/status")
 async def get_scheduler_status(current_user: dict = Depends(get_current_user)):
-    """
-    Gibt den Status des Schedulers zurück.
-    """
-    scheduler = get_scheduler()
-    job = scheduler.scheduler.get_job('auto_session_creation')
-
-    if job:
-        return {
-            "running": scheduler.scheduler.running,
-            "next_run": str(job.next_run_time) if job.next_run_time else None,
-            "job_id": job.id,
-            "job_name": job.name
-        }
-    else:
-        return {
-            "running": scheduler.scheduler.running,
-            "next_run": None,
-            "job_id": None,
-            "job_name": None
-        }
-
-
-@app.get("/api/debug/session/{session_id}")
-async def debug_session(session_id: str, current_user: dict = Depends(get_current_user)):
-    """Debug-Endpoint um Session-Details zu prüfen"""
-    session_path = session_manager.get_session_by_id(session_id)
-
-    if not session_path:
-        return JSONResponse({
-            "error": "Session nicht gefunden",
-            "session_id": session_id,
-            "base_output_dir": str(session_manager.base_output_dir)
-        })
-
-    # Alle Dateien auflisten
-    all_files = [f.name for f in session_path.iterdir()] if session_path.exists() else []
-
-    # Metadata laden
-    metadata = {}
-    metadata_path = session_path / "metadata.json"
-    if metadata_path.exists():
-        with open(metadata_path, 'r', encoding='utf-8') as f:
-            metadata = json.load(f)
-
-    # DOCX-Dateien
-    docx_files = [f.name for f in session_path.glob("*.docx")]
-
-    return JSONResponse({
-        "session_id": session_id,
-        "session_path": str(session_path),
-        "session_exists": session_path.exists(),
-        "all_files": all_files,
-        "docx_files": docx_files,
-        "docx_count": len(docx_files),
-        "metadata": metadata,
-        "base_output_dir": str(session_manager.base_output_dir)
-    })
+    """Status des naechtlichen Abrufs"""
+    return get_scheduler().get_status()
 
 
 @app.get("/api/health")
@@ -1095,7 +647,7 @@ async def health_check():
         "status": "online",
         "service": "Spesenfuchs API",
         "version": "1.1.1",
-        "output_dir": str(session_manager.base_output_dir)
+        "matches": count_distinct_matches()
     }
 
 

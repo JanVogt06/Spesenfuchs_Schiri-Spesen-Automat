@@ -357,7 +357,7 @@ export function MatchCard({
                                     Speichert...
                                 </>
                             ) : (
-                                'Speichern & neu generieren'
+                                'Speichern'
                             )}
                         </Button>
                         {saveMessage && (

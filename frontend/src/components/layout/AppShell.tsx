@@ -2,7 +2,7 @@ import type {ReactNode} from 'react';
 import {useNavigate, useLocation, Link} from 'react-router-dom';
 import {Button} from '@/components/ui/button';
 import {logout} from '@/lib/auth';
-import {Receipt, Settings, LogOut, LayoutDashboard, FolderClock} from 'lucide-react';
+import {Receipt, Settings, LogOut, LayoutDashboard} from 'lucide-react';
 import {cn} from '@/lib/utils';
 
 interface AppShellProps {
@@ -17,7 +17,6 @@ export function AppShell({children, actions}: AppShellProps) {
 
     const navItems = [
         {label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard},
-        {label: 'Sessions', path: '/sessions', icon: FolderClock},
         {label: 'Einstellungen', path: '/settings', icon: Settings},
     ];
 

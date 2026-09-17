@@ -3,9 +3,7 @@ import {LoginPage} from './pages/Login';
 import {RegisterPage} from './pages/Register';
 import {LandingPage} from './pages/Landing';
 import {DashboardPage} from './pages/Dashboard';
-import {SessionsPage} from './pages/Sessions';
 import {SettingsPage} from './pages/Settings';
-import {SessionDetailPage} from './pages/SessionDetail';
 import {isAuthenticated} from './lib/auth';
 import {Datenschutz} from './pages/Datenschutz';
 
@@ -37,28 +35,10 @@ function App() {
                 />
 
                 <Route
-                    path="/sessions"
-                    element={
-                        <ProtectedRoute>
-                            <SessionsPage/>
-                        </ProtectedRoute>
-                    }
-                />
-
-                <Route
                     path="/settings"
                     element={
                         <ProtectedRoute>
                             <SettingsPage/>
-                        </ProtectedRoute>
-                    }
-                />
-
-                <Route
-                    path="/session/:sessionId"
-                    element={
-                        <ProtectedRoute>
-                            <SessionDetailPage/>
                         </ProtectedRoute>
                     }
                 />
