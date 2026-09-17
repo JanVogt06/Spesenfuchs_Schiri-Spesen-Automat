@@ -10,6 +10,7 @@ also ist das Backup die Rueckfallebene.
 Neue Migration hinzufuegen: Funktion schreiben und unten in MIGRATIONS mit der
 naechsten freien Nummer eintragen. Bestehende Schritte werden nie geaendert.
 """
+import json
 import shutil
 import sqlite3
 from datetime import datetime, UTC
@@ -246,6 +247,135 @@ def _migration_005_download_log_matches(conn: sqlite3.Connection) -> None:
     """)
 
 
+def _migration_006_backfill_from_sessions(conn: sqlite3.Connection) -> None:
+    """
+    Holt die Spiele aus den bestehenden Session-Ordnern in die Datenbank.
+
+    Bis hierher lagen sie ausschliesslich als spesen_data.json unter
+    <DATA_DIR>/output/session_*/. Ohne diesen Schritt waere am Tag der
+    Umstellung bei jedem User die komplette Spielhistorie aus dem Dashboard
+    verschwunden, denn der alte Lesepfad hat die Ordner bei jedem Aufruf neu
+    eingelesen.
+
+    Die Ordner werden nach Alter aufsteigend verarbeitet, damit bei mehrfach
+    gescrapten Spielen der zuletzt gesehene Stand gewinnt - dieselbe Regel,
+    die der alte Endpunkt zur Laufzeit angewandt hat (verlegte Anstosszeiten
+    kommen in den Daten tatsaechlich vor).
+
+    Anschliessend werden die bereits erfassten Fahrtkosten aus der alten
+    Tabelle match_expenses auf die neuen Zeilen umgehaengt. Die alte Tabelle
+    bleibt vorerst stehen - sie ist die Rueckfallebene, falls hier etwas
+    schiefgeht.
+
+    Die Helfer werden aus dem Anwendungscode importiert statt hier kopiert:
+    der match_key MUSS exakt so gebildet werden wie beim naechtlichen Scrapen,
+    sonst legt der erste Lauf nach der Umstellung alles doppelt an.
+    """
+    # Lokale Importe: db.matches importiert db.database, das wiederum dieses
+    # Modul importiert - auf Modulebene waere das ein Zirkelbezug.
+    from core import config
+    from db.matches import build_match_key, upsert_match
+    from generator.spesen_calculator import calculate_spesen
+    from utils.match_utils import extract_iso_date_from_anpfiff
+
+    # Kilometersatz, der zum Zeitpunkt dieser Migration galt. Bewusst als
+    # Literal: eine spaetere Aenderung der Pauschale darf die eingefrorenen
+    # Werte historischer Abrechnungen nicht nachtraeglich verschieben.
+    km_satz = 0.30
+
+    output_dir = config.get_data_dir() / "output"
+    if not output_dir.exists():
+        logger.info("Kein output-Verzeichnis - nichts zu uebernehmen")
+        return
+
+    besitzer = {
+        row["session_id"]: row
+        for row in conn.execute("SELECT session_id, user_id, created_at FROM sessions")
+    }
+
+    ordner = sorted(
+        (d for d in output_dir.iterdir() if d.is_dir()),
+        key=lambda d: (besitzer[d.name]["created_at"] if d.name in besitzer else "", d.name),
+    )
+
+    spiele = uebersprungen = ohne_besitzer = 0
+
+    for verzeichnis in ordner:
+        session = besitzer.get(verzeichnis.name)
+        if not session:
+            # Ordner ohne Datenbankzeile - niemand kann ihn besitzen
+            ohne_besitzer += 1
+            continue
+
+        datei = verzeichnis / "spesen_data.json"
+        if not datei.exists():
+            continue
+
+        try:
+            matches = json.loads(datei.read_text(encoding="utf-8"))
+        except Exception as e:
+            logger.warning(f"{verzeichnis.name}: spesen_data.json unlesbar ({e})")
+            uebersprungen += 1
+            continue
+
+        for match_data in matches:
+            try:
+                spiel_info = match_data.get("spiel_info", {}) or {}
+                datum = extract_iso_date_from_anpfiff(spiel_info.get("anpfiff", ""))
+                sr_spesen, sra_spesen = calculate_spesen(
+                    spiel_info.get("spielklasse", ""),
+                    spiel_info.get("mannschaftsart", ""),
+                )
+                upsert_match(
+                    session["user_id"], match_data, datum,
+                    sr_spesen, sra_spesen, km_satz,
+                    scraped_at=session["created_at"],
+                    conn=conn,
+                )
+                spiele += 1
+            except Exception as e:
+                logger.warning(f"{verzeichnis.name}: Spiel uebersprungen ({e})")
+                uebersprungen += 1
+
+    gesamt = conn.execute("SELECT COUNT(*) AS n FROM matches").fetchone()["n"]
+    logger.info(
+        f"Uebernommen: {spiele} Datensaetze aus {len(ordner)} Ordnern -> {gesamt} Spiele "
+        f"({uebersprungen} uebersprungen, {ohne_besitzer} Ordner ohne Session-Zeile)"
+    )
+
+    # Erfasste Fahrtkosten auf die neuen Zeilen umhaengen. Der alte Schluessel
+    # war (user_id, heim_team, gast_team, datum) - genau die Felder, aus denen
+    # bei Spielen mit Teams auch der match_key besteht.
+    uebernommen = 0
+    for alt in conn.execute("SELECT * FROM match_expenses").fetchall():
+        treffer = conn.execute("""
+            SELECT id FROM matches
+            WHERE user_id = ? AND heim_team = ? AND gast_team = ? AND datum = ?
+        """, (alt["user_id"], alt["heim_team"], alt["gast_team"], alt["datum"])).fetchone()
+
+        if not treffer:
+            logger.warning(
+                f"Fahrtkosten ohne passendes Spiel: user {alt['user_id']}, "
+                f"{alt['heim_team']} vs {alt['gast_team']} am {alt['datum']}"
+            )
+            continue
+
+        for rolle, seq, praefix in (("SR", 0, "sr"), ("SRA 1", 0, "sra1"), ("SRA 2", 0, "sra2")):
+            km, oevm = alt[f"{praefix}_km"], alt[f"{praefix}_oevm"]
+            if km is None and oevm is None:
+                continue
+
+            conn.execute("""
+                INSERT INTO official_expenses (match_id, rolle, seq, km, oevm, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT (match_id, rolle, seq) DO UPDATE SET
+                    km = excluded.km, oevm = excluded.oevm, updated_at = excluded.updated_at
+            """, (treffer["id"], rolle, seq, km, oevm, alt["updated_at"]))
+            uebernommen += 1
+
+    logger.info(f"{uebernommen} erfasste Fahrtkosten-Eintraege uebernommen")
+
+
 # (Version, Beschreibung, Funktion) - aufsteigend, Luecken sind nicht erlaubt.
 MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "baseline schema", _migration_001_baseline),
@@ -253,6 +383,7 @@ MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (3, "matches, officials and expenses", _migration_003_matches),
     (4, "scrape runs replace session metadata", _migration_004_scrape_runs),
     (5, "downloads reference matches", _migration_005_download_log_matches),
+    (6, "backfill matches from session folders", _migration_006_backfill_from_sessions),
 ]
 
 
