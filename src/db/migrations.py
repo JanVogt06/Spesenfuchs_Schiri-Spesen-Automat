@@ -396,6 +396,29 @@ def _migration_006_backfill_from_sessions(conn: sqlite3.Connection) -> None:
     logger.info(f"{uebernommen} erfasste Fahrtkosten-Eintraege uebernommen")
 
 
+def _migration_007_drop_legacy_tables(conn: sqlite3.Connection) -> None:
+    """
+    Raeumt die Tabellen weg, die seit dem Umstieg auf die datenbankgestuetzten
+    Spiele niemand mehr anspricht.
+
+    `sessions` beschrieb einen Ordner unter data/output, den es nicht mehr gibt.
+    `match_expenses` war die flache Vorgaengerin von `official_expenses` mit
+    genau drei festen Rollen pro Spiel.
+
+    Beide wurden in Migration 006 ein letztes Mal gelesen. Danach sind sie tot -
+    im Code steht kein einziger Zugriff mehr. Faellt der Backfill doch noch
+    einmal auf die Fuesse, ist die Rueckfallebene die Sicherungskopie, die der
+    Runner vor jedem Lauf neben app.db legt.
+
+    `download_log.session_id` bleibt bestehen: die Spalte traegt die Historie
+    der Downloads aus der Zeit vor der Umstellung.
+    """
+    conn.executescript("""
+        DROP TABLE IF EXISTS sessions;
+        DROP TABLE IF EXISTS match_expenses;
+    """)
+
+
 # (Version, Beschreibung, Funktion) - aufsteigend, Luecken sind nicht erlaubt.
 MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "baseline schema", _migration_001_baseline),
@@ -404,6 +427,7 @@ MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (4, "scrape runs replace session metadata", _migration_004_scrape_runs),
     (5, "downloads reference matches", _migration_005_download_log_matches),
     (6, "backfill matches from session folders", _migration_006_backfill_from_sessions),
+    (7, "drop legacy session and expense tables", _migration_007_drop_legacy_tables),
 ]
 
 
