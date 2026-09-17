@@ -35,6 +35,12 @@ from utils.match_utils import generate_filename_from_match, extract_iso_date_fro
 from utils.pdf_converter import convert_docx_files_to_pdf
 from generator.docx_generator import SpesenGenerator
 from generator.spesen_calculator import calculate_spesen, format_spesen
+from db.scrape_runs import (
+    start_run,
+    update_run,
+    get_latest_run,
+    fail_stale_runs,
+)
 from db.database import (
     init_database,
     create_session as db_create_session,
@@ -73,6 +79,10 @@ async def lifespan(app: FastAPI):
     # === STARTUP ===
     init_database()
     logger.info("Datenbank initialisiert")
+
+    # Laeufe, die der letzte Prozess nicht beenden konnte (Neustart, Absturz),
+    # abschliessen - sonst pollt das Frontend ewig auf einen toten Lauf
+    fail_stale_runs()
 
     # Scheduler starten
     scheduler = get_scheduler()
@@ -216,10 +226,16 @@ def run_generation_process(
         session_id: str,
         dfb_username: str,
         dfb_password: str,
-        user_id: int = None
+        user_id: int = None,
+        run_id: int = None
 ):
     """
     Führt die Generierung in einem separaten Prozess aus.
+
+    Der Fortschritt wird in die Tabelle scrape_runs geschrieben - das ist der
+    Kanal, ueber den die API den Poll des Frontends bedient. Die
+    Session-Metadaten werden parallel weitergefuehrt, bis der Lesepfad
+    umgestellt ist.
     """
     from utils.logger import setup_logger
     from core.errors import DFBCredentialsInvalidError
@@ -236,6 +252,7 @@ def run_generation_process(
             progress={"current": 0, "total": 0, "step": "Scraping gestartet..."}
         )
         db_update_session_status(session_id, "scraping")
+        update_run(run_id, status="scraping", step="Scraping gestartet...")
 
         matches_data, _ = scrape_matches_with_session(
             session_path,
@@ -255,11 +272,16 @@ def run_generation_process(
                 progress={"current": 0, "total": len(matches_data), "step": "Erstelle Dokumente..."}
             )
             db_update_session_status(session_id, "generating")
+            update_run(run_id, status="generating", step="Erstelle Dokumente...",
+                       current=0, total=len(matches_data), matches_found=len(matches_data))
 
             generate_documents_in_session(matches_data, session_path, user_id)
 
             sm.update_session_metadata(session_path, status="completed")
             db_update_session_status(session_id, "completed")
+            update_run(run_id, status="completed", step="Fertig!",
+                       current=len(matches_data), total=len(matches_data),
+                       matches_found=len(matches_data), finished=True)
 
             process_logger.info(f"Session {session_path.name} erfolgreich abgeschlossen mit {len(matches_data)} Spielen")
         else:
@@ -270,6 +292,8 @@ def run_generation_process(
                 progress={"current": 0, "total": 0, "step": "Keine Spiele gefunden"}
             )
             db_update_session_status(session_id, "completed")
+            update_run(run_id, status="completed", step="Keine Spiele gefunden",
+                       matches_found=0, finished=True)
 
             process_logger.info(f"Session {session_path.name} abgeschlossen - keine Spiele vorhanden (Winterpause?)")
 
@@ -288,6 +312,10 @@ def run_generation_process(
             }
         )
         db_update_session_status(session_id, "failed")
+        update_run(run_id, status="failed", step="Fehler",
+                   error_code="DFB_CREDENTIALS_INVALID",
+                   error_message="Die DFBnet-Zugangsdaten sind ungültig. Bitte prüfe Benutzername und Passwort in den Einstellungen.",
+                   finished=True)
 
     except Exception as e:
         # GENERISCH: Anderer Fehler
@@ -304,6 +332,11 @@ def run_generation_process(
             }
         )
         db_update_session_status(session_id, "failed")
+        update_run(run_id, status="failed", step="Fehler",
+                   error_code="GENERATION_ERROR",
+                   error_message="Bei der Generierung ist ein Fehler aufgetreten.",
+                   finished=True)
+
 
 @app.post("/api/generate", response_model=SessionResponse)
 async def generate_spesen(
@@ -331,18 +364,23 @@ async def generate_spesen(
     dfb_username = decrypt_credential(dfb_creds['dfb_username_encrypted'])
     dfb_password = decrypt_credential(dfb_creds['dfb_password_encrypted'])
 
+    # Laeufe, deren Prozess gestorben ist, vorher abraeumen - sonst haengt
+    # der Poll des Frontends am alten Lauf fest
+    fail_stale_runs()
+
     # Neue Session erstellen
     session_path = session_manager.create_session()
     session_id = session_path.name
 
     # Session in DB speichern mit User-Verknuepfung
     db_create_session(session_id, user_id)
+    run_id = start_run(user_id)
 
     # Generierung in eigenem Prozess starten (fuer Playwright-Kompatibilitaet)
     # Credentials werden direkt als Parameter übergeben (nicht über ENV!)
     process = multiprocessing.Process(
         target=run_generation_process,
-        args=(session_path, session_id, dfb_username, dfb_password, user_id),
+        args=(session_path, session_id, dfb_username, dfb_password, user_id, run_id),
         daemon=True
     )
     process.start()
@@ -355,6 +393,39 @@ async def generate_spesen(
         created_at=datetime.now().isoformat(),
         progress={"current": 0, "total": 0, "step": "Starte..."}
     )
+
+
+@app.get("/api/scrape/status")
+async def get_scrape_status(current_user: dict = Depends(get_current_user)):
+    """
+    Aktueller Stand des juengsten Scrape-Laufs. Ersetzt den Poll auf die
+    Session-Metadaten.
+
+    error_code traegt weiterhin DFB_CREDENTIALS_INVALID, damit das Frontend
+    den User wie bisher in die Einstellungen schicken kann.
+    """
+    # Abgestuerzte Laeufe abraeumen, damit der Poll nicht ewig auf
+    # "scraping" stehen bleibt
+    fail_stale_runs()
+
+    run = get_latest_run(current_user['id'])
+    if not run:
+        return {"status": "idle", "progress": None}
+
+    return {
+        "run_id": run['id'],
+        "status": run['status'],
+        "matches_found": run['matches_found'],
+        "started_at": run['started_at'],
+        "finished_at": run['finished_at'],
+        "progress": {
+            "current": run['current_item'],
+            "total": run['total_items'],
+            "step": run['step'],
+            "error_code": run['error_code'],
+            "error_message": run['error_message'],
+        },
+    }
 
 
 @app.get("/api/sessions", response_model=List[SessionResponse])

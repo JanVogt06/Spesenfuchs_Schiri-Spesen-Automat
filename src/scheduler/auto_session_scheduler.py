@@ -17,6 +17,7 @@ from db.database import (
     create_session as db_create_session,
     update_session_status as db_update_session_status
 )
+from db.scrape_runs import start_run, update_run, fail_stale_runs
 from core.encryption import decrypt_credential
 from utils.session_manager import SessionManager
 from utils.logger import setup_logger
@@ -33,7 +34,8 @@ def run_generation_for_user(
     dfb_username: str,
     dfb_password: str,
     session_path: Path,
-    session_id: str
+    session_id: str,
+    run_id: int = None
 ):
     """
     Führt die komplette Generierung für einen User aus.
@@ -65,6 +67,7 @@ def run_generation_for_user(
             progress={"current": 0, "total": 0, "step": "DFB Scraping..."}
         )
         db_update_session_status(session_id, "scraping")
+        update_run(run_id, status="scraping", step="DFB Scraping...")
 
         # === NUTZE DIE BESTEHENDE FUNKTION AUS MAIN.PY MIT CREDENTIALS ===
         matches_data, _ = scrape_matches_with_session(
@@ -82,6 +85,8 @@ def run_generation_for_user(
                 progress={"current": 0, "total": 0, "step": "Keine Spiele gefunden"}
             )
             db_update_session_status(session_id, "completed")
+            update_run(run_id, status="completed", step="Keine Spiele gefunden",
+                       matches_found=0, finished=True)
             return
 
         process_logger.info(f"[User {user_id}] {len(matches_data)} Spiele gescrapt")
@@ -93,6 +98,8 @@ def run_generation_for_user(
             progress={"current": 0, "total": len(matches_data), "step": "Erstelle Dokumente..."}
         )
         db_update_session_status(session_id, "generating")
+        update_run(run_id, status="generating", step="Erstelle Dokumente...",
+                   current=0, total=len(matches_data), matches_found=len(matches_data))
 
         # === NUTZE DIE BESTEHENDE FUNKTION AUS MAIN.PY ===
         generate_documents_in_session(matches_data, session_path, user_id)
@@ -100,6 +107,9 @@ def run_generation_for_user(
         # Status: Abgeschlossen
         sm.update_session_metadata(session_path, status="completed")
         db_update_session_status(session_id, "completed")
+        update_run(run_id, status="completed", step="Fertig!",
+                   current=len(matches_data), total=len(matches_data),
+                   matches_found=len(matches_data), finished=True)
 
         process_logger.info(f"[User {user_id}] Session erfolgreich abgeschlossen")
 
@@ -108,6 +118,10 @@ def run_generation_for_user(
         sm = SessionManager()
         sm.update_session_metadata(session_path, status="failed")
         db_update_session_status(session_id, "failed")
+        update_run(run_id, status="failed", step="Fehler",
+                   error_code="GENERATION_ERROR",
+                   error_message="Bei der naechtlichen Generierung ist ein Fehler aufgetreten.",
+                   finished=True)
 
 
 class AutoSessionScheduler:
@@ -151,6 +165,7 @@ class AutoSessionScheduler:
 
             # In DB speichern
             db_create_session(session_id, user_id)
+            run_id = start_run(user_id)
 
             logger.info(f"[User {user_id}] Session erstellt: {session_id}")
 
@@ -158,7 +173,7 @@ class AutoSessionScheduler:
             # Credentials werden direkt als Parameter übergeben (nicht über ENV!)
             process = multiprocessing.Process(
                 target=run_generation_for_user,
-                args=(user_id, email, dfb_username, dfb_password, session_path, session_id),
+                args=(user_id, email, dfb_username, dfb_password, session_path, session_id, run_id),
                 daemon=True
             )
             process.start()
@@ -193,6 +208,8 @@ class AutoSessionScheduler:
             return
 
         self._is_running = True
+        # Laeufe abgestuerzter Vornaechte abraeumen
+        fail_stale_runs()
         logger.info("=" * 80)
         logger.info("AUTOMATISCHE SESSION-ERSTELLUNG GESTARTET")
         logger.info(f"Zeitpunkt: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
