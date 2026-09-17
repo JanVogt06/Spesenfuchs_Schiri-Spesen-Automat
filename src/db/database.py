@@ -7,9 +7,14 @@ from datetime import datetime, UTC
 from typing import Dict, List, Optional
 
 from core import config
+from db.migrations import apply_migrations
 from utils.logger import setup_logger
 
 logger = setup_logger("database")
+
+# Wartezeit, bevor SQLite bei einer gesperrten Datenbank aufgibt. Der Scraper
+# laeuft in einem eigenen Prozess und schreibt waehrend die API liest.
+BUSY_TIMEOUT_MS = 5000
 
 
 # Datenbankpfad
@@ -30,85 +35,24 @@ def get_connection() -> sqlite3.Connection:
     """Erstellt DB-Verbindung mit Row Factory"""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
+
+    # Beide Pragmas gelten nur fuer diese Verbindung und muessen daher bei
+    # jeder neu gesetzt werden - anders als journal_mode, das in der Datei steht.
+    conn.execute(f"PRAGMA busy_timeout = {BUSY_TIMEOUT_MS}")
+    conn.execute("PRAGMA foreign_keys = ON")
+
     return conn
 
 
 def init_database():
-    """Initialisiert Datenbank-Tabellen"""
+    """Bringt das Schema per Migrationen auf den aktuellen Stand"""
     conn = get_connection()
-    cursor = conn.cursor()
+    try:
+        version = apply_migrations(conn, DB_PATH)
+    finally:
+        conn.close()
 
-    # Tabelle: users
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            email TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            dfb_username_encrypted TEXT,
-            dfb_password_encrypted TEXT,
-            created_at TEXT NOT NULL
-        )
-    """)
-
-    # Tabelle: sessions
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS sessions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            session_id TEXT UNIQUE NOT NULL,
-            user_id INTEGER NOT NULL,
-            status TEXT NOT NULL,
-            created_at TEXT NOT NULL,
-            FOREIGN KEY (user_id) REFERENCES users (id)
-        )
-    """)
-
-    # Tabelle: login_log (protokolliert erfolgreiche Logins fuer Nutzungsstatistik)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS login_log (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            logged_in_at TEXT NOT NULL,
-            FOREIGN KEY (user_id) REFERENCES users (id)
-        )
-    """)
-
-    # Tabelle: download_log (protokolliert Downloads fuer Nutzungsstatistik)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS download_log (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            session_id TEXT NOT NULL,
-            filename TEXT NOT NULL,
-            file_type TEXT NOT NULL,
-            downloaded_at TEXT NOT NULL,
-            FOREIGN KEY (user_id) REFERENCES users (id)
-        )
-    """)
-
-    # Tabelle: match_expenses (Fahrtkosten/OeVM pro Spiel, ueberlebt Neu-Scrapes)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS match_expenses (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            heim_team TEXT NOT NULL,
-            gast_team TEXT NOT NULL,
-            datum TEXT NOT NULL,
-            sr_km REAL,
-            sr_oevm REAL,
-            sra1_km REAL,
-            sra1_oevm REAL,
-            sra2_km REAL,
-            sra2_oevm REAL,
-            updated_at TEXT NOT NULL,
-            UNIQUE (user_id, heim_team, gast_team, datum),
-            FOREIGN KEY (user_id) REFERENCES users (id)
-        )
-    """)
-
-    conn.commit()
-    conn.close()
-
-    logger.info(f"Datenbank initialisiert: {DB_PATH}")
+    logger.info(f"Datenbank initialisiert: {DB_PATH} (Schema-Version {version})")
 
 
 # ===== USER FUNKTIONEN =====
