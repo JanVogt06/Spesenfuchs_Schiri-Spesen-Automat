@@ -2,7 +2,9 @@
 DOCX Generator - Füllt Spesenabrechnung-Vorlage mit Daten
 Verbesserte Version mit korrekter Checkbox-Formatierung
 """
+from io import BytesIO
 from pathlib import Path
+from typing import Optional
 from docx import Document
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
@@ -36,24 +38,26 @@ def format_name_nachname_vorname(name: str) -> str:
 class SpesenGenerator:
     """Generiert ausgefüllte Spesenabrechnung-Dokumente"""
 
-    def __init__(self, template_path: str, output_dir: Path):
+    def __init__(self, template_path: str, output_dir: Optional[Path] = None):
         """
         Initialisiert den Generator.
 
         Args:
             template_path: Pfad zur DOCX-Vorlage
-            output_dir: Verzeichnis für generierte Dokumente (Path-Objekt vom SessionManager)
+            output_dir: Optional - nur noetig, wenn Dokumente auf die Platte
+                        geschrieben werden sollen. Fuer den Download-Pfad
+                        bleibt es None und render_document() liefert Bytes.
         """
         self.template_path = Path(template_path)
-        self.output_dir = Path(output_dir)
+        self.output_dir = Path(output_dir) if output_dir else None
 
-        self.output_dir.mkdir(exist_ok=True, parents=True)
+        if self.output_dir:
+            self.output_dir.mkdir(exist_ok=True, parents=True)
 
         if not self.template_path.exists():
             raise FileNotFoundError(f"Vorlage nicht gefunden: {self.template_path}")
 
-        logger.info(f"Generator initialisiert mit Vorlage: {self.template_path}")
-        logger.info(f"Output-Verzeichnis: {self.output_dir}")
+        logger.debug(f"Generator initialisiert mit Vorlage: {self.template_path}")
 
     def _determine_checkboxes(self, match_data: dict) -> dict:
         """Bestimmt welche Checkboxen aktiviert werden müssen."""
@@ -126,12 +130,9 @@ class SpesenGenerator:
         rFonts.set(qn('w:cs'), font_name)
         rFonts.set(qn('w:eastAsia'), font_name)
 
-    def _replace_in_paragraph(self, paragraph, checkbox_states: dict, text_replacements: dict):
-        """
-        Ersetzt Platzhalter in einem Paragraph.
-        Behandelt auch Platzhalter die über mehrere Runs verteilt sind.
-        """
-        # Alle Ersetzungen sammeln
+    @staticmethod
+    def _collect_replacements(checkbox_states: dict, text_replacements: dict) -> dict:
+        """Baut die Tabelle Platzhalter -> (Ersatztext, ist Checkbox)."""
         all_replacements = {}
 
         for key, is_checked in checkbox_states.items():
@@ -143,9 +144,33 @@ class SpesenGenerator:
             placeholder = f"{{{{{key}}}}}"
             all_replacements[placeholder] = (str(value), False)  # False = ist Text
 
-        # Für jeden Platzhalter prüfen und ersetzen
+        return all_replacements
+
+    def _replace_in_paragraph(self, paragraph, all_replacements: dict):
+        """
+        Ersetzt Platzhalter in einem Paragraph.
+        Behandelt auch Platzhalter die über mehrere Runs verteilt sind.
+
+        Der Absatztext wird einmal zusammengesetzt und als Filter benutzt: die
+        allermeisten Absaetze der Vorlage enthalten ueberhaupt keinen
+        Platzhalter, und den Text je Platzhalter erneut aus den Runs
+        zusammenzusetzen war der mit Abstand teuerste Teil der Generierung.
+        """
+        runs = paragraph.runs
+        if not runs:
+            return
+
+        full_text = ''.join(run.text for run in runs)
+        if '{{' not in full_text:
+            return
+
+        # Nur die Platzhalter anfassen, die hier wirklich vorkommen. Der
+        # Text kann durch eine Ersetzung veralten, aber Ersatzwerte bringen
+        # nie neue Platzhalter mit - ein Treffer zu viel ist harmlos, denn
+        # _replace_placeholder_in_paragraph prueft selbst nochmal.
         for placeholder, (replacement, is_checkbox) in all_replacements.items():
-            self._replace_placeholder_in_paragraph(paragraph, placeholder, replacement, is_checkbox)
+            if placeholder in full_text:
+                self._replace_placeholder_in_paragraph(paragraph, placeholder, replacement, is_checkbox)
 
     def _replace_placeholder_in_paragraph(self, paragraph, placeholder: str, replacement: str, is_checkbox: bool):
         """
@@ -216,27 +241,45 @@ class SpesenGenerator:
 
     def _replace_placeholders(self, doc: Document, checkbox_states: dict, text_replacements: dict):
         """Ersetzt alle Platzhalter im Dokument."""
+        all_replacements = self._collect_replacements(checkbox_states, text_replacements)
+
         # In Paragraphs ersetzen
         for paragraph in doc.paragraphs:
-            self._replace_in_paragraph(paragraph, checkbox_states, text_replacements)
+            self._replace_in_paragraph(paragraph, all_replacements)
 
         # In Tabellen ersetzen
         for table in doc.tables:
             for row in table.rows:
                 for cell in row.cells:
                     for paragraph in cell.paragraphs:
-                        self._replace_in_paragraph(paragraph, checkbox_states, text_replacements)
+                        self._replace_in_paragraph(paragraph, all_replacements)
+
+    @staticmethod
+    def _spesen_for_match(match_data: dict) -> tuple:
+        """
+        Liefert (sr_spesen, sra_spesen) als Zahlen.
+
+        Stammt das Spiel aus der Datenbank, sind die Saetze dort beim ersten
+        Scrape eingefroren worden und werden hier nur noch gelesen - sonst
+        wuerde eine spaetere Aenderung der Spesenordnung eine bereits
+        abgegebene Abrechnung rueckwirkend umschreiben. Nur ohne
+        eingefrorene Werte wird gerechnet.
+        """
+        if 'sr_spesen' in match_data or 'sra_spesen' in match_data:
+            return match_data.get('sr_spesen'), match_data.get('sra_spesen')
+
+        spiel_info = match_data.get('spiel_info', {})
+        return calculate_spesen(
+            spiel_info.get('spielklasse', ''),
+            spiel_info.get('mannschaftsart', '')
+        )
 
     def _calculate_spesen_for_match(self, match_data: dict, is_punktspiel: bool) -> tuple:
-        """Berechnet Spesen für ein Spiel."""
+        """Formatiert die Spesen für ein Spiel."""
         if not is_punktspiel:
             return ("", "")
 
-        spiel_info = match_data.get('spiel_info', {})
-        spielklasse = spiel_info.get('spielklasse', '')
-        mannschaftsart = spiel_info.get('mannschaftsart', '')
-
-        sr_spesen, sra_spesen = calculate_spesen(spielklasse, mannschaftsart)
+        sr_spesen, sra_spesen = self._spesen_for_match(match_data)
         sr_spesen_str = format_spesen(sr_spesen)
         sra_spesen_str = format_spesen(sra_spesen)
 
@@ -256,10 +299,10 @@ class SpesenGenerator:
         # Numerische Spesen fuer die Summenberechnung
         sr_spesen_num, sra_spesen_num = (None, None)
         if is_punktspiel:
-            spiel_info = match_data.get('spiel_info', {})
-            sr_spesen_num, sra_spesen_num = calculate_spesen(
-                spiel_info.get('spielklasse', ''), spiel_info.get('mannschaftsart', '')
-            )
+            sr_spesen_num, sra_spesen_num = self._spesen_for_match(match_data)
+
+        # Der km-Satz wird wie die Spesen beim Scrapen eingefroren
+        km_satz = match_data.get('km_satz') or KM_SATZ_EURO
 
         replacements = {}
         roles = [
@@ -279,7 +322,7 @@ class SpesenGenerator:
 
             # 0 ist ein gueltiger Wert (bewusst erfasst), None = nicht eingetragen
             erfasst = km is not None or oevm is not None
-            km_kosten = round(km * KM_SATZ_EURO, 2) if km is not None else None
+            km_kosten = round(km * km_satz, 2) if km is not None else None
             oevm_betrag = oevm if oevm is not None else None
 
             # Anzeige: 0-Betraege bleiben im Formular leer
@@ -306,13 +349,50 @@ class SpesenGenerator:
 
         return replacements
 
-    def generate_document(self, match_data: dict, output_filename: str = None, expenses: dict = None) -> Path:
+    def render_document(self, match_data: dict, expenses: dict = None) -> bytes:
         """
-        Generiert ein ausgefülltes Dokument für ein Spiel.
+        Rendert ein Dokument und gibt es als Bytes zurueck - ohne Umweg ueber
+        die Platte. Das ist der Weg fuer Downloads: das Dokument entsteht bei
+        jedem Abruf neu aus den Datenbankzeilen.
 
         Args:
             expenses: Optionale Fahrtkosten/OeVM-Werte
                       (Keys: sr_km, sr_oevm, sra1_km, sra1_oevm, sra2_km, sra2_oevm)
+        """
+        doc = self._fill_template(match_data, expenses)
+
+        buffer = BytesIO()
+        doc.save(buffer)
+        return buffer.getvalue()
+
+    def generate_document(self, match_data: dict, output_filename: str = None, expenses: dict = None) -> Path:
+        """
+        Generiert ein ausgefülltes Dokument für ein Spiel und legt es im
+        output_dir ab.
+
+        Args:
+            expenses: Optionale Fahrtkosten/OeVM-Werte
+                      (Keys: sr_km, sr_oevm, sra1_km, sra1_oevm, sra2_km, sra2_oevm)
+        """
+        if not self.output_dir:
+            raise ValueError("Kein output_dir gesetzt - render_document() verwenden")
+
+        doc = self._fill_template(match_data, expenses)
+
+        if not output_filename:
+            output_filename = generate_filename_from_match(match_data)
+
+        output_path = self.output_dir / output_filename
+        doc.save(output_path)
+
+        logger.info(f"Dokument erstellt: {output_path}")
+        return output_path
+
+    def _fill_template(self, match_data: dict, expenses: dict = None):
+        """
+        Fuellt die Vorlage mit den Daten eines Spiels und gibt das
+        python-docx-Dokument zurueck. Gemeinsamer Kern von render_document()
+        und generate_document().
         """
         spiel_info = match_data.get('spiel_info', {})
         schiedsrichter = match_data.get('schiedsrichter', [])
@@ -368,14 +448,7 @@ class SpesenGenerator:
 
         self._replace_placeholders(doc, checkboxes, text_replacements)
 
-        if not output_filename:
-            output_filename = generate_filename_from_match(match_data)
-
-        output_path = self.output_dir / output_filename
-        doc.save(output_path)
-
-        logger.info(f"Dokument erstellt: {output_path}")
-        return output_path
+        return doc
 
     def generate_all_documents(self, matches_data: list, expenses_map: dict = None) -> list:
         """
