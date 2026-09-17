@@ -214,12 +214,45 @@ def _migration_004_scrape_runs(conn: sqlite3.Connection) -> None:
     """)
 
 
+def _migration_005_download_log_matches(conn: sqlite3.Connection) -> None:
+    """
+    Downloads haengen kuenftig an einem Spiel, nicht mehr an einer Session.
+
+    SQLite kann einer Spalte das NOT NULL nicht nachtraeglich nehmen, also
+    wird die Tabelle neu gebaut und der Bestand uebernommen. Die alten Zeilen
+    behalten ihre session_id und bekommen kein match_id - sie sind Historie.
+    """
+    conn.executescript("""
+        CREATE TABLE download_log_neu (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            match_id INTEGER,
+            session_id TEXT,
+            filename TEXT NOT NULL,
+            file_type TEXT NOT NULL,
+            downloaded_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        );
+
+        INSERT INTO download_log_neu
+            (id, user_id, session_id, filename, file_type, downloaded_at)
+        SELECT id, user_id, session_id, filename, file_type, downloaded_at
+        FROM download_log;
+
+        DROP TABLE download_log;
+        ALTER TABLE download_log_neu RENAME TO download_log;
+
+        CREATE INDEX idx_download_log_user ON download_log (user_id, downloaded_at DESC);
+    """)
+
+
 # (Version, Beschreibung, Funktion) - aufsteigend, Luecken sind nicht erlaubt.
 MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "baseline schema", _migration_001_baseline),
     (2, "wal journal mode", _migration_002_wal),
     (3, "matches, officials and expenses", _migration_003_matches),
     (4, "scrape runs replace session metadata", _migration_004_scrape_runs),
+    (5, "downloads reference matches", _migration_005_download_log_matches),
 ]
 
 

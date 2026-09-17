@@ -11,9 +11,14 @@ from typing import Dict, List, Optional
 from datetime import datetime
 from contextlib import asynccontextmanager
 import multiprocessing
+import asyncio
+import unicodedata
+from io import BytesIO
+from urllib.parse import quote
 
 from fastapi import FastAPI, Depends, HTTPException
-from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
+from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import FileResponse, JSONResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -32,7 +37,7 @@ from main import scrape_matches_with_session, generate_documents_in_session
 from utils.session_manager import SessionManager
 from utils.logger import setup_logger
 from utils.match_utils import generate_filename_from_match, extract_iso_date_from_anpfiff
-from utils.pdf_converter import convert_docx_files_to_pdf
+from utils.pdf_converter import convert_docx_files_to_pdf, convert_docx_bytes_to_pdf
 from generator.docx_generator import SpesenGenerator
 from generator.spesen_calculator import calculate_spesen, format_spesen
 from db.scrape_runs import (
@@ -40,6 +45,12 @@ from db.scrape_runs import (
     update_run,
     get_latest_run,
     fail_stale_runs,
+)
+from db.matches import (
+    get_matches_for_user,
+    get_match,
+    set_official_expenses,
+    count_distinct_matches,
 )
 from db.database import (
     init_database,
@@ -136,6 +147,20 @@ async def serve_favicon():
 
 # Session Manager global
 session_manager = SessionManager()
+
+# Vorlagenpfad und Generator fuer den Download-Pfad. Der Generator haelt keinen
+# Zustand und braucht kein Ausgabeverzeichnis - er liefert Bytes.
+TEMPLATE_PATH = src_path / "data" / "Spesenabrechnung_Vorlage.docx"
+document_generator = SpesenGenerator(TEMPLATE_PATH)
+
+# Jede PDF-Konvertierung startet einen eigenen LibreOffice-Prozess mit 150-300 MB.
+# Ohne Begrenzung legen ein paar gleichzeitige Downloads den Container lahm.
+PDF_MAX_CONCURRENCY = int(os.getenv("PDF_MAX_CONCURRENCY", "2"))
+_pdf_semaphore = asyncio.Semaphore(PDF_MAX_CONCURRENCY)
+
+# Obergrenze fuer eine Sammel-ZIP. Reines DOCX kostet ~25 ms pro Dokument,
+# die PDF-Konvertierung dominiert mit ein paar Sekunden pro Aufruf.
+MAX_BULK_DOWNLOAD = int(os.getenv("MAX_BULK_DOWNLOAD", "50"))
 
 app.include_router(auth_router)
 
@@ -750,6 +775,166 @@ async def get_session_matches(
         raise APIError(f"Fehler beim Laden der Match-Daten: {str(e)}")
 
 
+# ===== Download-Endpunkte: Dokumente entstehen bei jedem Abruf neu =====
+
+DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+
+def _content_disposition(filename: str) -> Dict[str, str]:
+    """
+    Baut den Content-Disposition-Header fuer einen Dateinamen.
+
+    Vereinsnamen enthalten Umlaute und Sonderzeichen ("FSV Preußen"), HTTP-Header
+    sind aber auf latin-1 begrenzt - ein roher UTF-8-Name kommt verstuemmelt an
+    oder laesst den Response beim Kodieren scheitern. Also ASCII-Variante als
+    Rueckfallebene plus filename* nach RFC 5987, das jeder aktuelle Browser
+    bevorzugt.
+    """
+    ascii_name = unicodedata.normalize("NFKD", filename).encode("ascii", "ignore").decode("ascii")
+    ascii_name = ascii_name.replace('"', "") or "Spesenabrechnung"
+    quoted = quote(filename, safe="")
+
+    return {"Content-Disposition": f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{quoted}'}
+
+
+def _owned_match(match_id: int, user_id: int) -> dict:
+    """Laedt ein Spiel und stellt sicher, dass es dem User gehoert."""
+    match = get_match(match_id)
+
+    if not match:
+        raise NotFoundError("Spiel nicht gefunden")
+
+    if match['user_id'] != user_id:
+        raise AuthorizationError("Dieses Spiel gehört einem anderen User")
+
+    return match
+
+
+def _render_docx(match: dict) -> tuple:
+    """Rendert ein Spiel zu (Dateiname, DOCX-Bytes)."""
+    filename = generate_filename_from_match(match)
+    content = document_generator.render_document(match, expenses=match.get('expenses'))
+    return filename, content
+
+
+async def _render_pdfs(documents: List[tuple]) -> Dict[str, bytes]:
+    """
+    Konvertiert gerenderte DOCX zu PDF.
+
+    Zwei Dinge sind hier wesentlich: die Konvertierung laeuft in einem Thread,
+    weil sie sekundenlang blockiert und sonst den kompletten Event-Loop
+    anhaelt, und sie laeuft nur begrenzt nebenlaeufig, weil jeder Aufruf einen
+    eigenen LibreOffice-Prozess startet.
+    """
+    async with _pdf_semaphore:
+        return await run_in_threadpool(convert_docx_bytes_to_pdf, documents)
+
+
+@app.get("/api/matches/{match_id}/download/{file_format}")
+async def download_match_document(
+    match_id: int,
+    file_format: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Erzeugt die Abrechnung eines Spiels und liefert sie aus - ohne dass
+    jemals eine Datei auf der Platte entsteht.
+    """
+    if file_format not in ("docx", "pdf"):
+        raise APIError(400, "INVALID_FORMAT", "Format muss docx oder pdf sein")
+
+    user_id = current_user['id']
+    match = _owned_match(match_id, user_id)
+
+    filename, docx_bytes = await run_in_threadpool(_render_docx, match)
+
+    if file_format == "docx":
+        log_download(user_id, filename, "docx", match_id=match_id)
+        return Response(
+            content=docx_bytes,
+            media_type=DOCX_MIME,
+            headers=_content_disposition(filename),
+        )
+
+    pdfs = await _render_pdfs([(filename, docx_bytes)])
+    pdf_bytes = pdfs.get(filename)
+
+    if not pdf_bytes:
+        raise APIError(503, "PDF_CONVERSION_FAILED",
+                       "Die PDF-Erzeugung ist fehlgeschlagen. Bitte erneut versuchen "
+                       "oder das Word-Dokument herunterladen.")
+
+    pdf_filename = filename.replace(".docx", ".pdf")
+    log_download(user_id, pdf_filename, "pdf", match_id=match_id)
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers=_content_disposition(pdf_filename),
+    )
+
+
+class BulkDownloadRequest(BaseModel):
+    """Auswahl fuer den Sammel-Download"""
+    match_ids: List[int]
+    file_format: str = "both"
+
+
+@app.post("/api/matches/download")
+async def download_matches_as_zip(
+    request: BulkDownloadRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Packt die ausgewaehlten Spiele in ein ZIP - im Speicher, ohne Zwischenablage
+    auf der Platte. Loest den alten Session-ZIP-Download ab, der immer "alles
+    aus diesem Lauf" war und nie PDFs enthielt.
+    """
+    if request.file_format not in ("docx", "pdf", "both"):
+        raise APIError(400, "INVALID_FORMAT", "Format muss docx, pdf oder both sein")
+
+    if not request.match_ids:
+        raise APIError(400, "NO_SELECTION", "Es wurde kein Spiel ausgewählt")
+
+    if len(request.match_ids) > MAX_BULK_DOWNLOAD:
+        raise APIError(400, "TOO_MANY_MATCHES",
+                       f"Bitte höchstens {MAX_BULK_DOWNLOAD} Spiele auf einmal auswählen")
+
+    user_id = current_user['id']
+    matches = [_owned_match(match_id, user_id) for match_id in request.match_ids]
+
+    documents = await run_in_threadpool(lambda: [_render_docx(m) for m in matches])
+
+    pdfs = {}
+    if request.file_format in ("pdf", "both"):
+        pdfs = await _render_pdfs(documents)
+        if not pdfs:
+            raise APIError(503, "PDF_CONVERSION_FAILED",
+                           "Die PDF-Erzeugung ist fehlgeschlagen. Bitte erneut versuchen "
+                           "oder die Word-Dokumente herunterladen.")
+
+    buffer = BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        for filename, content in documents:
+            if request.file_format in ("docx", "both"):
+                archive.writestr(filename, content)
+
+            pdf_bytes = pdfs.get(filename)
+            if pdf_bytes:
+                archive.writestr(filename.replace(".docx", ".pdf"), pdf_bytes)
+
+    zip_name = f"Spesen_{datetime.now().strftime('%Y-%m-%d')}.zip"
+
+    for match, (filename, _) in zip(matches, documents):
+        log_download(user_id, filename, request.file_format, match_id=match['id'])
+
+    return Response(
+        content=buffer.getvalue(),
+        media_type="application/zip",
+        headers=_content_disposition(zip_name),
+    )
+
+
 # WICHTIG: ZIP-Download MUSS VOR dem Einzelfile-Download kommen!
 # Sonst matched FastAPI /all als filename
 @app.get("/api/download/{session_id}/all")
@@ -837,7 +1022,7 @@ async def download_all_as_zip(
 
         # Download protokollieren (best-effort, blockiert den Download nie)
         try:
-            log_download(user_id, session_id, zip_filename, 'zip')
+            log_download(user_id, zip_filename, 'zip', session_id=session_id)
         except Exception as e:
             logger.error(f"Download-Logging fehlgeschlagen: {e}")
 
@@ -899,7 +1084,7 @@ async def download_file(
     # Download protokollieren (best-effort, blockiert den Download nie)
     try:
         file_type = filename.rsplit('.', 1)[-1].lower() if '.' in filename else 'unbekannt'
-        log_download(user_id, session_id, filename, file_type)
+        log_download(user_id, filename, file_type, session_id=session_id)
     except Exception as e:
         logger.error(f"Download-Logging fehlgeschlagen: {e}")
 

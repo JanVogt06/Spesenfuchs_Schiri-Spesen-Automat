@@ -302,18 +302,34 @@ def log_login(user_id: int) -> None:
     conn.close()
 
 
-def log_download(user_id: int, session_id: str, filename: str, file_type: str) -> None:
-    """Protokolliert einen Download (fuer Nutzungsstatistik)"""
+def log_download(user_id: int, filename: str, file_type: str,
+                 match_id: Optional[int] = None, session_id: Optional[str] = None) -> None:
+    """
+    Protokolliert einen Download (fuer Nutzungsstatistik).
+
+    Downloads haengen an einem Spiel; session_id gibt es nur noch fuer die
+    Altlast-Endpunkte, solange die existieren.
+    """
     conn = get_connection()
     cursor = conn.cursor()
 
     cursor.execute("""
-        INSERT INTO download_log (user_id, session_id, filename, file_type, downloaded_at)
-        VALUES (?, ?, ?, ?, ?)
-    """, (user_id, session_id, filename, file_type, datetime.now(UTC).isoformat()))
+        INSERT INTO download_log (user_id, match_id, session_id, filename, file_type, downloaded_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (user_id, match_id, session_id, filename, file_type, datetime.now(UTC).isoformat()))
 
     conn.commit()
     conn.close()
+
+
+def count_downloads() -> int:
+    """Gesamtzahl aller Downloads - fuer die Zahl auf der Startseite."""
+    conn = get_connection()
+
+    try:
+        return conn.execute("SELECT COUNT(*) AS n FROM download_log").fetchone()["n"] or 0
+    finally:
+        conn.close()
 
 
 # ===== MATCH EXPENSES FUNKTIONEN =====
