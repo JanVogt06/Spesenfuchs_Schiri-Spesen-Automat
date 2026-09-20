@@ -57,6 +57,7 @@ from db.database import (
     init_database,
     log_download,
 )
+from db.stammdaten import get_stammdaten
 from api.auth import router as auth_router, get_current_user
 from core.errors import (
     APIError,
@@ -706,6 +707,22 @@ async def get_public_stats():
         count = 0
     return {"matches_total": count}
 
+
+
+@app.get("/api/stammdaten")
+async def get_own_stammdaten(current_user: dict = Depends(get_current_user)):
+    """
+    Die eigenen Stammdaten des angemeldeten Users aus DFBnet.
+
+    Vor dem ersten Abruf kommt bewusst 200 mit null zurueck und kein 404 oder
+    401: der Interceptor im Frontend wirft den Nutzer bei jedem 401 hart auf
+    die Login-Seite, und "noch nichts abgerufen" ist ein Leerzustand, kein
+    Fehler.
+
+    Ein Scoping-Check wie _owned_match braucht es nicht - der Schluessel der
+    Tabelle IST die user_id.
+    """
+    return get_stammdaten(current_user['id'])
 
 # ===== Frontend Routes =====
 @app.get("/")

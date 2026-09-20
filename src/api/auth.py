@@ -14,6 +14,7 @@ from db.database import (
     update_user_password,
     log_login
 )
+from db.stammdaten import delete_stammdaten
 from core.security import hash_password, verify_password, create_access_token, decode_access_token
 from core.encryption import encrypt_credential, decrypt_credential
 from core.errors import (
@@ -214,8 +215,31 @@ async def save_dfb_credentials(
     encrypted_username = encrypt_credential(request.dfb_username)
     encrypted_password = encrypt_credential(request.dfb_password)
 
+    # Gehoert der neue Zugang noch zum selben DFBnet-Konto? Muss VOR dem
+    # Ueberschreiben geprueft werden.
+    try:
+        bisher = get_dfb_credentials(user_id)
+        gleiches_konto = bool(bisher) and decrypt_credential(
+            bisher['dfb_username_encrypted']
+        ) == request.dfb_username
+    except Exception:
+        # Laesst sich der alte Benutzername nicht mehr entschluesseln, wird im
+        # Zweifel geloescht: lieber ein leerer Reiter als fremde Personendaten.
+        gleiches_konto = False
+
     # In DB speichern
     update_dfb_credentials(user_id, encrypted_username, encrypted_password)
+
+    # Die gespeicherten Stammdaten gehoeren zum bisherigen DFBnet-Konto. Zeigt
+    # jemand die App auf ein anderes Konto, stuenden dort bis zum naechsten
+    # erfolgreichen Abruf Name, Anschrift und Geburtsdatum einer anderen
+    # Person - also weg damit.
+    #
+    # Ein reiner Passwortwechsel laesst sie dagegen stehen. DFBnet erzwingt den
+    # regelmaessig; wuerde er die Stammdaten mitnehmen, waere der Reiter danach
+    # jedes Mal bis zum naechsten Nachtlauf leer.
+    if not gleiches_konto:
+        delete_stammdaten(user_id)
 
     return DFBCredentialsResponse(
         success=True,
