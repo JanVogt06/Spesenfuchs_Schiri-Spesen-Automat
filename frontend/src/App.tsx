@@ -4,6 +4,7 @@ import {RegisterPage} from './pages/Register';
 import {LandingPage} from './pages/Landing';
 import {DashboardPage} from './pages/Dashboard';
 import {SettingsPage} from './pages/Settings';
+import {SpesenPage} from './pages/Spesen';
 import {SaisonPage} from './pages/Saison';
 import {StammdatenPage} from './pages/Stammdaten';
 import {isAuthenticated} from './lib/auth';
@@ -32,6 +33,15 @@ function App() {
                     element={
                         <ProtectedRoute>
                             <DashboardPage/>
+                        </ProtectedRoute>
+                    }
+                />
+
+                <Route
+                    path="/spesen"
+                    element={
+                        <ProtectedRoute>
+                            <SpesenPage/>
                         </ProtectedRoute>
                     }
                 />
