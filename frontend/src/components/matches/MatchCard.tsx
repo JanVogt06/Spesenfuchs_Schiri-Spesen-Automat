@@ -519,6 +519,14 @@ export function MatchCard({
                             <CardTitle className="break-words text-sm sm:text-base">
                                 {getMatchTitle()}
                             </CardTitle>
+                            {match._missing_since && (
+                                <span
+                                    className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive ring-1 ring-destructive/20"
+                                    title="Dieses Spiel stand beim letzten Abruf nicht mehr in deiner DFBnet-Ansetzung."
+                                >
+                                    Nicht mehr angesetzt
+                                </span>
+                            )}
                             {renderHeaderSpesen()}
                         </div>
                         <p className="flex items-center gap-1.5 break-words text-xs text-muted-foreground sm:text-sm">
