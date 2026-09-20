@@ -17,11 +17,16 @@ from apscheduler.triggers.cron import CronTrigger
 from db.database import get_all_users, get_dfb_credentials
 from db.scrape_runs import start_run, update_run, fail_stale_runs
 from core.encryption import decrypt_credential
+from core.errors import DFBCredentialsInvalidError
 from utils.logger import setup_logger
 
 from main import scrape_matches
 
 logger = setup_logger("auto_scheduler")
+
+# Wie lange ein einzelner User-Abruf hoechstens laufen darf. Ein voller Scrape
+# mit Login dauert wenige Minuten; danach haengt der Prozess.
+USER_TIMEOUT_SECONDS = 20 * 60
 
 
 def run_scrape_for_user(user_id: int, email: str, dfb_username: str, dfb_password: str, run_id: int):
@@ -56,6 +61,21 @@ def run_scrape_for_user(user_id: int, email: str, dfb_username: str, dfb_passwor
             finished=True,
         )
         process_logger.info(f"[User {user_id}] Abruf abgeschlossen: {anzahl} Spiele")
+
+    except DFBCredentialsInvalidError as e:
+        # Eigener Zweig wie im API-Pfad: das Frontend schickt den Nutzer bei
+        # diesem Code in die Einstellungen. Ohne ihn saehe er nach einem
+        # naechtlichen Lauf nur "ein Fehler ist aufgetreten".
+        process_logger.error(f"[User {user_id}] DFB-Login fehlgeschlagen: {e.message}")
+        update_run(
+            run_id,
+            status="failed",
+            step="Fehler",
+            error_code="DFB_CREDENTIALS_INVALID",
+            error_message="Die DFBnet-Zugangsdaten sind ungültig. Bitte prüfe Benutzername "
+                          "und Passwort in den Einstellungen.",
+            finished=True,
+        )
 
     except Exception as e:
         process_logger.error(f"[User {user_id}] Fehler: {e}", exc_info=True)
@@ -101,8 +121,25 @@ class AutoScrapeScheduler:
             )
             process.start()
 
-            # Warten, bevor der naechste User drankommt - ein Browser genuegt
-            await asyncio.get_event_loop().run_in_executor(None, process.join)
+            # Warten, bevor der naechste User drankommt - ein Browser genuegt.
+            # Mit Zeitlimit: haengt ein Kindprozess, waere sonst der ganze
+            # naechtliche Lauf blockiert und alle folgenden User kaemen nie dran.
+            await asyncio.get_event_loop().run_in_executor(
+                None, process.join, USER_TIMEOUT_SECONDS
+            )
+
+            if process.is_alive():
+                logger.error(
+                    f"[User {user_id}] Abruf laeuft nach {USER_TIMEOUT_SECONDS}s noch - "
+                    "wird beendet"
+                )
+                process.terminate()
+                await asyncio.get_event_loop().run_in_executor(None, process.join, 10)
+                update_run(run_id, status="failed", step="Zeitüberschreitung",
+                           error_code="GENERATION_ERROR",
+                           error_message="Der Abruf hat zu lange gedauert und wurde beendet.",
+                           finished=True)
+                return {"user_id": user_id, "email": email, "success": False, "reason": "timeout"}
 
             logger.info(f"[User {user_id}] Prozess abgeschlossen")
             return {"user_id": user_id, "email": email, "success": True, "run_id": run_id}

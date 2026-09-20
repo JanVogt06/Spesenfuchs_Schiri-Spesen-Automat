@@ -44,6 +44,7 @@ from db.scrape_runs import (
     start_run,
     update_run,
     get_latest_run,
+    has_active_run,
     fail_stale_runs,
 )
 from db.matches import (
@@ -325,6 +326,13 @@ async def generate_spesen(
     # Laeufe, deren Prozess gestorben ist, vorher abraeumen - sonst haengt
     # der Poll des Frontends am alten Lauf fest
     fail_stale_runs()
+
+    # Ein zweiter Lauf desselben Users waere ein zweiter Playwright-Prozess mit
+    # demselben DFBnet-Login, und der Poll wuesste nicht mehr, welchen Lauf er
+    # anzeigt. Doppelklick oder eine Kollision mit dem naechtlichen Job.
+    if has_active_run(user_id):
+        raise APIError(409, "RUN_ALREADY_ACTIVE",
+                       "Es läuft bereits ein Abruf. Bitte warte, bis er fertig ist.")
 
     run_id = start_run(user_id)
 
@@ -640,9 +648,18 @@ async def trigger_scheduler_now(current_user: dict = Depends(get_current_user)):
     """
     Startet den naechtlichen Abruf sofort (fuer Testzwecke).
 
-    ACHTUNG: betrifft ALLE User.
+    ACHTUNG: betrifft ALLE User - der Lauf entschluesselt die DFBnet-Zugangs-
+    daten jedes Kontos und meldet sich damit an. Es gibt in diesem Projekt
+    keine Rollen, also war der Endpunkt fuer jeden registrierten Nutzer offen.
+    Er ist deshalb standardmaessig abgeschaltet und muss ueber die Umgebung
+    freigegeben werden.
     """
-    logger.info(f"Manueller Scheduler-Trigger durch User {current_user['email']}")
+    if os.getenv("ALLOW_SCHEDULER_TRIGGER", "").lower() not in ("1", "true", "yes"):
+        raise APIError(403, "TRIGGER_DISABLED",
+                       "Der manuelle Sammel-Abruf ist abgeschaltet. "
+                       "Zum Freigeben ALLOW_SCHEDULER_TRIGGER=1 setzen.")
+
+    logger.warning(f"Manueller Scheduler-Trigger durch User {current_user['email']}")
 
     scheduler = get_scheduler()
     asyncio.create_task(scheduler.scrape_all_users())
