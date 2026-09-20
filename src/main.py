@@ -15,8 +15,9 @@ from generator.docx_generator import KM_SATZ_EURO
 from generator.spesen_calculator import calculate_spesen
 from db.matches import upsert_match, mark_missing_matches, build_match_key
 from db.stammdaten import upsert_stammdaten
+from db.season import replace_saison
 from utils.logger import setup_logger
-from utils.match_utils import extract_iso_date_from_anpfiff
+from utils.match_utils import extract_iso_date_from_anpfiff, parse_saison_datum
 
 logger = setup_logger("main")
 
@@ -101,6 +102,67 @@ def persist_stammdaten(user_id: int, stammdaten: dict) -> None:
         logger.info(f"Stammdaten gespeichert ({gefuellt} Felder)")
     except Exception as e:
         logger.error(f"Stammdaten konnten nicht gespeichert werden: {e}")
+
+
+def persist_saisons(user_id: int, saisons: dict) -> int:
+    """
+    Schreibt die gelesenen Saisons in die Datenbank - jede fuer sich ersetzend.
+
+    Eine unvollstaendig gelesene Saison wird NICHT geschrieben. Die Tabellen
+    werden pro Saison geleert und neu befuellt; mit einem halben Ergebnis
+    wuerde dabei der gute Bestand vernichtet. Lieber bleibt der alte Stand
+    stehen, bis der naechste Lauf die Saison sauber liest.
+
+    Returns:
+        Anzahl der ersetzten Saisons.
+    """
+    ersetzt = 0
+
+    for saison, daten in saisons.items():
+        if not daten.get("vollstaendig"):
+            logger.warning(f"Saison {saison} unvollstaendig gelesen - bleibt unveraendert")
+            continue
+
+        try:
+            spiele = []
+            for roh in daten.get("spiele", []):
+                datum, uhrzeit = parse_saison_datum(roh.get("datum_text", ""))
+                gespann = roh.get("gespann") or []
+                eigene = next((p.get("rolle", "") for p in gespann if p.get("selbst")), "")
+
+                spiele.append({
+                    "datum": datum,
+                    "uhrzeit": uhrzeit,
+                    "liga": roh.get("liga", ""),
+                    "heim": roh.get("heim", ""),
+                    "gast": roh.get("gast", ""),
+                    "ergebnis": roh.get("ergebnis", ""),
+                    "heim_gelb": roh.get("heim_gelb"),
+                    "heim_gelbrot": roh.get("heim_gelbrot"),
+                    "heim_rot": roh.get("heim_rot"),
+                    "gast_gelb": roh.get("gast_gelb"),
+                    "gast_gelbrot": roh.get("gast_gelbrot"),
+                    "gast_rot": roh.get("gast_rot"),
+                    "eigene_rolle": eigene,
+                    "gespann": gespann,
+                })
+
+            geschrieben = replace_saison(
+                user_id,
+                saison,
+                spiele=spiele,
+                einsaetze=daten.get("einsaetze", []),
+                lehrgaenge=daten.get("lehrgaenge", {}),
+            )
+            ersetzt += 1
+            logger.info(f"Saison {saison}: {geschrieben} Spiele gespeichert")
+
+        except Exception as e:
+            logger.error(f"Saison {saison} konnte nicht gespeichert werden: {e}")
+            continue
+
+    logger.info(f"{ersetzt}/{len(saisons)} Saisons in der Datenbank")
+    return ersetzt
 
 
 def scrape_matches(
@@ -199,9 +261,27 @@ def scrape_matches(
         except Exception as e:
             logger.warning(f"Stammdaten konnten nicht gelesen werden: {e}")
 
+        # Und zum Schluss die Saisonzusammenfassung - wieder nur ein Reiter
+        # weiter im selben Tab. Auch sie mit eigenem try/except: sie laeuft
+        # ueber alle Saisons und ist damit der laengste Schritt, aber die
+        # Ansetzungen sind das Produkt und duerfen daran nicht scheitern.
+        saisons = {}
+
+        try:
+            melde(len(all_matches), erwartet, "Lese Saisonzusammenfassung...")
+
+            scraper.open_referee_tab(
+                "matches-statistics", "sria-matches-statistics-officiated-games-card"
+            )
+            saisons = scraper.scrape_saisons(progress_callback=fortschritt)
+
+        except Exception as e:
+            logger.warning(f"Saisonzusammenfassung konnte nicht gelesen werden: {e}")
+
     if user_id is not None:
         persist_matches(user_id, all_matches, vollstaendig=vollstaendig)
         persist_stammdaten(user_id, stammdaten)
+        persist_saisons(user_id, saisons)
 
     logger.info(f"Erfolgreich {len(all_matches)} Spiele gescrapt")
     return all_matches

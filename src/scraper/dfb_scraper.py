@@ -1,4 +1,5 @@
 import sys
+import time
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright, Page, Browser
@@ -870,6 +871,403 @@ class DFBScraper:
         except Exception as e:
             logger.error(f"Fehler beim Extrahieren der Spielstätten-Info: {e}")
             return {}
+
+    # ===== Saisonzusammenfassung (Reiter "Spiele & Statistiken") =====
+
+    _SPIELE_KARTE = 'sria-matches-statistics-officiated-games-card'
+    _BILANZ_KARTE = 'sria-matches-statistics-countable-games-card'
+
+    # Die Datenzeilen dieser Tabelle stehen bei DFBnet im <thead>, nicht im
+    # <tbody> - ein 'tbody tr' fände nichts. Gefiltert wird deshalb über
+    # "enthält td-Zellen".
+    #
+    # Spalte 1 ist St.-Kzb. und wird bewusst übersprungen.
+    # Im Gespann trägt der EIGENE Name die Klasse fw-700; daraus wird die
+    # eigene Rolle im Spiel abgeleitet.
+    _SPIELE_JS = r"""
+        (karte) => {
+            const tabelle = karte.querySelector('table');
+            if (!tabelle) return [];
+
+            const zeilen = [...tabelle.querySelectorAll('tr')]
+                .filter(tr => tr.querySelectorAll('td').length > 0);
+
+            return zeilen.map(tr => {
+                const z = [...tr.children].map(
+                    td => td.textContent.trim().replace(/\s+/g, ' ')
+                );
+
+                const srZelle = tr.children[12];
+                const gespann = srZelle
+                    ? [...srZelle.querySelectorAll('div.d-flex')].map(d => {
+                          const rolle = d.querySelector('div.team-role');
+                          const name = rolle ? rolle.nextElementSibling : null;
+                          if (!rolle || !name) return null;
+                          return {
+                              rolle: rolle.textContent.trim(),
+                              name: name.textContent.trim(),
+                              selbst: name.classList.contains('fw-700'),
+                          };
+                      }).filter(Boolean)
+                    : [];
+
+                return {
+                    datum_text: z[0] || '',
+                    liga: z[2] || '',
+                    heim: z[3] || '',
+                    gast: z[4] || '',
+                    ergebnis: z[5] || '',
+                    heim_gelb: z[6] || '',
+                    heim_gelbrot: z[7] || '',
+                    heim_rot: z[8] || '',
+                    gast_gelb: z[9] || '',
+                    gast_gelbrot: z[10] || '',
+                    gast_rot: z[11] || '',
+                    gespann: gespann,
+                };
+            });
+        }
+    """
+
+    # Die Seite meldet ihre Gesamtzahl als "(85 Treffer)". Das ist der einzige
+    # verlässliche Anker dafür, ob wirklich alles gelesen wurde.
+    _TREFFER_JS = r"""
+        (karte) => {
+            const m = karte.textContent.match(/\((\d+)\s*Treffer\)/);
+            return m ? Number(m[1]) : null;
+        }
+    """
+
+    _BILANZ_JS = r"""
+        (karte) => {
+            const lies = (t) => [...t.querySelectorAll('tr')].map(
+                tr => [...tr.children].map(
+                    c => c.textContent.trim().replace(/\s+/g, ' ')
+                )
+            );
+            const tabellen = [...karte.querySelectorAll('table')];
+            return {
+                einsaetze: tabellen[0] ? lies(tabellen[0]) : [],
+                lehrgaenge: tabellen[1] ? lies(tabellen[1]) : [],
+            };
+        }
+    """
+
+    @staticmethod
+    def _dropdown_optionen(dropdown) -> list:
+        """
+        Beschriftungen eines dfb-dropdown-input.
+
+        Die Einträge liegen auch eingeklappt im DOM, gelesen wird deshalb
+        textContent - innerText wäre bei ausgeblendeten Elementen leer.
+        """
+        return dropdown.locator('button.dropdown-item').evaluate_all(
+            "els => els.map(e => e.textContent.trim())"
+        )
+
+    def _dropdown_waehlen(self, dropdown, wert: str):
+        """
+        Wählt einen Eintrag in einem dfb-dropdown-input.
+
+        Zwei Feinheiten:
+
+        1. Eingeklappt sind die Einträge zwar im DOM, aber nicht anklickbar -
+           erst der Toggle, dann der Eintrag.
+        2. Ausgewählt wird über den Index, nicht über einen Textselektor:
+           "10 Ergebnisse pro Seite" ist ein Teilstring von "100 Ergebnisse
+           pro Seite", ein has_text träfe die falsche Zeile.
+        """
+        texte = self._dropdown_optionen(dropdown)
+
+        if wert not in texte:
+            raise Exception(f"Eintrag '{wert}' nicht vorhanden, verfügbar: {texte}")
+
+        dropdown.locator('.dropdown-toggle').first.click()
+        dropdown.locator('button.dropdown-item').nth(texte.index(wert)).click()
+
+    def _spiele_karte(self):
+        return self.page.locator(self._SPIELE_KARTE).first
+
+    def _spiele_dropdowns(self) -> list:
+        return self._spiele_karte().locator('dfb-dropdown-input').all()
+
+    def _treffer(self):
+        return self._spiele_karte().evaluate(self._TREFFER_JS)
+
+    def _spielzeilen(self) -> list:
+        return self._spiele_karte().evaluate(self._SPIELE_JS) or []
+
+    def _warte_auf_spieltabelle(self, vorherige_kennung, erwartet=None,
+                                seitengroesse: int = 100, timeout_ms: int = 45000):
+        """
+        Wartet, bis die Tabelle die gewählte Seite vollständig zeigt.
+
+        Eine feste Pause reicht nicht: beim Durchzählen aller Saisons auf der
+        echten Seite kam eine Saison mit 85 gemeldeten Treffern und 0
+        gelesenen Zeilen heraus - die Tabelle hatte noch nicht neu gerendert.
+
+        Zwei Bedingungen:
+
+        - Die Zeilenzahl muss der Soll-Zahl entsprechen. Die ist NICHT immer
+          min(Treffer, Seitengröße): auf der letzten Seite einer Blätterung
+          sind es nur die restlichen Zeilen. Wer das verwechselt, wartet dort
+          bis zum Timeout.
+        - Die erste Zeile muss sich geändert haben, sonst ginge beim Wechsel
+          zwischen zwei Saisons mit zufällig gleicher Spielzahl der alte
+          Inhalt als fertig durch. Darauf wird aber nur eine Frist lang
+          bestanden: wird dieselbe Saison noch einmal gewählt - die erste ist
+          beim Start bereits aktiv -, ändert sich nichts, und ohne die Frist
+          liefe auch das in den Timeout.
+
+        Args:
+            erwartet: Soll-Zeilenzahl dieser Seite; None leitet sie aus der
+                      gemeldeten Trefferzahl ab (erste Seite einer Saison).
+
+        Returns:
+            Tuple (zeilen, treffer)
+        """
+        jetzt = time.monotonic()
+        ende = jetzt + timeout_ms / 1000
+        frist_wechsel = jetzt + 5
+
+        while time.monotonic() < ende:
+            treffer = self._treffer()
+            zeilen = self._spielzeilen()
+
+            if treffer is not None:
+                soll = erwartet if erwartet is not None else min(treffer, seitengroesse)
+                gewechselt = self._zeilen_kennung(zeilen) != vorherige_kennung
+
+                if len(zeilen) == soll and (gewechselt or time.monotonic() > frist_wechsel):
+                    return zeilen, treffer
+
+            self.page.wait_for_timeout(300)
+
+        treffer = self._treffer()
+        zeilen = self._spielzeilen()
+        logger.warning(
+            f"Spieltabelle nicht rechtzeitig vollständig: {len(zeilen)} Zeilen, "
+            f"erwartet {erwartet}, gemeldete Treffer {treffer}"
+        )
+        return zeilen, treffer
+
+    @staticmethod
+    def _zeilen_kennung(zeilen: list):
+        """Kennung der ersten Zeile, um einen Tabellenwechsel zu erkennen."""
+        if not zeilen:
+            return None
+        erste = zeilen[0]
+        return f"{erste.get('datum_text')}|{erste.get('heim')}|{erste.get('gast')}"
+
+    def _blaettere_durch(self, zeilen: list, treffer: int, seitengroesse: int) -> list:
+        """
+        Sammelt die restlichen Seiten ein, falls die Saison länger ist als eine
+        Seite.
+
+        Geblättert wird über den Vor-Knopf und nicht über die Seitenzahlen: die
+        Liste der Zahlen ist ein Fenster (bei 9 Seiten stehen nur "1 2 3 4 5"
+        da), der Vor-Knopf dagegen führt zuverlässig bis ans Ende und meldet
+        sich am Schluss selbst als deaktiviert.
+        """
+        alle = list(zeilen)
+
+        # Die vier Knöpfe sind Anfang, zurück, vor, Ende - der Vor-Knopf wird
+        # über sein Icon gesucht, nicht über seine Position.
+        vor_index = self._spiele_karte().evaluate("""
+            (karte) => {
+                const pag = karte.querySelector('dfb-pagination');
+                if (!pag) return -1;
+                const knoepfe = [...pag.querySelectorAll('button')]
+                    .filter(b => !b.classList.contains('dropdown-item'));
+                return knoepfe.findIndex(b => b.querySelector('dfb-arrow-dropdown-right-icon'));
+            }
+        """)
+
+        if vor_index < 0:
+            logger.warning("Kein Vor-Knopf gefunden - es bleibt bei einer Seite")
+            return alle
+
+        knoepfe = self._spiele_karte().locator(
+            'dfb-pagination button:not(.dropdown-item)'
+        )
+
+        # Obergrenze als Reissleine gegen eine Blätterung, die nie endet.
+        max_seiten = treffer // seitengroesse + 2
+
+        for _ in range(max_seiten):
+            if len(alle) >= treffer:
+                break
+
+            vor = knoepfe.nth(vor_index)
+            if vor.is_disabled():
+                break
+
+            kennung = self._zeilen_kennung(self._spielzeilen())
+            vor.click()
+
+            # Die letzte Seite ist kuerzer als die Seitengroesse.
+            erwartet = min(seitengroesse, treffer - len(alle))
+            neue, _ = self._warte_auf_spieltabelle(
+                kennung, erwartet=erwartet, seitengroesse=seitengroesse
+            )
+            if not neue:
+                break
+
+            alle.extend(neue)
+
+        return alle
+
+    def extract_saison_namen(self) -> list:
+        """
+        Die Saisons, die DFBnet für diesen Schiedsrichter anbietet.
+
+        Bewusst aus dem Auswahlfeld gelesen und nirgends fest hinterlegt: wie
+        weit die Liste zurückreicht, hängt daran, seit wann jemand pfeift.
+        """
+        dropdowns = self._spiele_dropdowns()
+        if not dropdowns:
+            raise Exception("Kein Saison-Auswahlfeld gefunden")
+
+        return self._dropdown_optionen(dropdowns[0])
+
+    def extract_saison_bilanz(self, saison: str) -> dict:
+        """
+        Einsatzbilanz und Lehrgänge einer Saison aus der zweiten Karte.
+
+        Die Karte hat ein EIGENES Saison-Auswahlfeld, das dem der Spieltabelle
+        nicht folgt - es muss getrennt gesetzt werden. Sie lädt außerdem
+        merklich langsamer als die erste, deshalb die großzügige Wartezeit auf
+        ihre Überschrift.
+        """
+        karte = self.page.locator(self._BILANZ_KARTE).first
+
+        try:
+            dropdown = karte.locator('dfb-dropdown-input').first
+            dropdown.locator('button.dropdown-item').first.wait_for(
+                state="attached", timeout=30000
+            )
+            self._dropdown_waehlen(dropdown, saison)
+
+            # Die Karte betitelt ihre Tabellen mit "Saison <name>" - daran ist
+            # zu erkennen, dass sie wirklich umgeschaltet hat.
+            karte.locator('table').first.locator(
+                f'tr:has-text("{saison}")'
+            ).first.wait_for(state="visible", timeout=30000)
+
+            roh = karte.evaluate(self._BILANZ_JS) or {}
+
+        except Exception as e:
+            logger.warning(f"Bilanz für Saison {saison} nicht lesbar: {e}")
+            return {"einsaetze": [], "lehrgaenge": {}}
+
+        einsaetze = []
+        for zeile in roh.get("einsaetze", []):
+            if len(zeile) < 2:
+                continue
+            rolle = (zeile[0] or "").strip()
+            # Überschriftenzeilen der Tabelle überspringen
+            if not rolle or rolle.startswith("Saison") or rolle == "Geleitet":
+                continue
+            einsaetze.append({
+                "rolle": rolle,
+                "geleitet": zeile[1] if len(zeile) > 1 else "",
+                "zurueckgegeben": zeile[2] if len(zeile) > 2 else "",
+                "nicht_angetreten": zeile[3] if len(zeile) > 3 else "",
+            })
+
+        zuordnung = {
+            "Lehrabend": "lehrabend",
+            "Lehrabend (online)": "lehrabend_online",
+            "Leistungsprüfung": "leistungspruefung",
+        }
+        lehrgaenge = {}
+        for zeile in roh.get("lehrgaenge", []):
+            if len(zeile) < 2:
+                continue
+            schluessel = zuordnung.get((zeile[0] or "").strip())
+            if schluessel:
+                lehrgaenge[schluessel] = zeile[1]
+
+        logger.info(
+            f"Saison {saison}: {len(einsaetze)} Einsatzzeilen, "
+            f"{len(lehrgaenge)} Lehrgangswerte"
+        )
+        return {"einsaetze": einsaetze, "lehrgaenge": lehrgaenge}
+
+    def scrape_saisons(self, progress_callback=None) -> dict:
+        """
+        Liest für jede angebotene Saison die geleiteten Spiele und die Bilanz.
+
+        Setzt voraus, dass open_referee_tab("matches-statistics", ...) gelaufen
+        ist.
+
+        Die Seitengröße wird einmal auf 100 gestellt - sie bleibt über einen
+        Saisonwechsel hinweg erhalten. Reicht das nicht (ein Schiedsrichter
+        kann über 100 Spiele in einer Saison haben), wird geblättert.
+
+        Args:
+            progress_callback: wird als (aktuell, gesamt, schritt) aufgerufen
+
+        Returns:
+            Dict saison -> {spiele, einsaetze, lehrgaenge, vollstaendig}
+        """
+        logger.info("=== Lese Saisonzusammenfassung ===")
+
+        seitengroesse = 100
+        karte = self._spiele_karte()
+        karte.locator('table').first.wait_for(state="visible", timeout=30000)
+
+        saisons = self.extract_saison_namen()
+        logger.info(f"Angebotene Saisons: {saisons}")
+
+        dropdowns = self._spiele_dropdowns()
+        try:
+            self._dropdown_waehlen(dropdowns[-1], f"{seitengroesse} Ergebnisse pro Seite")
+            self.page.wait_for_timeout(2000)
+        except Exception as e:
+            # Nicht tödlich: dann wird eben mit der Standardgröße geblättert.
+            logger.warning(f"Seitengröße konnte nicht gesetzt werden: {e}")
+            seitengroesse = 10
+
+        ergebnis = {}
+
+        for nummer, saison in enumerate(saisons, start=1):
+            if progress_callback:
+                progress_callback(nummer, len(saisons), f"Saison {saison} ({nummer}/{len(saisons)})")
+
+            try:
+                kennung = self._zeilen_kennung(self._spielzeilen())
+                self._dropdown_waehlen(self._spiele_dropdowns()[0], saison)
+
+                zeilen, treffer = self._warte_auf_spieltabelle(
+                    kennung, seitengroesse=seitengroesse
+                )
+
+                if treffer is not None and treffer > seitengroesse:
+                    zeilen = self._blaettere_durch(zeilen, treffer, seitengroesse)
+
+                vollstaendig = treffer is not None and len(zeilen) == treffer
+                if not vollstaendig:
+                    logger.warning(
+                        f"Saison {saison}: {len(zeilen)} von {treffer} Spielen gelesen"
+                    )
+
+                bilanz = self.extract_saison_bilanz(saison)
+
+                ergebnis[saison] = {
+                    "spiele": zeilen,
+                    "einsaetze": bilanz["einsaetze"],
+                    "lehrgaenge": bilanz["lehrgaenge"],
+                    "vollstaendig": vollstaendig,
+                }
+                logger.info(f"✓ Saison {saison}: {len(zeilen)}/{treffer} Spiele")
+
+            except Exception as e:
+                logger.error(f"Saison {saison} konnte nicht gelesen werden: {e}")
+                continue
+
+        logger.info(f"=== Saisonzusammenfassung: {len(ergebnis)}/{len(saisons)} Saisons ===")
+        return ergebnis
 
     def scrape_all_matches(self, progress_callback=None):
         """

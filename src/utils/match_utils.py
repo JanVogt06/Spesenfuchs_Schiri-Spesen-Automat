@@ -141,3 +141,37 @@ def sanitize_team_name(team_name: str) -> str:
         result = result.replace(old, new)
 
     return result.strip()
+
+
+def parse_saison_datum(text: str) -> Tuple[str, str]:
+    """
+    Parsed die Datumsspalte aus der Tabelle der geleiteten Spiele.
+
+    Dort steht das Jahr zweistellig ("20.09.26, 15:00"), anders als im
+    Anpfiff-String der Ansetzungen ("... · 08.11.2025 · ..."). Deshalb ein
+    eigener Parser statt extract_iso_date_from_anpfiff: dessen regulaerer
+    Ausdruck verlangt vier Stellen und faende hier gar nichts.
+
+    Args:
+        text: z.B. "20.09.26, 15:00"
+
+    Returns:
+        Tuple (iso_datum, uhrzeit), bei Parsing-Fehler ("1900-01-01", "")
+
+    Example:
+        >>> parse_saison_datum("20.09.26, 15:00")
+        ('2026-09-20', '15:00')
+    """
+    treffer = re.search(r'(\d{2})\.(\d{2})\.(\d{2})(?!\d)', text or '')
+    uhrzeit_treffer = re.search(r'(\d{1,2}:\d{2})', text or '')
+    uhrzeit = uhrzeit_treffer.group(1) if uhrzeit_treffer else ''
+
+    if not treffer:
+        return "1900-01-01", uhrzeit
+
+    tag, monat, jahr = treffer.groups()
+
+    # DFBnet fuehrt die Spieltabelle nur fuer laufende und vergangene Saisons.
+    # Ein zweistelliges Jahr ist hier also immer 20xx - der Verband gibt es
+    # seit 1900 nicht als Alternative her.
+    return f"20{jahr}-{monat}-{tag}", uhrzeit
