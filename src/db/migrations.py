@@ -27,13 +27,30 @@ from utils.logger import setup_logger
 logger = setup_logger("migrations")
 
 
+def _run_script(conn: sqlite3.Connection, script: str) -> None:
+    """
+    Fuehrt mehrere SQL-Anweisungen aus, ohne die laufende Transaktion zu beenden.
+
+    conn.executescript() waere das Naheliegende, gibt aber vor jedem Lauf ein
+    COMMIT ab. Damit waere jede DDL sofort dauerhaft und das rollback() im
+    Runner wirkungslos: ein Schritt, der in der Mitte scheitert, liesse seine
+    halben Tabellen zurueck, waehrend user_version zurueckbleibt - der naechste
+    Start scheiterte dann an "table already exists" und die Anwendung kaeme nie
+    wieder hoch. SQLite kann DDL transaktional, also fuehren wir die
+    Anweisungen einzeln in der offenen Transaktion aus.
+    """
+    for anweisung in script.split(";"):
+        if anweisung.strip():
+            conn.execute(anweisung)
+
+
 def _migration_001_baseline(conn: sqlite3.Connection) -> None:
     """
     Ausgangsschema: die Tabellen, die vor Einfuehrung der Migrationen bereits
     per CREATE TABLE IF NOT EXISTS angelegt wurden. Auf einer bestehenden
     Datenbank ist dieser Schritt ein No-Op, auf einer leeren erzeugt er alles.
     """
-    conn.executescript("""
+    _run_script(conn, """
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             email TEXT UNIQUE NOT NULL,
@@ -121,7 +138,7 @@ def _migration_003_matches(conn: sqlite3.Connection) -> None:
     Aus demselben Grund werden auch die Spesensaetze und der km-Satz beim
     Scrapen eingefroren statt bei jedem Rendern neu berechnet.
     """
-    conn.executescript("""
+    _run_script(conn, """
         CREATE TABLE matches (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
@@ -199,7 +216,7 @@ def _migration_004_scrape_runs(conn: sqlite3.Connection) -> None:
     error_code traegt weiterhin die Werte, auf die das Frontend prueft
     (DFB_CREDENTIALS_INVALID leitet den User in die Einstellungen).
     """
-    conn.executescript("""
+    _run_script(conn, """
         CREATE TABLE scrape_runs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
@@ -228,7 +245,7 @@ def _migration_005_download_log_matches(conn: sqlite3.Connection) -> None:
     wird die Tabelle neu gebaut und der Bestand uebernommen. Die alten Zeilen
     behalten ihre session_id und bekommen kein match_id - sie sind Historie.
     """
-    conn.executescript("""
+    _run_script(conn, """
         CREATE TABLE download_log_neu (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
@@ -413,7 +430,7 @@ def _migration_007_drop_legacy_tables(conn: sqlite3.Connection) -> None:
     `download_log.session_id` bleibt bestehen: die Spalte traegt die Historie
     der Downloads aus der Zeit vor der Umstellung.
     """
-    conn.executescript("""
+    _run_script(conn, """
         DROP TABLE IF EXISTS sessions;
         DROP TABLE IF EXISTS match_expenses;
     """)
@@ -453,9 +470,10 @@ def apply_migrations(conn: sqlite3.Connection, db_path: Path) -> int:
     Bringt die Datenbank auf den neuesten Stand.
 
     Jeder Schritt laeuft in einer eigenen Transaktion und setzt danach
-    user_version. Bricht ein Schritt ab, bleibt die Datenbank auf der letzten
-    erfolgreich angewendeten Version stehen und die Exception wird
-    weitergereicht - halb migriert startet die App nicht.
+    user_version. Bricht ein Schritt ab, wird er vollstaendig zurueckgerollt,
+    die Datenbank bleibt auf der letzten erfolgreich angewendeten Version und
+    die Exception wird weitergereicht - halb migriert startet die App nicht.
+    Ein erneuter Start nimmt den gescheiterten Schritt sauber noch einmal.
 
     Returns:
         Die Version, auf der die Datenbank nach dem Lauf steht.
@@ -476,7 +494,16 @@ def apply_migrations(conn: sqlite3.Connection, db_path: Path) -> int:
 
         logger.info(f"Migration {version}: {description}")
         try:
+            # Ausdrueckliches BEGIN: Pythons sqlite3 oeffnet von sich aus keine
+            # Transaktion fuer DDL, und ohne eine ist rollback() folgenlos.
+            # journal_mode vertraegt keine offene Transaktion, deshalb die
+            # Ausnahme fuer Schritt 2.
+            transaktional = migrate is not _migration_002_wal
+            if transaktional:
+                conn.execute("BEGIN")
+
             migrate(conn)
+
             # user_version nimmt keine Parameter-Bindung entgegen; die Version
             # stammt aus MIGRATIONS und ist damit keine fremde Eingabe.
             conn.execute(f"PRAGMA user_version = {version}")
