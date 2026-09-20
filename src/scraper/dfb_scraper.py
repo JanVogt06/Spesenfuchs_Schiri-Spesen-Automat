@@ -335,6 +335,31 @@ class DFBScraper:
         }
     """
 
+    @staticmethod
+    def _warte_auf_karteninhalt(karte, timeout: int = 15000):
+        """
+        Wartet, bis eine Karte ihre Zeilen wirklich gerendert hat.
+
+        Zwei Dinge, die hier schon einmal schiefgingen:
+
+        1. is_visible() WARTET NICHT. Playwright ignoriert sein
+           timeout-Argument ausdrücklich und antwortet sofort. Ein
+           `if not karte.is_visible(timeout=5000): continue` übersprang
+           deshalb jede Karte, die im selben Moment noch leer war.
+
+        2. Auf die Karte selbst zu warten reicht nicht. Angular hängt die
+           Kartenelemente sofort in den Baum und füllt sie erst, wenn die
+           Daten da sind - und `sria-coredata` enthält neben den Karten den
+           statischen Knopf "Änderungshistorie anzeigen", der ihr sofort
+           Höhe gibt. Der Wechsel auf den Reiter gilt damit als fertig,
+           während alle drei Karten noch leer sind.
+
+        Deshalb wird auf eine Beschriftung INNERHALB der Karte gewartet.
+        """
+        karte.locator('div.row div.fw-700').first.wait_for(
+            state="visible", timeout=timeout
+        )
+
     def extract_stammdaten(self):
         """
         Extrahiert die eigenen Stammdaten aus den drei Karten des Reiters.
@@ -393,8 +418,10 @@ class DFBScraper:
             for karten_selektor, zuordnung in felder.items():
                 karte = self.page.locator(karten_selektor).first
 
-                if not karte.is_visible(timeout=5000):
-                    logger.warning(f"Karte {karten_selektor} nicht sichtbar - übersprungen")
+                try:
+                    self._warte_auf_karteninhalt(karte)
+                except Exception as e:
+                    logger.warning(f"Karte {karten_selektor} nicht geladen: {e}")
                     continue
 
                 gelesen = karte.evaluate(self._KARTEN_FELDER_JS) or {}
@@ -413,7 +440,10 @@ class DFBScraper:
             meldedaten = self.page.locator('sria-coredata-reporting-data-card').first
             hinweis = meldedaten.locator('div.row div.fw-700:has-text("FUSSBALL.DE")').first
 
-            if hinweis.is_visible(timeout=2000):
+            # Kein timeout noetig und auch keines moeglich: der Inhalt der
+            # Karte ist oben abgewartet worden, und is_visible() antwortet
+            # ohnehin sofort.
+            if hinweis.is_visible():
                 stammdaten['fussball_de_hinweis'] = hinweis.inner_text().strip()
 
             gefuellt = sum(1 for wert in stammdaten.values() if wert)
@@ -447,7 +477,10 @@ class DFBScraper:
 
         try:
             karte = self.page.locator('sria-qualifications-referee-qualifications-card').first
-            karte.wait_for(state="visible", timeout=8000)
+
+            # Auf eine Beschriftung warten, nicht auf die Karte: auch hier kann
+            # die Hülle vor ihrem Inhalt da sein.
+            karte.locator('div.fw-700').first.wait_for(state="visible", timeout=15000)
 
             gelesen = karte.evaluate(self._QMAX_FELDER_JS) or {}
             qmax = {schluessel: (gelesen.get(label) or '').strip()
