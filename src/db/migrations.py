@@ -16,7 +16,6 @@ die Ordner fehlen, obwohl die Datenbank Sessions kennt.
 """
 import json
 import os
-import shutil
 import sqlite3
 from datetime import datetime, UTC
 from pathlib import Path
@@ -463,18 +462,31 @@ MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
 ]
 
 
-def _backup_database(db_path: Path, from_version: int) -> Path | None:
+def _backup_database(conn: sqlite3.Connection, db_path: Path, from_version: int) -> Path | None:
     """
     Legt eine Kopie der Datenbank neben der Originaldatei ab, bevor migriert
     wird. Gibt den Pfad des Backups zurueck, oder None wenn es noch keine
     Datenbankdatei gibt (frische Installation - da ist nichts zu sichern).
+
+    Bewusst ueber die Backup-API von SQLite und nicht per Dateikopie: sobald
+    die Datenbank im WAL-Modus laeuft (ab Migration 002), stehen frisch
+    committete Daten noch in app.db-wal. Ein shutil.copy2 nimmt nur app.db mit
+    und liefert damit eine stille Teilsicherung - genau dann wertlos, wenn sie
+    gebraucht wird. backup() zieht einen konsistenten Schnappschuss inklusive
+    WAL-Inhalt.
     """
     if not db_path.exists():
         return None
 
     stamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     backup_path = db_path.with_name(f"{db_path.name}.v{from_version}.{stamp}.bak")
-    shutil.copy2(db_path, backup_path)
+
+    ziel = sqlite3.connect(backup_path)
+    try:
+        conn.backup(ziel)
+    finally:
+        ziel.close()
+
     logger.info(f"Backup vor Migration angelegt: {backup_path}")
 
     return backup_path
@@ -501,7 +513,7 @@ def apply_migrations(conn: sqlite3.Connection, db_path: Path) -> int:
         return current
 
     logger.info(f"Migriere Schema von Version {current} auf {target}")
-    _backup_database(db_path, current)
+    _backup_database(conn, db_path, current)
 
     for version, description, migrate in MIGRATIONS:
         if version <= current:
