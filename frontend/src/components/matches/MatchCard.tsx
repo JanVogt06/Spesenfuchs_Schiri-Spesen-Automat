@@ -5,6 +5,7 @@ import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import {Separator} from '@/components/ui/separator';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
+import {cn} from '@/lib/utils';
 import {Calendar, ChevronDown, ChevronUp, Download, Users, MapPin, Euro, Car, Check, Loader2, Info} from 'lucide-react';
 
 /** "12,5" oder "12.5" -> 12.5; leer -> null; ungültig -> undefined */
@@ -500,21 +501,47 @@ export function MatchCard({
         );
     };
 
+    /**
+     * Ein Klick auf die Karte waehlt sie fuer den Sammel-Download aus.
+     *
+     * Klicks auf Bedienelemente sind ausgenommen - sonst wuerde jeder Download,
+     * jedes Aufklappen und jede Eingabe im Kilometerfeld die Auswahl mit
+     * umschalten.
+     */
+    const handleCardClick = (event: React.MouseEvent) => {
+        if (!onToggleSelected) return;
+        if ((event.target as HTMLElement).closest('button, a, input, select, textarea, label')) return;
+        onToggleSelected();
+    };
+
+    const handleCardKey = (event: React.KeyboardEvent) => {
+        if (!onToggleSelected) return;
+        if (event.target !== event.currentTarget) return;
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        onToggleSelected();
+    };
+
     return (
-        <Card className="gap-0 overflow-hidden py-0 transition-all hover:ring-foreground/20">
+        <Card
+            onClick={handleCardClick}
+            onKeyDown={handleCardKey}
+            role={onToggleSelected ? 'button' : undefined}
+            tabIndex={onToggleSelected ? 0 : undefined}
+            aria-pressed={onToggleSelected ? !!selected : undefined}
+            aria-label={onToggleSelected ? `${getMatchTitle()} für den Sammel-Download auswählen` : undefined}
+            className={cn(
+                'gap-0 overflow-hidden py-0 transition-all',
+                onToggleSelected && 'cursor-pointer outline-none',
+                selected
+                    ? 'ring-2 ring-primary'
+                    : 'hover:ring-foreground/20 focus-visible:ring-2 focus-visible:ring-ring'
+            )}
+        >
             <CardHeader className="px-4 py-3">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0 flex-1">
                         <div className="mb-1 flex flex-wrap items-center gap-2">
-                            {onToggleSelected && (
-                                <input
-                                    type="checkbox"
-                                    checked={!!selected}
-                                    onChange={onToggleSelected}
-                                    aria-label={`${getMatchTitle()} für Sammel-Download auswählen`}
-                                    className="size-4 shrink-0 accent-foreground"
-                                />
-                            )}
                             <CardTitle className="break-words text-sm sm:text-base">
                                 {getMatchTitle()}
                             </CardTitle>
