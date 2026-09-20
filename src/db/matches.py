@@ -37,6 +37,18 @@ def build_match_key(spiel_info: Dict, spielstaette: Dict, datum: str) -> str:
     Datum. Sobald die Spielnummer verfuegbar ist, wird sie hier zum Schluessel
     und alles andere bleibt unveraendert.
 
+    Mannschaftsart und Spielklasse gehoeren dazu, weil dieselben zwei Vereine
+    am selben Tag zwei verschiedene Ansetzungen haben koennen - etwa ein
+    Hallenturnier mit G-Junioren um 09:00 und C-Junioren um 14:00. Ohne sie
+    faenden beide in einer Zeile zusammen und eine der beiden Abrechnungen
+    waere weder sichtbar noch abrufbar.
+
+    Die Anstosszeit gehoert bewusst NICHT dazu: in den echten Daten sind 19 von
+    20 Mehrfachvorkommen blosse Verlegungen derselben Ansetzung (gleiche
+    Mannschaftsart und Spielklasse, Anpfiff um 30 bis 120 Minuten verschoben).
+    Die sollen zusammenfallen, sonst stuende jede Verlegung doppelt in der
+    Liste und die eingetragenen Kilometer haengten an der veralteten Zeile.
+
     Turnier-Ansetzungen haben keine Teams (dafuer mehrere Unparteiische in der
     Rolle SR). Fuer sie treten Spielstaette und Anpfiff an die Stelle der
     Teams, sonst wuerden zwei Turniere am selben Tag zu einer Zeile kollabieren.
@@ -45,7 +57,9 @@ def build_match_key(spiel_info: Dict, spielstaette: Dict, datum: str) -> str:
     gast = (spiel_info.get("gast_team") or "").strip()
 
     if heim and gast:
-        return f"{heim}|{gast}|{datum}"
+        art = (spiel_info.get("mannschaftsart") or "").strip()
+        klasse = (spiel_info.get("spielklasse") or "").strip()
+        return f"{heim}|{gast}|{datum}|{art}|{klasse}"
 
     staette = (spielstaette.get("name") or "").strip()
     anpfiff = (spiel_info.get("anpfiff") or "").strip()

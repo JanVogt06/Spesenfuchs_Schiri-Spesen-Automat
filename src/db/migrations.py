@@ -450,6 +450,51 @@ def _migration_007_drop_legacy_tables(conn: sqlite3.Connection) -> None:
     """)
 
 
+def _migration_008_rekey_matches(conn: sqlite3.Connection) -> None:
+    """
+    Berechnet match_key fuer bestehende Zeilen nach der erweiterten Regel neu.
+
+    Der Schluessel enthaelt jetzt auch Mannschaftsart und Spielklasse. Ohne
+    diesen Schritt bildete der naechste Scrape neue Schluessel, fuende die
+    bestehenden Zeilen nicht wieder und legte jedes Spiel ein zweites Mal an -
+    samt Verlust der Verbindung zu den eingetragenen Kilometern.
+
+    Zusaetzliche Bestandteile koennen nur trennen, nie zusammenfuehren, also
+    kann dabei kein Konflikt mit UNIQUE(user_id, match_key) entstehen.
+
+    Was dieser Schritt NICHT kann: eine Ansetzung zurueckholen, die vorher von
+    einer anderen ueberschrieben wurde. Die taucht beim naechsten Scrape als
+    eigene Zeile auf.
+    """
+    from db.matches import build_match_key
+
+    zeilen = conn.execute("""
+        SELECT id, match_key, heim_team, gast_team, datum, anpfiff,
+               mannschaftsart, spielklasse, staette_name
+        FROM matches
+    """).fetchall()
+
+    geaendert = 0
+    for zeile in zeilen:
+        neuer_key = build_match_key(
+            {
+                "heim_team": zeile["heim_team"],
+                "gast_team": zeile["gast_team"],
+                "anpfiff": zeile["anpfiff"],
+                "mannschaftsart": zeile["mannschaftsart"],
+                "spielklasse": zeile["spielklasse"],
+            },
+            {"name": zeile["staette_name"]},
+            zeile["datum"],
+        )
+
+        if neuer_key != zeile["match_key"]:
+            conn.execute("UPDATE matches SET match_key = ? WHERE id = ?", (neuer_key, zeile["id"]))
+            geaendert += 1
+
+    logger.info(f"{geaendert} von {len(zeilen)} Spielen haben einen neuen match_key")
+
+
 # (Version, Beschreibung, Funktion) - aufsteigend, Luecken sind nicht erlaubt.
 MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "baseline schema", _migration_001_baseline),
@@ -459,6 +504,7 @@ MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (5, "downloads reference matches", _migration_005_download_log_matches),
     (6, "backfill matches from session folders", _migration_006_backfill_from_sessions),
     (7, "drop legacy session and expense tables", _migration_007_drop_legacy_tables),
+    (8, "rekey matches by mannschaftsart and spielklasse", _migration_008_rekey_matches),
 ]
 
 
