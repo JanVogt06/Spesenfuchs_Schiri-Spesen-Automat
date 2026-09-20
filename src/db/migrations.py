@@ -495,6 +495,63 @@ def _migration_008_rekey_matches(conn: sqlite3.Connection) -> None:
     logger.info(f"{geaendert} von {len(zeilen)} Spielen haben einen neuen match_key")
 
 
+def _migration_009_stammdaten(conn: sqlite3.Connection) -> None:
+    """
+    Eigene Stammdaten des Schiedsrichters aus DFBnet.
+
+    DFBnet fuehrt diese Daten am SR-Account, und jeder App-User hinterlegt
+    genau einen solchen Account - also gehoert zu einem User genau eine Zeile.
+    Deshalb ist user_id hier Primaerschluessel: das ist Fremdschluessel und
+    UNIQUE in einem und macht eine zweite Zeile pro User unmoeglich.
+
+    Bewusst eine eigene Tabelle statt weiterer Spalten an users: get_user_by_id
+    macht ein SELECT *, und dessen Ergebnis haengt ueber get_current_user in
+    jedem geschuetzten Endpunkt. Anschrift und Geburtsdatum haetten dort nichts
+    zu suchen.
+
+    Alle Scrape-Felder sind NOT NULL DEFAULT '', weil der Upsert leere Werte
+    per COALESCE(NULLIF(...)) wegmergt - '' heisst "der Scraper hat nichts
+    geliefert", nicht "das Feld ist jetzt leer". Die persoenlichen Felder
+    stehen verschluesselt drin (siehe db/stammdaten.py), das Schema sieht davon
+    nichts: es ist in beiden Faellen TEXT.
+    """
+    _run_script(conn, """
+        CREATE TABLE stammdaten (
+            user_id INTEGER PRIMARY KEY,
+            name_vorname TEXT NOT NULL DEFAULT '',
+            strasse TEXT NOT NULL DEFAULT '',
+            plz_ort TEXT NOT NULL DEFAULT '',
+            geburtsdatum TEXT NOT NULL DEFAULT '',
+            email TEXT NOT NULL DEFAULT '',
+            telefon_privat TEXT NOT NULL DEFAULT '',
+            telefon_geschaeftlich TEXT NOT NULL DEFAULT '',
+            telefon_mobil TEXT NOT NULL DEFAULT '',
+            ausweisnummer TEXT NOT NULL DEFAULT '',
+            ausweisgueltigkeit TEXT NOT NULL DEFAULT '',
+            foto_status TEXT NOT NULL DEFAULT '',
+            foto_gueltigkeit TEXT NOT NULL DEFAULT '',
+            sr_gebiet TEXT NOT NULL DEFAULT '',
+            schiedsrichter_seit TEXT NOT NULL DEFAULT '',
+            verein TEXT NOT NULL DEFAULT '',
+            fehlmonate TEXT NOT NULL DEFAULT '',
+            zusatzausbildungen TEXT NOT NULL DEFAULT '',
+            patensystem_am TEXT NOT NULL DEFAULT '',
+            kreditor_nr TEXT NOT NULL DEFAULT '',
+            debitor_nr TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT '',
+            umsatzsteuerpflichtig TEXT NOT NULL DEFAULT '',
+            fussball_de_hinweis TEXT NOT NULL DEFAULT '',
+            bemerkung TEXT NOT NULL DEFAULT '',
+            qmax_sr TEXT NOT NULL DEFAULT '',
+            qmax_sra1 TEXT NOT NULL DEFAULT '',
+            qmax_sra2 TEXT NOT NULL DEFAULT '',
+            qmax_beobachter TEXT NOT NULL DEFAULT '',
+            first_seen_at TEXT NOT NULL,
+            scraped_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        );
+    """)
+
 # (Version, Beschreibung, Funktion) - aufsteigend, Luecken sind nicht erlaubt.
 MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "baseline schema", _migration_001_baseline),
@@ -505,6 +562,7 @@ MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (6, "backfill matches from session folders", _migration_006_backfill_from_sessions),
     (7, "drop legacy session and expense tables", _migration_007_drop_legacy_tables),
     (8, "rekey matches by mannschaftsart and spielklasse", _migration_008_rekey_matches),
+    (9, "referee coredata per user", _migration_009_stammdaten),
 ]
 
 
