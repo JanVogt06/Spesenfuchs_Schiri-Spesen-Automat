@@ -4,7 +4,10 @@
 DFB.net-Ansetzungen. Einmal die DFB.net-Zugangsdaten hinterlegen, danach holt
 die Anwendung jede Nacht die aktuellen Ansetzungen in die Datenbank. Die
 Abrechnung als DOCX oder PDF entsteht beim Download — inklusive Fahrtkosten,
-wenn die Kilometer im Rechner eingetragen sind.
+wenn die Kilometer im Rechner eingetragen sind. Beim selben Abruf liest die
+Anwendung auch die eigenen Stammdaten aus DFB.net und zeigt sie im Reiter
+*Stammdaten*; die persönlichen Angaben darunter liegen verschlüsselt in der
+Datenbank.
 
 Self-hosted: ein Container, eine `docker-compose.yml`, ein `data`-Ordner.
 
@@ -65,7 +68,7 @@ neben der Compose-Datei — es übersteht Neustarts und Updates:
 | Pfad | Inhalt |
 | --- | --- |
 | `data/.env` | `JWT_SECRET_KEY` und `ENCRYPTION_KEY` |
-| `data/app.db` | Nutzer, Spiele, Unparteiische, Fahrtkosten, Abruf-Protokoll, Login- und Download-Log |
+| `data/app.db` | Nutzer, eigene Stammdaten, Spiele, Unparteiische, Fahrtkosten, Abruf-Protokoll, Login- und Download-Log |
 
 Erzeugte Dokumente werden nicht gespeichert: sie entstehen bei jedem Download
 neu aus den Daten in `app.db`. Ein Backup der Datenbank ist damit ein

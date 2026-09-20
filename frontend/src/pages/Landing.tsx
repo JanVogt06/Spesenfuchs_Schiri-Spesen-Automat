@@ -106,7 +106,9 @@ export function LandingPage() {
             question: 'Welche Daten werden aus DFBnet ausgelesen?',
             answer: 'Das System liest automatisch alle relevanten Spielinformationen aus: Datum und Uhrzeit, Teams, Spielklasse, ' +
                 'Spielort mit Adresse und Platztyp, sowie alle Schiedsrichter-Kontaktdaten (Name, Telefon, E-Mail, Adresse). ' +
-                'Diese Daten werden strukturiert in die Dokumente übertragen.',
+                'Diese Daten werden strukturiert in die Dokumente übertragen. Zusätzlich werden deine eigenen Stammdaten ' +
+                'aus DFBnet mitgelesen – Anschrift, Ausweis, Verein, Status und dein Qualifikations-Maximum – und im ' +
+                'Reiter „Stammdaten" angezeigt. Dein Passfoto wird nicht abgerufen.',
         },
         {
             question: 'Wie lange dauert die Generierung?',

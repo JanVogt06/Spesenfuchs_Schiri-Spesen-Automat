@@ -30,6 +30,16 @@ export function Datenschutz() {
                         <li>DFBnet-Zugangsdaten (verschlüsselt mit Fernet)</li>
                         <li>Aus DFBnet abgerufene Spieldaten: Paarung, Anstoß, Spielklasse und Spielstätte</li>
                         <li>
+                            Deine eigenen Stammdaten aus DFBnet: Name, Anschrift, Geburtsdatum,
+                            E-Mail-Adresse und Telefonnummern, Ausweisnummer und -gültigkeit,
+                            Foto-Status, SR-Gebiet, Verein, Schiedsrichter-Status, Zusatzausbildungen,
+                            Kreditor- und Debitor-Nummer sowie dein Qualifikations-Maximum. Sie werden
+                            bei jedem Abruf mitgelesen und dienen allein der Anzeige im Reiter
+                            „Stammdaten"; in keinem Dokument stehen sie. Die persönlichen Angaben
+                            darunter liegen verschlüsselt (Fernet) in der Datenbank. Dein Passfoto
+                            wird nicht abgerufen und nicht gespeichert.
+                        </li>
+                        <li>
                             Die zum jeweiligen Spiel angesetzten Unparteiischen mit Name, Anschrift,
                             Telefonnummer und E-Mail-Adresse, so wie DFBnet sie zum Zeitpunkt des Abrufs
                             ausweist. Diese Angaben stammen aus deiner Ansetzung und betreffen auch
@@ -56,10 +66,13 @@ export function Datenschutz() {
             title: 'Datensicherheit',
             content: (
                 <p className="text-sm leading-relaxed text-muted-foreground">
-                    Zugangsdaten werden verschlüsselt gespeichert, Passwörter nur als Hash. Die Übertragung
-                    erfolgt ausschließlich über HTTPS. Deine Daten werden nicht an Dritte weitergegeben und
-                    ausschließlich zur Erstellung deiner Spesenabrechnungen verwendet. Spieldaten sind
-                    immer nur für den Account sichtbar, zu dessen Ansetzung sie gehören.
+                    Zugangsdaten und deine persönlichen Stammdaten werden verschlüsselt gespeichert,
+                    Passwörter nur als Hash. Die Übertragung erfolgt ausschließlich über HTTPS. Deine
+                    Daten werden nicht an Dritte weitergegeben und ausschließlich dafür verwendet, dir
+                    deine Spesenabrechnungen und deine DFBnet-Daten im Browser bereitzustellen.
+                    Spiel- und Stammdaten sind immer nur für den Account sichtbar, zu dem sie gehören.
+                    Hinterlegst du andere DFBnet-Zugangsdaten, werden die gespeicherten Stammdaten
+                    sofort gelöscht.
                 </p>
             ),
         },
@@ -71,7 +84,9 @@ export function Datenschutz() {
                     Du hast jederzeit das Recht auf Auskunft, Berichtigung und Löschung deiner Daten.
                     Eine Selbstbedienungs-Funktion dafür gibt es derzeit nicht – schreib uns eine
                     E-Mail, dann löschen wir dein Konto und alle zugehörigen Daten von Hand,
-                    einschließlich der zu deinen Spielen gespeicherten Angaben zu Unparteiischen.
+                    einschließlich deiner Stammdaten und der zu deinen Spielen gespeicherten Angaben
+                    zu Unparteiischen. Deine Stammdaten pflegst du in DFBnet; der Dienst spiegelt sie
+                    nur und schreibt nichts nach DFBnet zurück.
                     Wer als Unparteiischer in einer Ansetzung auftaucht, ohne den Dienst selbst zu
                     nutzen, kann die Löschung dieser Angaben ebenfalls per E-Mail verlangen.
                 </p>
