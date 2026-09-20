@@ -47,6 +47,16 @@ export function Datenschutz() {
                             die Abrechnung benötigt, Telefon und E-Mail dienen ausschließlich der
                             Anzeige in deiner Spielübersicht und stehen in keinem Dokument.
                         </li>
+                        <li>
+                            Deine geleiteten Spiele aus DFBnet über alle dort angebotenen Saisons:
+                            Datum, Liga, Paarung, Ergebnis, Karten je Mannschaft sowie das jeweilige
+                            Gespann mit Namen und Rolle. Dazu die Einsatzbilanz je Saison und die
+                            erfassten Lehrabende und Leistungsprüfungen. Die Namen der übrigen
+                            Unparteiischen stammen aus der DFBnet-Statistik und betreffen auch
+                            Personen, die den Dienst selbst nicht nutzen; gespeichert wird nur der
+                            Name samt Rolle, keine Kontaktdaten. Diese Daten dienen allein der
+                            Anzeige im Reiter „Saison" und stehen in keinem Dokument.
+                        </li>
                         <li>Von dir eingetragene Kilometer und Kosten für öffentliche Verkehrsmittel</li>
                         <li>
                             Nutzungsprotokolle: Zeitpunkt jedes Logins, Zeitpunkt und Dateiname
@@ -56,7 +66,9 @@ export function Datenschutz() {
                     <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                         Erzeugte Abrechnungen werden nicht gespeichert. Sie entstehen bei jedem Download
                         neu aus den genannten Daten. Die Daten zu einem Spiel bleiben gespeichert, bis du
-                        ihre Löschung verlangst oder deinen Account löschst.
+                        ihre Löschung verlangst oder deinen Account löschst. Die Saisondaten werden bei
+                        jedem Abruf je Saison vollständig ersetzt und spiegeln damit immer den aktuellen
+                        Stand in DFBnet.
                     </p>
                 </>
             ),
@@ -71,8 +83,8 @@ export function Datenschutz() {
                     Daten werden nicht an Dritte weitergegeben und ausschließlich dafür verwendet, dir
                     deine Spesenabrechnungen und deine DFBnet-Daten im Browser bereitzustellen.
                     Spiel- und Stammdaten sind immer nur für den Account sichtbar, zu dem sie gehören.
-                    Hinterlegst du andere DFBnet-Zugangsdaten, werden die gespeicherten Stammdaten
-                    sofort gelöscht.
+                    Hinterlegst du andere DFBnet-Zugangsdaten, werden die gespeicherten Stamm- und
+                    Saisondaten sofort gelöscht.
                 </p>
             ),
         },
@@ -84,8 +96,8 @@ export function Datenschutz() {
                     Du hast jederzeit das Recht auf Auskunft, Berichtigung und Löschung deiner Daten.
                     Eine Selbstbedienungs-Funktion dafür gibt es derzeit nicht – schreib uns eine
                     E-Mail, dann löschen wir dein Konto und alle zugehörigen Daten von Hand,
-                    einschließlich deiner Stammdaten und der zu deinen Spielen gespeicherten Angaben
-                    zu Unparteiischen. Deine Stammdaten pflegst du in DFBnet; der Dienst spiegelt sie
+                    einschließlich deiner Stammdaten, deiner Saisondaten und der zu deinen Spielen
+                    gespeicherten Angaben zu Unparteiischen. Deine Stammdaten pflegst du in DFBnet; der Dienst spiegelt sie
                     nur und schreibt nichts nach DFBnet zurück.
                     Wer als Unparteiischer in einer Ansetzung auftaucht, ohne den Dienst selbst zu
                     nutzen, kann die Löschung dieser Angaben ebenfalls per E-Mail verlangen.
