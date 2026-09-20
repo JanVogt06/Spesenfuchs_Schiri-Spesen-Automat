@@ -15,7 +15,7 @@ from generator.docx_generator import KM_SATZ_EURO
 from generator.spesen_calculator import calculate_spesen
 from db.matches import upsert_match, mark_missing_matches, build_match_key
 from db.stammdaten import upsert_stammdaten
-from db.season import replace_saison
+from db.season import replace_saison, get_komplette_saisons
 from utils.logger import setup_logger
 from utils.match_utils import extract_iso_date_from_anpfiff, parse_saison_datum
 
@@ -153,6 +153,8 @@ def persist_saisons(user_id: int, saisons: dict) -> int:
                 spiele=spiele,
                 einsaetze=daten.get("einsaetze", []),
                 lehrgaenge=daten.get("lehrgaenge", {}),
+                erwartet=daten.get("erwartet"),
+                vollstaendig=True,
             )
             ersetzt += 1
             logger.info(f"Saison {saison}: {geschrieben} Spiele gespeichert")
@@ -273,7 +275,14 @@ def scrape_matches(
             scraper.open_referee_tab(
                 "matches-statistics", "sria-matches-statistics-officiated-games-card"
             )
-            saisons = scraper.scrape_saisons(progress_callback=fortschritt)
+            # Abgeschlossene Saisons aendern sich nicht mehr - was vollstaendig
+            # in der Datenbank steht, wird nicht noch einmal gelesen. Die
+            # laufende Saison nimmt der Scraper selbst wieder aus der Liste.
+            fertig = get_komplette_saisons(user_id) if user_id is not None else set()
+
+            saisons = scraper.scrape_saisons(
+                progress_callback=fortschritt, ueberspringen=fertig
+            )
 
         except Exception as e:
             logger.warning(f"Saisonzusammenfassung konnte nicht gelesen werden: {e}")

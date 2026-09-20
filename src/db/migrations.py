@@ -635,6 +635,28 @@ def _migration_010_saison(conn: sqlite3.Connection) -> None:
         );
     """)
 
+def _migration_011_saison_vollstaendig(conn: sqlite3.Connection) -> None:
+    """
+    Merkt sich je Saison, ob sie vollstaendig gelesen wurde.
+
+    Abgeschlossene Saisons aendern sich bei DFBnet nicht mehr. Sie jede Nacht
+    erneut zu lesen kostet bei neun Saisons ein Vielfaches der eigentlichen
+    Arbeit - der Abruf haengt an Umschaltvorgaengen, nicht an Rechenzeit.
+    Kuenftig wird eine Saison nur noch gelesen, wenn sie die laufende ist oder
+    ihr Bestand nicht vollstaendig ist.
+
+    spiele_erwartet ist die von DFBnet gemeldete Trefferzahl. Sie wird beim
+    Pruefen gegen die tatsaechlich gespeicherten Zeilen gehalten: stimmen beide
+    nicht ueberein, fehlt etwas, und die Saison wird komplett neu gelesen.
+
+    Bestehende Zeilen bekommen vollstaendig = 0 und werden damit genau einmal
+    nachgelesen - deren Vollstaendigkeit ist nicht rueckwirkend feststellbar.
+    """
+    _run_script(conn, """
+        ALTER TABLE season_education ADD COLUMN spiele_erwartet INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE season_education ADD COLUMN vollstaendig INTEGER NOT NULL DEFAULT 0;
+    """)
+
 # (Version, Beschreibung, Funktion) - aufsteigend, Luecken sind nicht erlaubt.
 MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "baseline schema", _migration_001_baseline),
@@ -647,6 +669,7 @@ MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (8, "rekey matches by mannschaftsart and spielklasse", _migration_008_rekey_matches),
     (9, "referee coredata per user", _migration_009_stammdaten),
     (10, "officiated games and season totals", _migration_010_saison),
+    (11, "track which seasons are completely stored", _migration_011_saison_vollstaendig),
 ]
 
 

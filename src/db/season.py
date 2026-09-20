@@ -55,6 +55,8 @@ def replace_saison(
     spiele: List[Dict],
     einsaetze: List[Dict],
     lehrgaenge: Dict,
+    erwartet: Optional[int] = None,
+    vollstaendig: bool = True,
     scraped_at: Optional[str] = None,
 ) -> int:
     """
@@ -71,6 +73,10 @@ def replace_saison(
         einsaetze: Zeilen der Einsatz-Tabelle (rolle, geleitet,
                    zurueckgegeben, nicht_angetreten)
         lehrgaenge: lehrabend, lehrabend_online, leistungspruefung
+        erwartet: von DFBnet gemeldete Trefferzahl (Default: Anzahl der
+                  uebergebenen Spiele)
+        vollstaendig: Ob die Saison komplett gelesen wurde. Nur dann wird sie
+                      bei kuenftigen Laeufen uebersprungen.
 
     Returns:
         Anzahl geschriebener Spiele.
@@ -178,18 +184,23 @@ def replace_saison(
 
         conn.execute("""
             INSERT INTO season_education
-                (user_id, saison, lehrabend, lehrabend_online, leistungspruefung, scraped_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+                (user_id, saison, lehrabend, lehrabend_online, leistungspruefung,
+                 spiele_erwartet, vollstaendig, scraped_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (user_id, saison) DO UPDATE SET
                 lehrabend = excluded.lehrabend,
                 lehrabend_online = excluded.lehrabend_online,
                 leistungspruefung = excluded.leistungspruefung,
+                spiele_erwartet = excluded.spiele_erwartet,
+                vollstaendig = excluded.vollstaendig,
                 scraped_at = excluded.scraped_at
         """, (
             user_id, saison,
             (lehrgaenge.get("lehrabend") or "").strip(),
             (lehrgaenge.get("lehrabend_online") or "").strip(),
             (lehrgaenge.get("leistungspruefung") or "").strip(),
+            len(spiele) if erwartet is None else erwartet,
+            1 if vollstaendig else 0,
             scraped_at,
         ))
 
@@ -199,6 +210,42 @@ def replace_saison(
     except Exception:
         conn.rollback()
         raise
+    finally:
+        conn.close()
+
+
+def get_komplette_saisons(user_id: int) -> set:
+    """
+    Saisons, die vollstaendig gespeichert sind und nicht neu gelesen werden
+    muessen.
+
+    Vollstaendig heisst: der Lauf hat sie als vollstaendig gemeldet, es liegen
+    genau so viele Spiele vor wie DFBnet damals Treffer gemeldet hat, UND eine
+    Einsatzbilanz ist da. Faellt nur eines davon aus, wird die Saison als Ganzes
+    neu gelesen - eine halb ergaenzte Saison waere schlimmer als eine neu
+    geholte.
+
+    Die laufende Saison filtert der Aufrufer heraus; sie steht hier mit drin,
+    weil diese Funktion nichts darueber weiss, welche das gerade ist.
+    """
+    conn = get_connection()
+
+    try:
+        rows = conn.execute("""
+            SELECT e.saison
+            FROM season_education e
+            WHERE e.user_id = :uid
+              AND e.vollstaendig = 1
+              AND e.spiele_erwartet = (
+                    SELECT COUNT(*) FROM season_matches m
+                     WHERE m.user_id = :uid AND m.saison = e.saison
+              )
+              AND EXISTS (
+                    SELECT 1 FROM season_appearances a
+                     WHERE a.user_id = :uid AND a.saison = e.saison
+              )
+        """, {"uid": user_id}).fetchall()
+        return {row["saison"] for row in rows}
     finally:
         conn.close()
 
