@@ -31,8 +31,8 @@ export function LandingPage() {
 
     const stats = [
         {
-            value: docCount !== null ? docCount.toLocaleString('de-DE') : '7.300+',
-            label: 'Dokumente generiert',
+            value: docCount !== null ? docCount.toLocaleString('de-DE') : '400+',
+            label: 'Spiele erfasst',
         },
         {value: '03:00', label: 'Uhr startet der automatische Lauf, jede Nacht'},
         {value: '0 €', label: 'Kostenlos für alle SR in Thüringen'},

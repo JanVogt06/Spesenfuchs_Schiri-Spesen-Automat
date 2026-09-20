@@ -18,7 +18,7 @@ enthält absichtlich keine Build-Anweisung:
 
 ```bash
 mkdir -p spesenfuchs/data && cd spesenfuchs
-curl -O https://raw.githubusercontent.com/JanVogt06/spesenfuchs/main/docker-compose.yml
+curl -fO https://raw.githubusercontent.com/JanVogt06/dfb-spesen-generator/main/docker-compose.yml
 docker compose pull && docker compose up -d
 ```
 
@@ -88,7 +88,13 @@ docker compose start
 ```
 
 Einzelne Pfade lassen sich per Umgebungsvariable verlegen (`DATA_DIR`,
-`ENV_FILE`, `DATABASE_PATH`); nötig ist das im Normalfall nicht.
+`ENV_FILE`, `DATABASE_PATH`, `OUTPUT_DIR`); nötig ist das im Normalfall nicht.
+`OUTPUT_DIR` zeigt nur noch auf die alten Session-Ordner und wird ausschließlich
+für die einmalige Übernahme beim Versionssprung gebraucht.
+
+`ALLOW_SCHEDULER_TRIGGER=1` gibt den manuellen Sammel-Abruf über
+`POST /api/scheduler/trigger` frei. Er ist standardmäßig gesperrt, weil er den
+nächtlichen Lauf für **alle** Konten startet und das Projekt keine Rollen kennt.
 
 Zwei Stellschrauben für den Download-Pfad: `PDF_MAX_CONCURRENCY` (Standard 2)
 begrenzt, wie viele LibreOffice-Prozesse gleichzeitig laufen dürfen — jeder
@@ -119,7 +125,7 @@ einmal weichen, weil sich der `container_name` geändert hat:
 
 ```bash
 docker compose down          # entfernt den Container "dfb-spesen-generator"
-curl -O https://raw.githubusercontent.com/JanVogt06/spesenfuchs/main/docker-compose.yml
+curl -fO https://raw.githubusercontent.com/JanVogt06/dfb-spesen-generator/main/docker-compose.yml
 docker compose pull && docker compose up -d
 ```
 

@@ -38,6 +38,10 @@ export function Datenschutz() {
                             Anzeige in deiner Spielübersicht und stehen in keinem Dokument.
                         </li>
                         <li>Von dir eingetragene Kilometer und Kosten für öffentliche Verkehrsmittel</li>
+                        <li>
+                            Nutzungsprotokolle: Zeitpunkt jedes Logins, Zeitpunkt und Dateiname
+                            jedes Downloads sowie Verlauf und Fehlermeldungen der DFBnet-Abrufe
+                        </li>
                     </ul>
                     <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                         Erzeugte Abrechnungen werden nicht gespeichert. Sie entstehen bei jedem Download
@@ -65,11 +69,11 @@ export function Datenschutz() {
             content: (
                 <p className="text-sm leading-relaxed text-muted-foreground">
                     Du hast jederzeit das Recht auf Auskunft, Berichtigung und Löschung deiner Daten.
-                    Kontaktiere uns dazu einfach per E-Mail. Bei Löschung deines Accounts werden alle
-                    zugehörigen Daten entfernt, einschließlich der zu deinen Spielen gespeicherten
-                    Angaben zu Unparteiischen. Wer als Unparteiischer in einer Ansetzung auftaucht,
-                    ohne den Dienst selbst zu nutzen, kann die Löschung dieser Angaben ebenfalls per
-                    E-Mail verlangen.
+                    Eine Selbstbedienungs-Funktion dafür gibt es derzeit nicht – schreib uns eine
+                    E-Mail, dann löschen wir dein Konto und alle zugehörigen Daten von Hand,
+                    einschließlich der zu deinen Spielen gespeicherten Angaben zu Unparteiischen.
+                    Wer als Unparteiischer in einer Ansetzung auftaucht, ohne den Dienst selbst zu
+                    nutzen, kann die Löschung dieser Angaben ebenfalls per E-Mail verlangen.
                 </p>
             ),
         },
@@ -125,8 +129,7 @@ export function Datenschutz() {
                 </div>
 
                 <p className="mt-8 text-center text-sm text-muted-foreground">
-                    Stand: Januar 2025
-                </p>
+                    Stand: September 2026</p>
             </main>
         </div>
     );
