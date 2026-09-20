@@ -66,9 +66,10 @@ export function Datenschutz() {
                     <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                         Erzeugte Abrechnungen werden nicht gespeichert. Sie entstehen bei jedem Download
                         neu aus den genannten Daten. Die Daten zu einem Spiel bleiben gespeichert, bis du
-                        ihre Löschung verlangst oder deinen Account löschst. Die Saisondaten werden bei
-                        jedem Abruf je Saison vollständig ersetzt und spiegeln damit immer den aktuellen
-                        Stand in DFBnet.
+                        ihre Löschung verlangst oder deinen Account löschst. Die Daten der laufenden
+                        Saison werden bei jedem Abruf vollständig ersetzt und spiegeln damit den
+                        aktuellen Stand in DFBnet; abgeschlossene Saisons werden nur einmal gelesen
+                        und danach nur noch angefasst, wenn etwas fehlt.
                     </p>
                 </>
             ),

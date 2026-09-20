@@ -9,6 +9,11 @@ Anwendung auch die eigenen Stammdaten aus DFB.net und zeigt sie im Reiter
 *Stammdaten*; die persönlichen Angaben darunter liegen verschlüsselt in der
 Datenbank. Der Reiter *Saison* zeigt alle geleiteten Spiele je Saison mit
 Ergebnis, Kartenstatistik und Gespann, dazu Einsatzbilanz und Lehrabende.
+Abgeschlossene Saisons werden nur einmal gelesen — erneut geholt werden die
+laufende Saison und jede, deren Bestand unvollständig ist.
+
+Die Oberfläche hat vier Reiter: *Dashboard* mit der Übersicht, *Spesen* mit den
+Abrechnungen zum Herunterladen, *Saison* und *Stammdaten*.
 
 Self-hosted: ein Container, eine `docker-compose.yml`, ein `data`-Ordner.
 
