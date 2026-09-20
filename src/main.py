@@ -20,7 +20,7 @@ from utils.match_utils import extract_iso_date_from_anpfiff
 logger = setup_logger("main")
 
 
-def persist_matches(user_id: int, matches_data: List[dict]) -> int:
+def persist_matches(user_id: int, matches_data: List[dict], vollstaendig: bool = True) -> int:
     """
     Schreibt ein Scrape-Ergebnis in die Datenbank.
 
@@ -31,6 +31,13 @@ def persist_matches(user_id: int, matches_data: List[dict]) -> int:
 
     Spiele, die nicht mehr in der Ansetzung stehen, werden markiert statt
     geloescht - sonst wuerden eingetragene Kilometer mit verschwinden.
+
+    Args:
+        vollstaendig: Ob der Scrape alle Ansetzungen erfasst hat. Nur dann darf
+            aus "nicht im Ergebnis" auf "nicht mehr angesetzt" geschlossen
+            werden. Der Scraper ueberspringt einzelne Spiele stillschweigend,
+            wenn ein Modal auflaeuft; ohne diese Unterscheidung wuerden dem
+            Nutzer voellig gueltige Ansetzungen als zurueckgezogen angezeigt.
 
     Returns:
         Anzahl gespeicherter Spiele.
@@ -57,10 +64,14 @@ def persist_matches(user_id: int, matches_data: List[dict]) -> int:
             logger.error(f"Spiel konnte nicht gespeichert werden: {e}")
             continue
 
-    if seen_keys:
+    if seen_keys and vollstaendig:
         markiert = mark_missing_matches(user_id, seen_keys)
         if markiert:
             logger.info(f"{markiert} Spiele nicht mehr in der Ansetzung - markiert")
+    elif seen_keys:
+        logger.warning(
+            "Scrape war unvollstaendig - es wird kein Spiel als zurueckgezogen markiert"
+        )
 
     logger.info(f"{saved}/{len(matches_data)} Spiele in der Datenbank")
     return saved
@@ -120,8 +131,20 @@ def scrape_matches(
 
         all_matches = scraper.scrape_all_matches(progress_callback=fortschritt)
 
+        # Hat der Scraper einzelne Spiele uebersprungen, ist das Ergebnis
+        # unvollstaendig und taugt nicht als Grundlage fuer "nicht mehr
+        # angesetzt"
+        erwartet = getattr(scraper, "erwartete_spiele", len(all_matches))
+        vollstaendig = len(all_matches) >= erwartet
+
+        if not vollstaendig:
+            logger.warning(
+                f"Nur {len(all_matches)} von {erwartet} Ansetzungen gelesen - "
+                "unvollstaendiger Scrape"
+            )
+
     if user_id is not None:
-        persist_matches(user_id, all_matches)
+        persist_matches(user_id, all_matches, vollstaendig=vollstaendig)
 
     logger.info(f"Erfolgreich {len(all_matches)} Spiele gescrapt")
     return all_matches

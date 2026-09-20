@@ -639,6 +639,11 @@ class DFBScraper:
         all_matches = []
         anzahl_spiele = self.get_all_matches()
 
+        # Wie viele Ansetzungen die Liste hergab. Der Aufrufer braucht das, um
+        # einen unvollstaendigen Scrape zu erkennen: einzelne Spiele koennen
+        # unten stillschweigend uebersprungen werden.
+        self.erwartete_spiele = anzahl_spiele
+
         # Initial progress
         if progress_callback:
             progress_callback(0, anzahl_spiele, "Scraping gestartet...")
