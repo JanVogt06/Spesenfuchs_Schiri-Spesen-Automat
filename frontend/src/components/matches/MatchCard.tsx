@@ -36,9 +36,9 @@ interface SpesenInfo {
 interface MatchCardProps {
     match: MatchData & { _spesen?: SpesenInfo };
     index: number;
-    filename: string;
     onDownload: (fileFormat: 'docx' | 'pdf') => void;
-    downloadingFilename: string | null;
+    /** Formate, deren Download für dieses Spiel gerade läuft */
+    laufendeFormate: readonly ('docx' | 'pdf')[];
     selected?: boolean;
     onToggleSelected?: () => void;
     /** Wird nach erfolgreichem Speichern aufgerufen, damit die Liste nachzieht */
@@ -46,11 +46,10 @@ interface MatchCardProps {
 }
 
 export function MatchCard({
-                              match, index, filename, onDownload, downloadingFilename,
+                              match, index, onDownload, laufendeFormate,
                               selected, onToggleSelected, onSaved,
                           }: MatchCardProps) {
     const [isExpanded, setIsExpanded] = useState(false);
-    const pdfFilename = filename.replace(/\.docx$/i, '.pdf');
 
     // Fahrtkosten/ÖVM-Eingaben (als Strings, deutsche Kommaeingabe erlaubt)
     const [expenseInputs, setExpenseInputs] = useState<Record<string, string>>({
@@ -537,23 +536,23 @@ export function MatchCard({
                     <div className="flex gap-2 self-start">
                         <Button
                             onClick={() => onDownload('docx')}
-                            disabled={downloadingFilename === filename}
+                            disabled={laufendeFormate.includes('docx')}
                             size="sm"
                             variant="outline"
                             className="whitespace-nowrap"
                         >
                             <Download className="size-3.5"/>
-                            {downloadingFilename === filename ? 'Lade...' : 'DOCX'}
+                            {laufendeFormate.includes('docx') ? 'Lade...' : 'DOCX'}
                         </Button>
                         <Button
                             onClick={() => onDownload('pdf')}
-                            disabled={downloadingFilename === pdfFilename}
+                            disabled={laufendeFormate.includes('pdf')}
                             variant="outline"
                             size="sm"
                             className="whitespace-nowrap"
                         >
                             <Download className="size-3.5"/>
-                            {downloadingFilename === pdfFilename ? 'Erstelle...' : 'PDF'}
+                            {laufendeFormate.includes('pdf') ? 'Erstelle...' : 'PDF'}
                         </Button>
                         <Button
                             onClick={() => setIsExpanded(!isExpanded)}

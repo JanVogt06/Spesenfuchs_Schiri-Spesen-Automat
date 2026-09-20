@@ -109,6 +109,26 @@ export async function downloadMatchesAsZip(
     triggerBrowserDownload(response.data, `Spesen_${datum}.zip`);
 }
 
+/**
+ * Liest die Fehlermeldung des Servers aus einer fehlgeschlagenen Anfrage.
+ *
+ * Downloads laufen mit responseType 'blob', deshalb liefert axios auch den
+ * JSON-Fehlerkörper als Blob - ein direkter Zugriff auf error.response.data.error
+ * ergäbe undefined. Der Blob muss erst asynchron gelesen werden.
+ */
+export async function extractApiError(error: unknown, fallback: string): Promise<string> {
+    const antwort = (error as {response?: {data?: unknown}})?.response?.data;
+    if (!antwort) return fallback;
+
+    try {
+        const text = antwort instanceof Blob ? await antwort.text() : JSON.stringify(antwort);
+        const geparst = JSON.parse(text);
+        return geparst?.error?.message || geparst?.detail || fallback;
+    } catch {
+        return fallback;
+    }
+}
+
 function triggerBrowserDownload(blob: Blob, filename: string): void {
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');

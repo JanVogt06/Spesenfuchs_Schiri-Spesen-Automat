@@ -1,6 +1,6 @@
 import {useState} from 'react';
 import type {MatchData} from '@/lib/matches';
-import {downloadMatchDocument, downloadMatchesAsZip} from '@/lib/matches';
+import {downloadMatchDocument, downloadMatchesAsZip, extractApiError} from '@/lib/matches';
 import {MatchCard} from '../matches/MatchCard';
 import {Button} from '@/components/ui/button';
 import {Calendar, Download} from 'lucide-react';
@@ -12,7 +12,10 @@ interface MatchListProps {
 }
 
 export function MatchList({matches, onReload}: MatchListProps) {
-    const [downloadingFile, setDownloadingFile] = useState<string | null>(null);
+    // Schlüssel "<matchId>:<format>": PDFs entstehen jetzt erst beim Klick und
+    // dauern Sekunden, deshalb können mehrere Downloads gleichzeitig laufen.
+    // Ein einzelner gemeinsamer Zustand würde den jeweils anderen zurücksetzen.
+    const [laufendeDownloads, setLaufendeDownloads] = useState<string[]>([]);
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [isBulkDownloading, setIsBulkDownloading] = useState(false);
     const [bulkError, setBulkError] = useState('');
@@ -20,15 +23,17 @@ export function MatchList({matches, onReload}: MatchListProps) {
     const handleDownload = async (match: MatchData, fileFormat: 'docx' | 'pdf') => {
         const docxName = match._filename || `spiel_${match._id}.docx`;
         const filename = fileFormat === 'pdf' ? docxName.replace(/\.docx$/i, '.pdf') : docxName;
+        const key = `${match._id}:${fileFormat}`;
 
-        setDownloadingFile(filename);
+        setLaufendeDownloads(prev => [...prev, key]);
+        setBulkError('');
         try {
             await downloadMatchDocument(match._id, fileFormat, filename);
         } catch (error) {
             console.error('Download failed:', error);
-            alert('Download fehlgeschlagen');
+            setBulkError(await extractApiError(error, 'Download fehlgeschlagen.'));
         } finally {
-            setDownloadingFile(null);
+            setLaufendeDownloads(prev => prev.filter(k => k !== key));
         }
     };
 
@@ -46,7 +51,8 @@ export function MatchList({matches, onReload}: MatchListProps) {
             setSelectedIds([]);
         } catch (error) {
             console.error('Sammel-Download fehlgeschlagen:', error);
-            setBulkError('Sammel-Download fehlgeschlagen. Bitte erneut versuchen.');
+            setBulkError(await extractApiError(
+                error, 'Sammel-Download fehlgeschlagen. Bitte erneut versuchen.'));
         } finally {
             setIsBulkDownloading(false);
         }
@@ -91,23 +97,21 @@ export function MatchList({matches, onReload}: MatchListProps) {
                 </p>
             )}
 
-            {matches.map((match, index) => {
-                const filename = match._filename || `spiel_${index + 1}.docx`;
-
-                return (
+            {matches.map((match, index) => (
                     <MatchCard
                         key={match._id}
                         match={match}
                         index={index}
-                        filename={filename}
                         onDownload={(fileFormat) => handleDownload(match, fileFormat)}
-                        downloadingFilename={downloadingFile}
+                        laufendeFormate={
+                            (['docx', 'pdf'] as const).filter(
+                                f => laufendeDownloads.includes(`${match._id}:${f}`))
+                        }
                         selected={selectedIds.includes(match._id)}
                         onToggleSelected={() => toggleSelected(match._id)}
                         onSaved={onReload}
                     />
-                );
-            })}
+            ))}
         </div>
     );
 }
