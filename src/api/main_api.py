@@ -58,6 +58,7 @@ from db.database import (
     log_download,
 )
 from db.stammdaten import get_stammdaten
+from db.season import get_saisons, get_saison
 from api.auth import router as auth_router, get_current_user
 from core.errors import (
     APIError,
@@ -723,6 +724,34 @@ async def get_own_stammdaten(current_user: dict = Depends(get_current_user)):
     Tabelle IST die user_id.
     """
     return get_stammdaten(current_user['id'])
+
+
+@app.get("/api/saison")
+async def get_own_saisons(current_user: dict = Depends(get_current_user)):
+    """
+    Die Saisons, zu denen geleitete Spiele gespeichert sind - neueste zuerst.
+
+    Vor dem ersten Abruf eine leere Liste, kein Fehler: der Reiter zeigt dann
+    seinen Leerzustand.
+    """
+    return get_saisons(current_user['id'])
+
+
+@app.get("/api/saison/{saison:path}")
+async def get_own_saison(saison: str, current_user: dict = Depends(get_current_user)):
+    """
+    Eine Saison mit allen geleiteten Spielen, Einsatzbilanz und Lehrgaengen.
+
+    Der Pfadparameter ist als :path deklariert, weil Saisonnamen bei DFBnet
+    einen Schraegstrich enthalten ("26/27"). Ohne das endete die Route hinter
+    der 26 und der Rest waere ein eigenes Pfadsegment.
+    """
+    daten = get_saison(current_user['id'], saison)
+
+    if not daten:
+        raise NotFoundError(f"Zur Saison {saison} ist nichts gespeichert")
+
+    return daten
 
 # ===== Frontend Routes =====
 @app.get("/")

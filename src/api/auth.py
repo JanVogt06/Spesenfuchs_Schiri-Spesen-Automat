@@ -15,6 +15,7 @@ from db.database import (
     log_login
 )
 from db.stammdaten import delete_stammdaten
+from db.season import delete_saisons
 from core.security import hash_password, verify_password, create_access_token, decode_access_token
 from core.encryption import encrypt_credential, decrypt_credential
 from core.errors import (
@@ -240,6 +241,7 @@ async def save_dfb_credentials(
     # jedes Mal bis zum naechsten Nachtlauf leer.
     if not gleiches_konto:
         delete_stammdaten(user_id)
+        delete_saisons(user_id)
 
     return DFBCredentialsResponse(
         success=True,
