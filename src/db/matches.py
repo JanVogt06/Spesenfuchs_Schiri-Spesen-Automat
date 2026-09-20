@@ -153,12 +153,10 @@ def upsert_match(
             conn.execute("DELETE FROM match_officials WHERE match_id = ?", (match_id,))
 
             seq_per_rolle: Dict[str, int] = {}
-            besetzt = []
             for person in schiedsrichter:
                 rolle = (person.get("rolle") or "").strip() or "SR"
                 seq = seq_per_rolle.get(rolle, 0)
                 seq_per_rolle[rolle] = seq + 1
-                besetzt.append((rolle, seq))
 
                 conn.execute("""
                     INSERT INTO match_officials
@@ -173,24 +171,14 @@ def upsert_match(
                     person.get("plz_ort") or "",
                 ))
 
-            # Fahrtkosten von Rollen wegraeumen, die es nicht mehr gibt. Wird
-            # eine Assistenz zurueckgezogen, blieben ihre Kilometer sonst als
-            # Waise liegen: official_expenses haengt an matches, nicht an
-            # match_officials, und im Formular gaebe es keine Zeile mehr, ueber
-            # die man sie loeschen koennte - im Dokument staenden sie trotzdem.
-            if besetzt:
-                platzhalter = ",".join("(?,?)" for _ in besetzt)
-                werte = [teil for paar in besetzt for teil in paar]
-                verwaist = conn.execute(f"""
-                    DELETE FROM official_expenses
-                    WHERE match_id = ? AND (rolle, seq) NOT IN (VALUES {platzhalter})
-                """, [match_id, *werte]).rowcount
-
-                if verwaist:
-                    logger.info(
-                        f"Spiel {match_id}: {verwaist} Fahrtkosten-Eintraege zu nicht mehr "
-                        "angesetzten Unparteiischen entfernt"
-                    )
+            # Erfasste Fahrtkosten werden hier bewusst NICHT angetastet, auch
+            # nicht fuer Rollen, die in diesem Scrape fehlen. Der Scraper gibt
+            # bei einem aufgelaufenen Modal eine kuerzere Liste zurueck, ohne
+            # dass sich an der Ansetzung etwas geaendert haette - ein Loeschen
+            # wuerde dann Eingaben des Nutzers vernichten. Zu einer nicht mehr
+            # besetzten Rolle gehoerende Werte werden stattdessen beim Lesen
+            # ausgeblendet (siehe _rows_to_matches) und tauchen wieder auf,
+            # wenn die Rolle zurueckkommt.
 
         if own_conn:
             conn.commit()
@@ -264,8 +252,18 @@ def _rows_to_matches(match_rows, official_rows, expense_rows) -> List[Dict]:
         )
 
         # Flaches Dict fuer den Generator: sr_km, sra1_oevm, ...
+        #
+        # Nur Rollen, die aktuell auch besetzt sind. Erfasste Werte zu einer
+        # zurueckgezogenen Assistenz bleiben in der Datenbank stehen (ein
+        # Scrape darf keine Nutzereingaben vernichten), gehoeren aber weder in
+        # die Anzeige noch ins Dokument. Kommt die Rolle zurueck, ist der Wert
+        # wieder da.
+        besetzte_rollen = {(o["rolle"], o["seq"]) for o in officials if o.get("name")}
+
         flat_expenses: Dict[str, Optional[float]] = {}
         for entry in expenses_by_match.get(match["id"], []):
+            if (entry["rolle"], entry["seq"]) not in besetzte_rollen:
+                continue
             prefix = _expense_prefix(entry["rolle"], entry["seq"])
             if prefix:
                 flat_expenses[f"{prefix}_km"] = entry["km"]
