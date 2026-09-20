@@ -938,17 +938,35 @@ class DFBScraper:
         }
     """
 
+    # Die Karte zeigt ZWEI Saisons gleichzeitig: die gewaehlte und die davor,
+    # als vier Tabellen (Einsaetze + Lehrgaenge je Saison). Ein Zugriff ueber
+    # tabellen[0]/[1] traf deshalb je nach Renderzeitpunkt die falsche Saison.
+    #
+    # Gesucht wird stattdessen ueber die Ueberschrift "Saison <name>": sie
+    # beschriftet ihre Daten, ganz gleich an welcher Stelle der Block steht -
+    # und ganz gleich, ob die Karte gerade schon umgeschaltet hat. Welcher der
+    # beiden gleich beschrifteten Bloecke welcher ist, entscheidet ihr Inhalt.
     _BILANZ_JS = r"""
-        (karte) => {
+        (karte, saison) => {
+            const kopf = (t) => (t.querySelector('tr')?.textContent || '').trim();
             const lies = (t) => [...t.querySelectorAll('tr')].map(
                 tr => [...tr.children].map(
                     c => c.textContent.trim().replace(/\s+/g, ' ')
                 )
             );
-            const tabellen = [...karte.querySelectorAll('table')];
+
+            const gesucht = 'Saison ' + saison;
+            const bloecke = [...karte.querySelectorAll('table')]
+                .filter(t => kopf(t) === gesucht);
+
+            const einsatzTabelle = bloecke.find(t => t.textContent.includes('Geleitet'));
+            const lehrTabelle = bloecke.find(t => t.textContent.includes('Lehrabend'));
+
+            if (!einsatzTabelle && !lehrTabelle) return null;
+
             return {
-                einsaetze: tabellen[0] ? lies(tabellen[0]) : [],
-                lehrgaenge: tabellen[1] ? lies(tabellen[1]) : [],
+                einsaetze: einsatzTabelle ? lies(einsatzTabelle) : [],
+                lehrgaenge: lehrTabelle ? lies(lehrTabelle) : [],
             };
         }
     """
@@ -1130,34 +1148,43 @@ class DFBScraper:
 
         return self._dropdown_optionen(dropdowns[0])
 
-    def extract_saison_bilanz(self, saison: str) -> dict:
+    def extract_saison_bilanz(self, saison: str, timeout_ms: int = 45000) -> dict:
         """
-        Einsatzbilanz und Lehrgänge einer Saison aus der zweiten Karte.
+        Einsatzbilanz und Lehrgaenge einer Saison aus der zweiten Karte.
 
         Die Karte hat ein EIGENES Saison-Auswahlfeld, das dem der Spieltabelle
-        nicht folgt - es muss getrennt gesetzt werden. Sie lädt außerdem
-        merklich langsamer als die erste, deshalb die großzügige Wartezeit auf
-        ihre Überschrift.
+        nicht folgt, und laedt beim ersten Aufruf merklich langsamer als die
+        erste Karte - daher die grosszuegige Wartezeit.
+
+        Gewartet wird, bis ein Block mit der Ueberschrift "Saison <name>" da
+        ist. Ein Warten auf "irgendein tr enthaelt den Saisonnamen" war
+        wertlos: die Karte zeigt immer auch die Vorsaison, der Name stand also
+        schon vor dem Umschalten auf der Seite.
         """
         karte = self.page.locator(self._BILANZ_KARTE).first
 
         try:
             dropdown = karte.locator('dfb-dropdown-input').first
             dropdown.locator('button.dropdown-item').first.wait_for(
-                state="attached", timeout=30000
+                state="attached", timeout=timeout_ms
             )
             self._dropdown_waehlen(dropdown, saison)
 
-            # Die Karte betitelt ihre Tabellen mit "Saison <name>" - daran ist
-            # zu erkennen, dass sie wirklich umgeschaltet hat.
-            karte.locator('table').first.locator(
-                f'tr:has-text("{saison}")'
-            ).first.wait_for(state="visible", timeout=30000)
+            ende = time.monotonic() + timeout_ms / 1000
+            roh = None
 
-            roh = karte.evaluate(self._BILANZ_JS) or {}
+            while time.monotonic() < ende:
+                roh = karte.evaluate(self._BILANZ_JS, saison)
+                if roh and roh.get("einsaetze"):
+                    break
+                self.page.wait_for_timeout(400)
+
+            if not roh:
+                logger.warning(f"Bilanz fuer Saison {saison} nicht gefunden")
+                return {"einsaetze": [], "lehrgaenge": {}}
 
         except Exception as e:
-            logger.warning(f"Bilanz für Saison {saison} nicht lesbar: {e}")
+            logger.warning(f"Bilanz fuer Saison {saison} nicht lesbar: {e}")
             return {"einsaetze": [], "lehrgaenge": {}}
 
         einsaetze = []
@@ -1165,7 +1192,7 @@ class DFBScraper:
             if len(zeile) < 2:
                 continue
             rolle = (zeile[0] or "").strip()
-            # Überschriftenzeilen der Tabelle überspringen
+            # Ueberschriftenzeilen der Tabelle ueberspringen
             if not rolle or rolle.startswith("Saison") or rolle == "Geleitet":
                 continue
             einsaetze.append({
@@ -1194,57 +1221,116 @@ class DFBScraper:
         )
         return {"einsaetze": einsaetze, "lehrgaenge": lehrgaenge}
 
-    def scrape_saisons(self, progress_callback=None) -> dict:
+    # DFBnet liefert bei mindestens einer Saison (beobachtet: 24/25) mit "100
+    # Ergebnisse pro Seite" dauerhaft eine LEERE Tabelle, waehrend 50, 20 und
+    # 10 dort einwandfrei laufen. Ein Timing-Problem ist es nicht - die Seite
+    # bleibt auch nach 30 Sekunden leer. Deshalb 50 als Standard und eine
+    # Rueckfallleiter darunter, statt eine ganze Saison an einem Anzeigefehler
+    # von DFBnet zu verlieren.
+    _SEITENGROESSEN = [50, 20, 10]
+
+    def _setze_seitengroesse(self, groesse: int):
+        """Stellt die Zeilen pro Seite um; gilt auch nach einem Saisonwechsel."""
+        self._dropdown_waehlen(
+            self._spiele_dropdowns()[-1], f"{groesse} Ergebnisse pro Seite"
+        )
+        self.page.wait_for_timeout(1500)
+
+    def _lies_spiele_mit_rueckfall(self, saison: str, aktuelle_groesse, kennung):
         """
-        Liest für jede angebotene Saison die geleiteten Spiele und die Bilanz.
+        Liest die Spiele einer bereits gewaehlten Saison.
+
+        Bleibt die Tabelle bei einer Seitengroesse unvollstaendig, wird es mit
+        der naechstkleineren versucht.
+
+        Returns:
+            Tuple (zeilen, treffer, benutzte_seitengroesse)
+        """
+        zeilen, treffer = [], None
+
+        for groesse in self._SEITENGROESSEN:
+            if groesse != aktuelle_groesse:
+                try:
+                    self._setze_seitengroesse(groesse)
+                    aktuelle_groesse = groesse
+                    # Nach dem Umstellen taugt die alte Kennung nicht mehr als
+                    # Vergleich - die Zeilen sind dieselben, nur mehr oder
+                    # weniger davon.
+                    kennung = None
+                except Exception as e:
+                    logger.warning(f"Seitengroesse {groesse} nicht setzbar: {e}")
+                    continue
+
+            zeilen, treffer = self._warte_auf_spieltabelle(kennung, seitengroesse=groesse)
+
+            if treffer is not None and treffer > groesse:
+                zeilen = self._blaettere_durch(zeilen, treffer, groesse)
+
+            if treffer is not None and len(zeilen) == treffer:
+                return zeilen, treffer, aktuelle_groesse
+
+            logger.warning(
+                f"Saison {saison}: bei {groesse} pro Seite nur {len(zeilen)} von "
+                f"{treffer} Spielen - versuche eine kleinere Seitengroesse"
+            )
+
+        return zeilen, treffer, aktuelle_groesse
+
+    def scrape_saisons(self, progress_callback=None, ueberspringen=None) -> dict:
+        """
+        Liest die geleiteten Spiele und die Bilanz je Saison.
 
         Setzt voraus, dass open_referee_tab("matches-statistics", ...) gelaufen
         ist.
 
-        Die Seitengröße wird einmal auf 100 gestellt - sie bleibt über einen
-        Saisonwechsel hinweg erhalten. Reicht das nicht (ein Schiedsrichter
-        kann über 100 Spiele in einer Saison haben), wird geblättert.
-
         Args:
             progress_callback: wird als (aktuell, gesamt, schritt) aufgerufen
+            ueberspringen: Saisons, die bereits vollstaendig gespeichert sind.
+                Abgeschlossene Saisons aendern sich bei DFBnet nicht mehr; sie
+                jede Nacht neu zu lesen kostet nur Zeit. Die laufende Saison
+                gehoert nie dazu - sie waechst mit jedem Spieltag.
 
         Returns:
             Dict saison -> {spiele, einsaetze, lehrgaenge, vollstaendig}
         """
         logger.info("=== Lese Saisonzusammenfassung ===")
 
-        seitengroesse = 100
+        ueberspringen = set(ueberspringen or ())
+
         karte = self._spiele_karte()
         karte.locator('table').first.wait_for(state="visible", timeout=30000)
 
         saisons = self.extract_saison_namen()
+
+        # Die laufende Saison waechst mit jedem Spieltag und wird nie
+        # uebersprungen, auch wenn sie als vollstaendig gespeichert ist. DFBnet
+        # listet die Saisons neueste zuerst.
+        if saisons:
+            ueberspringen.discard(saisons[0])
+
+        zu_lesen = [saison for saison in saisons if saison not in ueberspringen]
+
         logger.info(f"Angebotene Saisons: {saisons}")
+        if ueberspringen:
+            logger.info(
+                f"Uebersprungen (bereits vollstaendig): "
+                f"{sorted(ueberspringen & set(saisons))}"
+            )
 
-        dropdowns = self._spiele_dropdowns()
-        try:
-            self._dropdown_waehlen(dropdowns[-1], f"{seitengroesse} Ergebnisse pro Seite")
-            self.page.wait_for_timeout(2000)
-        except Exception as e:
-            # Nicht tödlich: dann wird eben mit der Standardgröße geblättert.
-            logger.warning(f"Seitengröße konnte nicht gesetzt werden: {e}")
-            seitengroesse = 10
-
+        seitengroesse = None
         ergebnis = {}
 
-        for nummer, saison in enumerate(saisons, start=1):
+        for nummer, saison in enumerate(zu_lesen, start=1):
             if progress_callback:
-                progress_callback(nummer, len(saisons), f"Saison {saison} ({nummer}/{len(saisons)})")
+                progress_callback(nummer, len(zu_lesen), f"Saison {saison} ({nummer}/{len(zu_lesen)})")
 
             try:
                 kennung = self._zeilen_kennung(self._spielzeilen())
                 self._dropdown_waehlen(self._spiele_dropdowns()[0], saison)
 
-                zeilen, treffer = self._warte_auf_spieltabelle(
-                    kennung, seitengroesse=seitengroesse
+                zeilen, treffer, seitengroesse = self._lies_spiele_mit_rueckfall(
+                    saison, seitengroesse, kennung
                 )
-
-                if treffer is not None and treffer > seitengroesse:
-                    zeilen = self._blaettere_durch(zeilen, treffer, seitengroesse)
 
                 vollstaendig = treffer is not None and len(zeilen) == treffer
                 if not vollstaendig:
@@ -1254,11 +1340,18 @@ class DFBScraper:
 
                 bilanz = self.extract_saison_bilanz(saison)
 
+                # Ohne Einsatzbilanz ist die Saison nicht vollstaendig erfasst -
+                # sie wuerde sonst als fertig gelten und nie wieder gelesen.
+                if not bilanz["einsaetze"]:
+                    logger.warning(f"Saison {saison}: keine Einsatzbilanz gelesen")
+                    vollstaendig = False
+
                 ergebnis[saison] = {
                     "spiele": zeilen,
                     "einsaetze": bilanz["einsaetze"],
                     "lehrgaenge": bilanz["lehrgaenge"],
                     "vollstaendig": vollstaendig,
+                    "erwartet": treffer if treffer is not None else len(zeilen),
                 }
                 logger.info(f"✓ Saison {saison}: {len(zeilen)}/{treffer} Spiele")
 
@@ -1266,7 +1359,10 @@ class DFBScraper:
                 logger.error(f"Saison {saison} konnte nicht gelesen werden: {e}")
                 continue
 
-        logger.info(f"=== Saisonzusammenfassung: {len(ergebnis)}/{len(saisons)} Saisons ===")
+        logger.info(
+            f"=== Saisonzusammenfassung: {len(ergebnis)} gelesen, "
+            f"{len(saisons) - len(zu_lesen)} uebersprungen ==="
+        )
         return ergebnis
 
     def scrape_all_matches(self, progress_callback=None):
