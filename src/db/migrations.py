@@ -552,6 +552,89 @@ def _migration_009_stammdaten(conn: sqlite3.Connection) -> None:
         );
     """)
 
+def _migration_010_saison(conn: sqlite3.Connection) -> None:
+    """
+    Geleitete Spiele und Saisonbilanz aus dem Reiter "Spiele & Statistiken".
+
+    Bewusst voellig getrennt von `matches`. Dort stehen die ANSETZUNGEN, an
+    denen die vom Nutzer eingetragenen Kilometer haengen; hier stehen die
+    GELEITETEN Spiele mit Ergebnis und Kartenstatistik. Teils dieselbe Partie,
+    aber aus zwei verschiedenen Tabellen von DFBnet. Ein Zusammenfuehren ueber
+    Heim/Gast/Datum ginge bei Turnieren und Verlegungen schief und haengte im
+    schlimmsten Fall erfasste Fahrtkosten an die falsche Zeile.
+
+    Anders als bei `matches` darf hier pro Saison komplett neu geschrieben
+    werden: an diesen Zeilen haengt nichts, was der Nutzer selbst eingegeben
+    hat. Das ist auch noetig, denn DFBnet korrigiert Ergebnisse und
+    Kartenzahlen nachtraeglich, und die laufende Saison waechst mit jedem
+    Spieltag.
+
+    Die Kartenspalten sind INTEGER und duerfen NULL sein - DFBnet zeigt in der
+    Tabelle ein "-", wenn zu einem Spiel nichts erfasst ist. Als Text waeren
+    Summen ueber eine Saison nicht moeglich.
+    """
+    _run_script(conn, """
+        CREATE TABLE season_matches (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            saison TEXT NOT NULL,
+            match_key TEXT NOT NULL,
+            datum TEXT NOT NULL,
+            uhrzeit TEXT NOT NULL DEFAULT '',
+            liga TEXT NOT NULL DEFAULT '',
+            heim TEXT NOT NULL DEFAULT '',
+            gast TEXT NOT NULL DEFAULT '',
+            ergebnis TEXT NOT NULL DEFAULT '',
+            heim_gelb INTEGER,
+            heim_gelbrot INTEGER,
+            heim_rot INTEGER,
+            gast_gelb INTEGER,
+            gast_gelbrot INTEGER,
+            gast_rot INTEGER,
+            eigene_rolle TEXT NOT NULL DEFAULT '',
+            scraped_at TEXT NOT NULL,
+            UNIQUE (user_id, saison, match_key),
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        );
+
+        CREATE INDEX idx_season_matches_user ON season_matches (user_id, saison, datum DESC);
+
+        CREATE TABLE season_match_officials (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            season_match_id INTEGER NOT NULL,
+            rolle TEXT NOT NULL,
+            seq INTEGER NOT NULL DEFAULT 0,
+            name TEXT NOT NULL DEFAULT '',
+            ist_selbst INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY (season_match_id) REFERENCES season_matches (id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX idx_season_match_officials_match ON season_match_officials (season_match_id);
+
+        CREATE TABLE season_appearances (
+            user_id INTEGER NOT NULL,
+            saison TEXT NOT NULL,
+            rolle TEXT NOT NULL,
+            seq INTEGER NOT NULL DEFAULT 0,
+            geleitet TEXT NOT NULL DEFAULT '',
+            zurueckgegeben TEXT NOT NULL DEFAULT '',
+            nicht_angetreten TEXT NOT NULL DEFAULT '',
+            PRIMARY KEY (user_id, saison, rolle),
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        );
+
+        CREATE TABLE season_education (
+            user_id INTEGER NOT NULL,
+            saison TEXT NOT NULL,
+            lehrabend TEXT NOT NULL DEFAULT '',
+            lehrabend_online TEXT NOT NULL DEFAULT '',
+            leistungspruefung TEXT NOT NULL DEFAULT '',
+            scraped_at TEXT NOT NULL,
+            PRIMARY KEY (user_id, saison),
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        );
+    """)
+
 # (Version, Beschreibung, Funktion) - aufsteigend, Luecken sind nicht erlaubt.
 MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "baseline schema", _migration_001_baseline),
@@ -563,6 +646,7 @@ MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (7, "drop legacy session and expense tables", _migration_007_drop_legacy_tables),
     (8, "rekey matches by mannschaftsart and spielklasse", _migration_008_rekey_matches),
     (9, "referee coredata per user", _migration_009_stammdaten),
+    (10, "officiated games and season totals", _migration_010_saison),
 ]
 
 
