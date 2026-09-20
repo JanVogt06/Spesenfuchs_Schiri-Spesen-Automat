@@ -498,7 +498,7 @@ def _render_docx(match: dict) -> tuple:
     return filename, content
 
 
-async def _render_pdfs(documents: List[tuple]) -> Dict[str, bytes]:
+async def _render_pdfs(documents: List[tuple]) -> List[Optional[bytes]]:
     """
     Konvertiert gerenderte DOCX zu PDF.
 
@@ -537,8 +537,7 @@ async def download_match_document(
             headers=_content_disposition(filename),
         )
 
-    pdfs = await _render_pdfs([(filename, docx_bytes)])
-    pdf_bytes = pdfs.get(filename)
+    pdf_bytes = (await _render_pdfs([(filename, docx_bytes)]))[0]
 
     if not pdf_bytes:
         raise APIError(503, "PDF_CONVERSION_FAILED",
@@ -586,23 +585,43 @@ async def download_matches_as_zip(
 
     documents = await run_in_threadpool(lambda: [_render_docx(m) for m in matches])
 
-    pdfs = {}
+    pdfs: List[Optional[bytes]] = [None] * len(documents)
     if request.file_format in ("pdf", "both"):
         pdfs = await _render_pdfs(documents)
-        if not pdfs:
+
+        # Auch ein TEILWEISER Ausfall ist ein Fehler. Frueher wurden fehlende
+        # PDFs einfach uebersprungen und der User bekam ein HTTP 200 mit einem
+        # unvollstaendigen Archiv, ohne es zu merken.
+        fehlend = sum(1 for pdf in pdfs if pdf is None)
+        if fehlend:
             raise APIError(503, "PDF_CONVERSION_FAILED",
-                           "Die PDF-Erzeugung ist fehlgeschlagen. Bitte erneut versuchen "
-                           "oder die Word-Dokumente herunterladen.")
+                           f"Für {fehlend} von {len(documents)} Spielen konnte keine PDF "
+                           "erzeugt werden. Bitte erneut versuchen oder die Word-Dokumente "
+                           "herunterladen.")
 
     buffer = BytesIO()
-    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
-        for filename, content in documents:
-            if request.file_format in ("docx", "both"):
-                archive.writestr(filename, content)
+    # Gleiche Dateinamen sind moeglich (zwei Turniere am selben Tag), deshalb
+    # bekommt jeder Eintrag notfalls einen Zusatz - sonst laegen im Archiv zwei
+    # Dateien gleichen Namens.
+    vergeben: Dict[str, int] = {}
 
-            pdf_bytes = pdfs.get(filename)
+    def eindeutig(name: str) -> str:
+        if name not in vergeben:
+            vergeben[name] = 1
+            return name
+        vergeben[name] += 1
+        stamm, _, endung = name.rpartition(".")
+        return f"{stamm} ({vergeben[name]}).{endung}"
+
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        for (filename, content), pdf_bytes in zip(documents, pdfs):
+            basis = eindeutig(filename)
+
+            if request.file_format in ("docx", "both"):
+                archive.writestr(basis, content)
+
             if pdf_bytes:
-                archive.writestr(filename.replace(".docx", ".pdf"), pdf_bytes)
+                archive.writestr(basis.replace(".docx", ".pdf"), pdf_bytes)
 
     zip_name = f"Spesen_{datetime.now().strftime('%Y-%m-%d')}.zip"
 

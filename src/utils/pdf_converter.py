@@ -5,11 +5,16 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from utils.logger import setup_logger
 
 logger = setup_logger("pdf_converter")
+
+# Obergrenze fuer einen soffice-Aufruf. 120s pro Dokument waeren bei einem
+# Sammel-Download von 50 Spielen ueber anderthalb Stunden - so lange darf ein
+# haengender LibreOffice keinen der wenigen PDF-Plaetze blockieren.
+MAX_CONVERT_SECONDS = 300
 
 # Reihenfolge: zuerst PATH-Kommandos, dann bekannte macOS-Installationspfade
 _SOFFICE_CANDIDATES = [
@@ -33,7 +38,7 @@ def _find_soffice() -> str:
     )
 
 
-def convert_docx_bytes_to_pdf(documents: List[Tuple[str, bytes]]) -> Dict[str, bytes]:
+def convert_docx_bytes_to_pdf(documents: List[Tuple[str, bytes]]) -> List[Optional[bytes]]:
     """
     Konvertiert im Speicher erzeugte DOCX-Dokumente zu PDF, ohne dass Aufrufer
     mit Dateien hantieren muessen.
@@ -53,30 +58,36 @@ def convert_docx_bytes_to_pdf(documents: List[Tuple[str, bytes]]) -> Dict[str, b
         documents: Liste von (Dateiname mit .docx-Endung, DOCX-Bytes)
 
     Returns:
-        Dict Dateiname -> PDF-Bytes. Dokumente, deren Konvertierung
-        fehlschlug, fehlen im Ergebnis.
+        Liste in derselben Reihenfolge wie die Eingabe; None, wo die
+        Konvertierung fehlschlug.
+
+        Bewusst eine Liste und keine Abbildung ueber den Dateinamen: zwei
+        Spiele koennen denselben Namen erzeugen (Turnier-Ansetzungen haben
+        keine Teams), und dann ueberschriebe eins das andere still - beide
+        bekaemen dieselbe PDF.
     """
     if not documents:
-        return {}
+        return []
 
     work_dir = Path(tempfile.mkdtemp(prefix="spesen_pdf_"))
 
     try:
         paths = []
-        for filename, content in documents:
-            path = work_dir / filename
+        for index, (filename, content) in enumerate(documents):
+            # Eindeutiger Name im Arbeitsverzeichnis, unabhaengig davon, wie
+            # der Aufrufer die Datei spaeter nennt
+            path = work_dir / f"{index:04d}{Path(filename).suffix or '.docx'}"
             path.write_bytes(content)
             paths.append(path)
 
         convert_docx_files_to_pdf(paths)
 
-        results = {}
+        ergebnis: List[Optional[bytes]] = []
         for path in paths:
             pdf_path = path.with_suffix(".pdf")
-            if pdf_path.exists():
-                results[path.name] = pdf_path.read_bytes()
+            ergebnis.append(pdf_path.read_bytes() if pdf_path.exists() else None)
 
-        return results
+        return ergebnis
     finally:
         shutil.rmtree(work_dir, ignore_errors=True)
 
@@ -114,7 +125,7 @@ def convert_docx_files_to_pdf(docx_paths: List[Path]) -> Dict[Path, bool]:
             ],
             capture_output=True,
             text=True,
-            timeout=120 * len(docx_paths),
+            timeout=min(120 * len(docx_paths), MAX_CONVERT_SECONDS),
         )
 
         if result.returncode != 0:

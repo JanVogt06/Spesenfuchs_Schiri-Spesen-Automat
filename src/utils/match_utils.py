@@ -29,8 +29,8 @@ def generate_filename_from_match(match: dict) -> str:
         'Spesen_FC Bayern_vs_BVB_08-11-2025.docx'
     """
     spiel_info = match.get('spiel_info', {})
-    heim = spiel_info.get('heim_team', 'Unbekannt')
-    gast = spiel_info.get('gast_team', 'Unbekannt')
+    heim = spiel_info.get('heim_team') or ''
+    gast = spiel_info.get('gast_team') or ''
     anpfiff = spiel_info.get('anpfiff', '')
 
     # Extrahiere Datum im Format "08.11.2025"
@@ -44,6 +44,14 @@ def generate_filename_from_match(match: dict) -> str:
     # Bereinige Team-Namen (Slash kann Probleme im Dateisystem machen)
     heim_clean = heim.replace('/', '-')
     gast_clean = gast.replace('/', '-')
+
+    # Turnier-Ansetzungen haben keine Teams. Ohne die Anstosszeit hiessen alle
+    # Turniere eines Tages gleich - im Sammel-ZIP landeten dann zwei Eintraege
+    # unter demselben Namen.
+    if not heim.strip() or not gast.strip():
+        _, uhrzeit = parse_anpfiff(anpfiff)
+        zeit_clean = uhrzeit.replace(':', '-') if uhrzeit else 'ohne-Zeit'
+        return f"Spesen_Turnier_{datum_clean}_{zeit_clean}.docx"
 
     return f"Spesen_{heim_clean}_vs_{gast_clean}_{datum_clean}.docx"
 
