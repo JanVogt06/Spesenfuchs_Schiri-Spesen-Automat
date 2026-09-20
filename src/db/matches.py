@@ -153,10 +153,12 @@ def upsert_match(
             conn.execute("DELETE FROM match_officials WHERE match_id = ?", (match_id,))
 
             seq_per_rolle: Dict[str, int] = {}
+            besetzt = []
             for person in schiedsrichter:
                 rolle = (person.get("rolle") or "").strip() or "SR"
                 seq = seq_per_rolle.get(rolle, 0)
                 seq_per_rolle[rolle] = seq + 1
+                besetzt.append((rolle, seq))
 
                 conn.execute("""
                     INSERT INTO match_officials
@@ -170,6 +172,25 @@ def upsert_match(
                     person.get("strasse") or "",
                     person.get("plz_ort") or "",
                 ))
+
+            # Fahrtkosten von Rollen wegraeumen, die es nicht mehr gibt. Wird
+            # eine Assistenz zurueckgezogen, blieben ihre Kilometer sonst als
+            # Waise liegen: official_expenses haengt an matches, nicht an
+            # match_officials, und im Formular gaebe es keine Zeile mehr, ueber
+            # die man sie loeschen koennte - im Dokument staenden sie trotzdem.
+            if besetzt:
+                platzhalter = ",".join("(?,?)" for _ in besetzt)
+                werte = [teil for paar in besetzt for teil in paar]
+                verwaist = conn.execute(f"""
+                    DELETE FROM official_expenses
+                    WHERE match_id = ? AND (rolle, seq) NOT IN (VALUES {platzhalter})
+                """, [match_id, *werte]).rowcount
+
+                if verwaist:
+                    logger.info(
+                        f"Spiel {match_id}: {verwaist} Fahrtkosten-Eintraege zu nicht mehr "
+                        "angesetzten Unparteiischen entfernt"
+                    )
 
         if own_conn:
             conn.commit()

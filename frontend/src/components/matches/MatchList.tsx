@@ -7,9 +7,11 @@ import {Calendar, Download} from 'lucide-react';
 
 interface MatchListProps {
     matches: MatchData[];
+    /** Lädt die Spiele neu, nachdem Fahrtkosten gespeichert wurden */
+    onReload?: () => void;
 }
 
-export function MatchList({matches}: MatchListProps) {
+export function MatchList({matches, onReload}: MatchListProps) {
     const [downloadingFile, setDownloadingFile] = useState<string | null>(null);
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [isBulkDownloading, setIsBulkDownloading] = useState(false);
@@ -102,6 +104,7 @@ export function MatchList({matches}: MatchListProps) {
                         downloadingFilename={downloadingFile}
                         selected={selectedIds.includes(match._id)}
                         onToggleSelected={() => toggleSelected(match._id)}
+                        onSaved={onReload}
                     />
                 );
             })}

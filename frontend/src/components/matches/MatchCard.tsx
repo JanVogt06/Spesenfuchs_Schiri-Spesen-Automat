@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import {useState, useEffect, useRef} from 'react';
 import type {MatchData, MatchExpenses} from '@/lib/matches';
 import {saveMatchExpenses} from '@/lib/matches';
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
@@ -41,11 +41,13 @@ interface MatchCardProps {
     downloadingFilename: string | null;
     selected?: boolean;
     onToggleSelected?: () => void;
+    /** Wird nach erfolgreichem Speichern aufgerufen, damit die Liste nachzieht */
+    onSaved?: () => void;
 }
 
 export function MatchCard({
                               match, index, filename, onDownload, downloadingFilename,
-                              selected, onToggleSelected,
+                              selected, onToggleSelected, onSaved,
                           }: MatchCardProps) {
     const [isExpanded, setIsExpanded] = useState(false);
     const pdfFilename = filename.replace(/\.docx$/i, '.pdf');
@@ -63,15 +65,53 @@ export function MatchCard({
     const [saveMessage, setSaveMessage] = useState('');
     const [saveError, setSaveError] = useState('');
 
+    // Sobald der Nutzer etwas tippt, dürfen neu geladene Serverwerte die
+    // Eingaben nicht mehr überschreiben
+    const hatEigeneEingaben = useRef(false);
+
+    // Wer ist tatsächlich angesetzt? Anzeige und Speichern müssen dieselbe
+    // Antwort verwenden, sonst werden Werte gespeichert, für die es kein
+    // Eingabefeld gibt.
+    const hasSRA1 = !!match.schiedsrichter?.some(sr => sr.rolle === 'SRA 1' && sr.name);
+    const hasSRA2 = !!match.schiedsrichter?.some(sr => sr.rolle === 'SRA 2' && sr.name);
+    const sichtbareRollen: Record<string, boolean> = {
+        sr_km: true, sr_oevm: true,
+        sra1_km: hasSRA1, sra1_oevm: hasSRA1,
+        sra2_km: hasSRA2, sra2_oevm: hasSRA2,
+    };
+
+    // Lädt die Liste neu (z.B. nach einem Scrape oder einer Änderung auf einem
+    // anderen Gerät), müssen die Felder nachziehen. Ohne das behielte die Karte
+    // ihre Werte vom ersten Rendern und schriebe sie beim nächsten Speichern
+    // über den neueren Stand.
+    useEffect(() => {
+        if (hatEigeneEingaben.current) return;
+        setExpenseInputs({
+            sr_km: toInputValue(match._expenses?.sr_km),
+            sr_oevm: toInputValue(match._expenses?.sr_oevm),
+            sra1_km: toInputValue(match._expenses?.sra1_km),
+            sra1_oevm: toInputValue(match._expenses?.sra1_oevm),
+            sra2_km: toInputValue(match._expenses?.sra2_km),
+            sra2_oevm: toInputValue(match._expenses?.sra2_oevm),
+        });
+    }, [match._expenses]);
+
     const handleSaveExpenses = async () => {
         if (!match._id) {
             setSaveError('Spieldaten unvollständig, speichern nicht möglich.');
             return;
         }
 
-        // Eingaben parsen und validieren
+        // Eingaben parsen und validieren. Für Rollen ohne Eingabefeld wird
+        // ausdrücklich null geschickt: ist eine Assistenz nachträglich
+        // abgesetzt worden, stünden ihre Kilometer sonst weiter im Dokument,
+        // ohne dass es ein Feld gäbe, um sie zu löschen.
         const expenses: MatchExpenses = {};
         for (const key of Object.keys(expenseInputs) as (keyof MatchExpenses)[]) {
+            if (!sichtbareRollen[key]) {
+                expenses[key] = null;
+                continue;
+            }
             const parsed = parseGermanNumber(expenseInputs[key]);
             if (parsed === undefined) {
                 setSaveError('Bitte nur positive Zahlen eingeben (z.B. 42 oder 7,50).');
@@ -85,6 +125,8 @@ export function MatchCard({
         setSaveMessage('');
         try {
             await saveMatchExpenses(match._id, expenses);
+            hatEigeneEingaben.current = false;
+            onSaved?.();
             setSaveMessage('Gespeichert – steht beim nächsten Download im Dokument.');
             setTimeout(() => setSaveMessage(''), 4000);
         } catch (err) {
@@ -292,8 +334,6 @@ export function MatchCard({
 
     const renderExpenses = () => {
         // Nur Rollen anzeigen, die tatsächlich angesetzt sind (SR immer)
-        const hasSRA1 = match.schiedsrichter?.some(sr => sr.rolle === 'SRA 1' && sr.name);
-        const hasSRA2 = match.schiedsrichter?.some(sr => sr.rolle === 'SRA 2' && sr.name);
         const rows = [
             {label: 'SR', kmKey: 'sr_km', oevmKey: 'sr_oevm'},
             ...(hasSRA1 ? [{label: 'SRA 1', kmKey: 'sra1_km', oevmKey: 'sra1_oevm'}] : []),
@@ -328,7 +368,7 @@ export function MatchCard({
                                 <div>
                                     <Input
                                         value={expenseInputs[kmKey]}
-                                        onChange={(e) => setExpenseInputs(prev => ({...prev, [kmKey]: e.target.value}))}
+                                        onChange={(e) => { hatEigeneEingaben.current = true; setExpenseInputs(prev => ({...prev, [kmKey]: e.target.value})); }}
                                         placeholder="z.B. 42"
                                         inputMode="decimal"
                                         className="h-8 text-sm"
@@ -341,7 +381,7 @@ export function MatchCard({
                                 </div>
                                 <Input
                                     value={expenseInputs[oevmKey]}
-                                    onChange={(e) => setExpenseInputs(prev => ({...prev, [oevmKey]: e.target.value}))}
+                                    onChange={(e) => { hatEigeneEingaben.current = true; setExpenseInputs(prev => ({...prev, [oevmKey]: e.target.value})); }}
                                     placeholder="z.B. 7,50"
                                     inputMode="decimal"
                                     className="h-8 text-sm"

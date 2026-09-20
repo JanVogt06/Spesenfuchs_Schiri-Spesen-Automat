@@ -122,7 +122,7 @@ export function DashboardPage() {
                         </div>
                     )}
 
-                    <MatchList matches={matches}/>
+                    <MatchList matches={matches} onReload={loadMatches}/>
                 </div>
             )}
         </AppShell>
