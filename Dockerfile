@@ -14,7 +14,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # ===== Backend Stage =====
-FROM python:3.14
+FROM python:3.14-slim
 
 LABEL org.opencontainers.image.title="Spesenfuchs" \
       org.opencontainers.image.description="Schiri-Spesen-Automat: erstellt Spesenabrechnungen automatisch aus DFB.net-Ansetzungen" \
