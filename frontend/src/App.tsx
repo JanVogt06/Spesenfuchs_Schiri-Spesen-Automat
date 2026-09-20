@@ -4,6 +4,7 @@ import {RegisterPage} from './pages/Register';
 import {LandingPage} from './pages/Landing';
 import {DashboardPage} from './pages/Dashboard';
 import {SettingsPage} from './pages/Settings';
+import {StammdatenPage} from './pages/Stammdaten';
 import {isAuthenticated} from './lib/auth';
 import {Datenschutz} from './pages/Datenschutz';
 
@@ -30,6 +31,15 @@ function App() {
                     element={
                         <ProtectedRoute>
                             <DashboardPage/>
+                        </ProtectedRoute>
+                    }
+                />
+
+                <Route
+                    path="/stammdaten"
+                    element={
+                        <ProtectedRoute>
+                            <StammdatenPage/>
                         </ProtectedRoute>
                     }
                 />
