@@ -253,6 +253,217 @@ class DFBScraper:
             logger.error(f"Fehler beim Navigieren zu Schiriansetzung: {e}")
             raise
 
+    def open_referee_tab(self, tab_id: str, wartet_auf: str):
+        """
+        Wechselt in der Reiterleiste der Ansetzungs-App auf einen anderen Reiter.
+
+        Die Reiter tragen stabile englische ids - matches, coredata,
+        qualifications, availability, problem-clubs, teams,
+        matches-statistics - unabhängig von ihrer deutschen Beschriftung.
+        Deshalb wird über die id geklickt und nicht über den Text: "Stammdaten"
+        steht auch im Seitentitel.
+
+        Args:
+            tab_id: id des Reiter-Buttons, z.B. "coredata"
+            wartet_auf: Selektor, der nach dem Wechsel sichtbar sein muss
+        """
+        logger.info(f"Wechsle auf Reiter '{tab_id}'...")
+
+        try:
+            tab_button = self.page.locator(f'button#{tab_id}').first
+            tab_button.wait_for(state="visible", timeout=15000)
+            tab_button.click()
+
+            # Der Klick ist eine Angular-Router-Navigation, kein Seitenaufbau -
+            # wait_for_load_state liefe sofort durch. Also auf die Komponente
+            # warten, die der neue Reiter rendert.
+            self.page.locator(wartet_auf).first.wait_for(state="visible", timeout=15000)
+
+            logger.info(f"Reiter '{tab_id}' geöffnet")
+
+        except Exception as e:
+            logger.error(f"Fehler beim Wechsel auf Reiter '{tab_id}': {e}")
+            raise
+
+    # Liest alle Label/Wert-Zeilen einer Stammdaten-Karte in einem Rutsch.
+    #
+    # Bewusst eine DOM-Auswertung statt eines Playwright-Selektors: die Karten
+    # schachteln div.row ineinander - der Container der beiden Spalten ist
+    # selbst eine .row -, und ein Selektor wie
+    # div.row:has(div.col.fw-700:text-is("Verein")) fände in Dokumentreihenfolge
+    # zuerst diesen Container und lieferte eine komplette Spalte als "Wert".
+    # Hier entscheidet stattdessen die Form der Zeile: genau zwei Kinder, das
+    # erste mit fw-700, das zweite ohne.
+    #
+    # WICHTIG: Das Label/Wert-Idiom ist damit genau umgekehrt zu den
+    # Spiel-Modals. Dort trägt der WERT die Klasse fw-700 und das Label
+    # text-color-grey-5; auf der Stammdaten-Seite gibt es text-color-grey-5
+    # gar nicht und fw-700 markiert das LABEL.
+    _KARTEN_FELDER_JS = """
+        (karte) => {
+            const felder = {};
+            for (const zeile of karte.querySelectorAll('div.row')) {
+                const spalten = Array.from(zeile.children);
+                if (spalten.length !== 2) continue;
+
+                const label = spalten[0];
+                const wert = spalten[1];
+                if (!label.classList.contains('fw-700')) continue;
+                if (wert.classList.contains('fw-700')) continue;
+
+                const name = label.textContent.trim();
+                if (name) felder[name] = wert.textContent.trim();
+            }
+            return felder;
+        }
+    """
+
+    # Auf der Qualifikationen-Seite steht der Wert wieder in
+    # text-color-grey-5 und das Label in fw-700 - die Zeilen sind dort keine
+    # .row, sondern nebeneinanderliegende Geschwister.
+    _QMAX_FELDER_JS = """
+        (karte) => {
+            const felder = {};
+            for (const label of karte.querySelectorAll('div.fw-700')) {
+                const wert = label.nextElementSibling;
+                if (!wert || !wert.classList.contains('text-color-grey-5')) continue;
+
+                const name = label.textContent.trim();
+                if (name) felder[name] = wert.textContent.trim();
+            }
+            return felder;
+        }
+    """
+
+    def extract_stammdaten(self):
+        """
+        Extrahiert die eigenen Stammdaten aus den drei Karten des Reiters.
+
+        Setzt voraus, dass open_referee_tab("coredata", "sria-coredata")
+        gelaufen ist. Gibt bei einem Fehler {} zurück, wie die übrigen
+        Extraktoren auch.
+
+        Ein "-" wird bewusst NICHT zu einem leeren String normalisiert: DFBnet
+        zeigt damit an, dass ein Feld tatsächlich leer ist, und das ist etwas
+        anderes als "der Scraper hat nichts gefunden". Würden beide Fälle
+        zusammenfallen, behielte die Datenbank eine gelöschte Telefonnummer für
+        immer - der Upsert übernimmt leere Werte absichtlich nicht. Die Anzeige
+        blendet "-" aus.
+        """
+        logger.info("Extrahiere Stammdaten...")
+
+        # Vorsicht: "Umsatzsteuer\u00adpflichtig" enthält zwischen
+        # "Umsatzsteuer" und "pflichtig" ein weiches Trennzeichen (U+00AD).
+        # Ohne das Zeichen findet die Zuordnung das Feld nicht.
+        felder = {
+            'sria-coredata-id-photo-card': {
+                'Ausweisgültigkeit': 'ausweisgueltigkeit',
+                'Foto-Status': 'foto_status',
+                'Foto-Gültigkeit': 'foto_gueltigkeit',
+                'Ausweisnummer': 'ausweisnummer',
+            },
+            'sria-coredata-contact-details-card': {
+                'Name, Vorname': 'name_vorname',
+                'Straße, Nr.': 'strasse',
+                'PLZ, Ort': 'plz_ort',
+                'Geburtsdatum': 'geburtsdatum',
+                'E-Mail': 'email',
+                'Telefon (privat)': 'telefon_privat',
+                'Telefon (geschäftlich)': 'telefon_geschaeftlich',
+                'Telefon (mobil)': 'telefon_mobil',
+            },
+            'sria-coredata-reporting-data-card': {
+                'SR-Gebiet': 'sr_gebiet',
+                'Schiedsrichter seit': 'schiedsrichter_seit',
+                'Verein': 'verein',
+                'Anzahl Fehlmonate': 'fehlmonate',
+                'Zusatzausbildungen': 'zusatzausbildungen',
+                'SR Patensystem durchlaufen am': 'patensystem_am',
+                'Kreditor Nr': 'kreditor_nr',
+                'Debitor Nr': 'debitor_nr',
+                'Status': 'status',
+                'Umsatzsteuer\u00adpflichtig': 'umsatzsteuerpflichtig',
+                'Bemerkung': 'bemerkung',
+            },
+        }
+
+        try:
+            stammdaten = {}
+
+            for karten_selektor, zuordnung in felder.items():
+                karte = self.page.locator(karten_selektor).first
+
+                if not karte.is_visible(timeout=5000):
+                    logger.warning(f"Karte {karten_selektor} nicht sichtbar - übersprungen")
+                    continue
+
+                gelesen = karte.evaluate(self._KARTEN_FELDER_JS) or {}
+
+                for label, schluessel in zuordnung.items():
+                    stammdaten[schluessel] = (gelesen.get(label) or '').strip()
+
+                fehlend = [label for label in zuordnung if label not in gelesen]
+                if fehlend:
+                    logger.warning(f"{karten_selektor}: Felder nicht gefunden: {fehlend}")
+
+            # Der FUSSBALL.DE-Hinweis ist keine Label/Wert-Zeile, sondern ein
+            # einzelner Satz in einer eigenen Spalte. Er wird im Wortlaut
+            # übernommen: wie die Verneinung aussieht, ist nicht bekannt, und
+            # ein selbst erfundenes Ja/Nein wäre geraten.
+            meldedaten = self.page.locator('sria-coredata-reporting-data-card').first
+            hinweis = meldedaten.locator('div.row div.fw-700:has-text("FUSSBALL.DE")').first
+
+            if hinweis.is_visible(timeout=2000):
+                stammdaten['fussball_de_hinweis'] = hinweis.inner_text().strip()
+
+            gefuellt = sum(1 for wert in stammdaten.values() if wert)
+            logger.info(f"Extrahiert: {gefuellt}/{len(stammdaten)} Stammdaten-Felder")
+
+            return stammdaten
+
+        except Exception as e:
+            logger.error(f"Fehler beim Extrahieren der Stammdaten: {e}")
+            return {}
+
+    def extract_qmax(self):
+        """
+        Extrahiert die vier QMax-Werte aus dem Reiter Qualifikationen.
+
+        Setzt voraus, dass open_referee_tab("qualifications",
+        "sria-qualifications-referee-qualifications-card") gelaufen ist.
+
+        Nur die QMax-Werte, nicht die Einsatz-Tabelle darunter: die ist nach
+        Gebieten unterteilt, blättert und trägt für die Spesenabrechnung
+        nichts bei.
+        """
+        logger.info("Extrahiere QMax-Werte...")
+
+        labels = {
+            'QMax-SR:': 'qmax_sr',
+            'QMax-SRA1:': 'qmax_sra1',
+            'QMax-SRA2:': 'qmax_sra2',
+            'QMax-Beo.:': 'qmax_beobachter',
+        }
+
+        try:
+            karte = self.page.locator('sria-qualifications-referee-qualifications-card').first
+            karte.wait_for(state="visible", timeout=8000)
+
+            gelesen = karte.evaluate(self._QMAX_FELDER_JS) or {}
+            qmax = {schluessel: (gelesen.get(label) or '').strip()
+                    for label, schluessel in labels.items()}
+
+            fehlend = [label for label in labels if label not in gelesen]
+            if fehlend:
+                logger.warning(f"QMax-Felder nicht gefunden: {fehlend}")
+
+            logger.info(f"Extrahiert: QMax-SR '{qmax.get('qmax_sr', '?')}'")
+            return qmax
+
+        except Exception as e:
+            logger.error(f"Fehler beim Extrahieren der QMax-Werte: {e}")
+            return {}
+
     def get_all_matches(self):
         """Sammelt alle Spiele von der Seite"""
         logger.info("Sammle alle Spiele...")

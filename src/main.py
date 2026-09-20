@@ -14,6 +14,7 @@ from scraper.dfb_scraper import DFBScraper
 from generator.docx_generator import KM_SATZ_EURO
 from generator.spesen_calculator import calculate_spesen
 from db.matches import upsert_match, mark_missing_matches, build_match_key
+from db.stammdaten import upsert_stammdaten
 from utils.logger import setup_logger
 from utils.match_utils import extract_iso_date_from_anpfiff
 
@@ -75,6 +76,31 @@ def persist_matches(user_id: int, matches_data: List[dict], vollstaendig: bool =
 
     logger.info(f"{saved}/{len(matches_data)} Spiele in der Datenbank")
     return saved
+
+
+def persist_stammdaten(user_id: int, stammdaten: dict) -> None:
+    """
+    Schreibt die eigenen Stammdaten eines Users in die Datenbank.
+
+    Fehler werden nur geloggt: die Ansetzungen sind das Produkt, die
+    Stammdaten sind Beiwerk. Sie sollen einen Lauf nicht scheitern lassen,
+    nachdem die Spiele bereits erfolgreich geschrieben wurden.
+
+    Ein leeres Ergebnis wird uebersprungen statt gespeichert. Sonst legte der
+    Upsert eine Zeile aus lauter Leerstrings an, und der Reiter zeigte dem
+    Nutzer eine leere Tabelle statt des Hinweises, dass noch nichts abgerufen
+    wurde.
+    """
+    if not any(stammdaten.values()):
+        logger.warning("Keine Stammdaten gelesen - nichts zu speichern")
+        return
+
+    try:
+        upsert_stammdaten(user_id, stammdaten)
+        gefuellt = sum(1 for wert in stammdaten.values() if wert)
+        logger.info(f"Stammdaten gespeichert ({gefuellt} Felder)")
+    except Exception as e:
+        logger.error(f"Stammdaten konnten nicht gespeichert werden: {e}")
 
 
 def scrape_matches(
@@ -143,8 +169,39 @@ def scrape_matches(
                 "unvollstaendiger Scrape"
             )
 
+        # Die Stammdaten liegen als weiterer Reiter in genau dem Tab, den
+        # navigate_to_schiriansetzung schon gekapert hat - sie kosten also
+        # keinen zweiten Login, nur zwei Klicks.
+        #
+        # Bewusst NACH den Spielen: der Tab startet auf "Meine Spiele", davor
+        # eingeschoben braeuchte es einen Rueckklick samt erneutem Warten auf
+        # die Spielliste, und jede Flakiness dort kostete den ganzen
+        # Spiele-Scrape.
+        #
+        # Das eigene try/except, das nur warnt, ist tragend: persist_matches
+        # laeuft erst nach dem with-Block. Eine Exception hier kaeme aus
+        # scrape_matches heraus, und kein einziges Spiel waere gespeichert -
+        # ein kompletter Nachtlauf verloren, weil DFBnet ein Stammdaten-Feld
+        # verschoben hat.
+        stammdaten = {}
+
+        try:
+            melde(len(all_matches), erwartet, "Lese Stammdaten...")
+
+            scraper.open_referee_tab("coredata", "sria-coredata")
+            stammdaten = scraper.extract_stammdaten()
+
+            scraper.open_referee_tab(
+                "qualifications", "sria-qualifications-referee-qualifications-card"
+            )
+            stammdaten.update(scraper.extract_qmax())
+
+        except Exception as e:
+            logger.warning(f"Stammdaten konnten nicht gelesen werden: {e}")
+
     if user_id is not None:
         persist_matches(user_id, all_matches, vollstaendig=vollstaendig)
+        persist_stammdaten(user_id, stammdaten)
 
     logger.info(f"Erfolgreich {len(all_matches)} Spiele gescrapt")
     return all_matches
