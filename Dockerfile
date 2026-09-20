@@ -1,7 +1,7 @@
 # Multi-stage Build: Frontend bauen, dann Backend
 # Das Frontend-Build ist plattformunabhaengig und laeuft daher auf der
 # Architektur des Builders - sonst wuerde npm beim arm64-Image emuliert.
-FROM --platform=$BUILDPLATFORM node:20-slim AS frontend-builder
+FROM --platform=$BUILDPLATFORM node:26-slim AS frontend-builder
 
 WORKDIR /frontend
 
