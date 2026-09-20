@@ -305,25 +305,10 @@ def _migration_006_backfill_from_sessions(conn: sqlite3.Connection) -> None:
     # Werte historischer Abrechnungen nicht nachtraeglich verschieben.
     km_satz = 0.30
 
-    output_dir = config.get_data_dir() / "output"
-    if not output_dir.exists():
-        # Hat diese Datenbank jemals Sessions gehabt, muessen auch deren Ordner
-        # da sein. Fehlen sie, zeigt DATA_DIR woandershin oder das Verzeichnis
-        # wurde zu frueh geloescht - in beiden Faellen waere der Backfill danach
-        # dauerhaft als erledigt vermerkt und die Historie aller Nutzer weg.
-        # Lieber laut abbrechen als still ueberspringen.
-        altlast = conn.execute("SELECT COUNT(*) AS n FROM sessions").fetchone()["n"]
-
-        if altlast and not os.getenv("SKIP_SESSION_BACKFILL"):
-            raise RuntimeError(
-                f"{output_dir} fehlt, obwohl {altlast} Sessions in der Datenbank stehen. "
-                "Die Spiele koennen nicht uebernommen werden. Pruefe DATA_DIR und lege das "
-                "Verzeichnis zurueck. Ist der Verlust gewollt, den Start einmalig mit "
-                "SKIP_SESSION_BACKFILL=1 wiederholen."
-            )
-
-        logger.info("Kein output-Verzeichnis - nichts zu uebernehmen")
-        return
+    # get_output_dir() statt DATA_DIR/"output": eine Installation kann OUTPUT_DIR
+    # gesetzt haben oder noch auf dem alten Layout stehen, und dann lagen die
+    # Ordner woanders.
+    output_dir = config.get_output_dir()
 
     besitzer = {
         row["session_id"]: row
@@ -333,7 +318,37 @@ def _migration_006_backfill_from_sessions(conn: sqlite3.Connection) -> None:
     ordner = sorted(
         (d for d in output_dir.iterdir() if d.is_dir()),
         key=lambda d: (besitzer[d.name]["created_at"] if d.name in besitzer else "", d.name),
-    )
+    ) if output_dir.exists() else []
+
+    # Kennt die Datenbank Sessions, muessen auch deren Ordner da sein. Sind sie
+    # weg, zeigt der Pfad woandershin oder es wurde zu frueh aufgeraeumt. Ohne
+    # diese Pruefung liefe der Schritt durch, Migration 007 wuerfe gleich darauf
+    # `sessions` weg und die Historie aller Nutzer waere ohne eine einzige
+    # Fehlermeldung verloren.
+    #
+    # Geprueft wird die Zahl der WIEDERGEFUNDENEN Ordner, nicht bloss ob das
+    # Verzeichnis existiert: ein "rm -rf data/output/*" laesst das Verzeichnis
+    # stehen und waere sonst durchgerutscht.
+    bekannt = sum(1 for d in ordner if d.name in besitzer)
+
+    if besitzer and not bekannt and not os.getenv("SKIP_SESSION_BACKFILL"):
+        raise RuntimeError(
+            f"In {output_dir} liegt kein einziger der {len(besitzer)} Session-Ordner, "
+            "die diese Datenbank kennt. Die Spiele koennen nicht uebernommen werden. "
+            "Pruefe DATA_DIR/OUTPUT_DIR und lege das Verzeichnis zurueck. Ist der "
+            "Verlust gewollt, den Start einmalig mit SKIP_SESSION_BACKFILL=1 wiederholen."
+        )
+
+    if besitzer and bekannt < len(besitzer):
+        fehlend = len(besitzer) - bekannt
+        # Ein paar Sessions ohne Ordner sind normal: Laeufe, die schon beim
+        # DFB-Login scheiterten, haben nie etwas geschrieben. Erst wenn ein
+        # nennenswerter Teil fehlt, ist das ein Hinweis auf ein Problem.
+        melden = logger.warning if fehlend > len(besitzer) // 10 else logger.info
+        melden(
+            f"{fehlend} von {len(besitzer)} Sessions haben keinen Ordner "
+            "(in der Regel Laeufe, die vor dem Scrapen abgebrochen sind)."
+        )
 
     spiele = uebersprungen = ohne_besitzer = 0
 
