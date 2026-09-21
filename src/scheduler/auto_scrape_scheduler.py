@@ -8,7 +8,7 @@ Datenbank; Dokumente entstehen beim Download.
 """
 import asyncio
 import multiprocessing
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -149,6 +149,16 @@ class AutoScrapeScheduler:
             return {"user_id": user_id, "email": email, "success": False, "reason": str(e)}
 
     @staticmethod
+    def _ligatabellen_vorhanden() -> bool:
+        """Ob schon einmal Ligatabellen geholt wurden."""
+        try:
+            from db.ligen import bestand
+
+            return bool(bestand().get("mannschaften"))
+        except Exception:
+            return True   # im Zweifel nichts anstossen
+
+    @staticmethod
     def aktualisiere_ligatabellen():
         """
         Gleicht die Ligatabellen ab und traegt offene Spesensaetze nach.
@@ -213,6 +223,22 @@ class AutoScrapeScheduler:
             name="Automatischer DFBnet-Abruf (3 Uhr)",
             replace_existing=True
         )
+
+        # Beim allerersten Start sind die Ligatabellen leer, und ohne sie
+        # bleibt der Reiter *Ligen* bis 3 Uhr nachts leer und die Pokalspesen
+        # unbestimmt. Also einmal kurz nach dem Start nachholen - im Scheduler
+        # und nicht im Startvorgang, damit die Anwendung nicht auf fussball.de
+        # wartet, bevor sie erreichbar ist.
+        if not self._ligatabellen_vorhanden():
+            self.scheduler.add_job(
+                self.aktualisiere_ligatabellen,
+                "date",
+                run_date=datetime.now() + timedelta(seconds=30),
+                id="ligen_erstbefuellung",
+                name="Ligatabellen erstmalig holen",
+                replace_existing=True,
+            )
+            logger.info("Ligatabellen fehlen - werden 30 Sekunden nach dem Start geholt")
 
         self.scheduler.start()
         logger.info("Scheduler gestartet - Abruf täglich um 3:00 Uhr")
