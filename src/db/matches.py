@@ -429,3 +429,59 @@ def count_distinct_matches() -> int:
         return row["n"] or 0
     finally:
         conn.close()
+
+
+def ergaenze_offene_saetze() -> int:
+    """
+    Traegt Spesensaetze nach, die beim Scrapen noch nicht zu ermitteln waren.
+
+    Bei Pokal- und Freundschaftsspielen im Herrenbereich haengt der Satz an der
+    Spielklasse der beteiligten Vereine. Die steht in den Ligatabellen, und die
+    werden erst naechtlich gefuellt - ein Spiel, das im Juli angesetzt wurde,
+    hatte zu diesem Zeitpunkt vielleicht noch keine Tabelle zum Nachschlagen.
+    Ein Aufstieg oder Abstieg kann die Antwort ebenfalls erst spaeter liefern.
+
+    Angefasst werden nur Zeilen OHNE Satz. Ein einmal eingefrorener Wert bleibt,
+    wie er ist - er kann in einer bereits abgegebenen Abrechnung stehen. Diese
+    Funktion fuellt Luecken, sie korrigiert nicht.
+
+    Returns:
+        Zahl der ergaenzten Spiele.
+    """
+    from generator.spesen_calculator import calculate_spesen
+
+    conn = get_connection()
+
+    try:
+        offen = conn.execute(
+            """
+            SELECT id, spielklasse, mannschaftsart, staffel, heim_team, gast_team
+            FROM matches
+            WHERE sr_spesen IS NULL AND mannschaftsart = 'Herren' AND heim_team != ''
+              AND (lower(spielklasse) LIKE '%pokal%' OR lower(spielklasse) LIKE '%freundschaft%')
+            """
+        ).fetchall()
+
+        ergaenzt = 0
+        for zeile in offen:
+            sr_spesen, sra_spesen = calculate_spesen(
+                zeile["spielklasse"] or "", zeile["mannschaftsart"] or "",
+                zeile["staffel"] or "", zeile["heim_team"] or "", zeile["gast_team"] or "",
+            )
+            if sr_spesen is None:
+                continue
+
+            conn.execute(
+                "UPDATE matches SET sr_spesen = ?, sra_spesen = ? WHERE id = ?",
+                (sr_spesen, sra_spesen, zeile["id"]),
+            )
+            ergaenzt += 1
+
+        conn.commit()
+    finally:
+        conn.close()
+
+    if ergaenzt:
+        logger.info(f"Spesensätze nachgetragen: {ergaenzt} Pokal-/Freundschaftsspiele")
+
+    return ergaenzt

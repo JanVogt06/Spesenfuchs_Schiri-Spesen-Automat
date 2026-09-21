@@ -148,6 +148,25 @@ class AutoScrapeScheduler:
             logger.error(f"[User {user_id}] Fehler: {e}", exc_info=True)
             return {"user_id": user_id, "email": email, "success": False, "reason": str(e)}
 
+    @staticmethod
+    def aktualisiere_ligatabellen():
+        """
+        Gleicht die Ligatabellen ab und traegt offene Spesensaetze nach.
+
+        Vor dem Abruf der Ansetzungen, damit ein heute neu angesetztes
+        Pokalspiel gleich seinen Satz bekommt statt erst in der naechsten
+        Nacht. Ein Fehler hier darf den Abruf nicht aufhalten - die Tabellen
+        sind eine Zugabe, die Ansetzungen sind der Zweck der Anwendung.
+        """
+        try:
+            from db.matches import ergaenze_offene_saetze
+            from scraper.ligen_aktualisieren import aktualisiere_alle
+
+            aktualisiere_alle()
+            ergaenze_offene_saetze()
+        except Exception as e:
+            logger.error(f"Ligatabellen konnten nicht abgeglichen werden: {e}", exc_info=True)
+
     async def scrape_all_users(self):
         """Ruft die Ansetzungen aller User ab (naechtlich um 3 Uhr)."""
         if self._is_running:
@@ -157,6 +176,7 @@ class AutoScrapeScheduler:
         self._is_running = True
         # Laeufe abgestuerzter Vornaechte abraeumen
         fail_stale_runs()
+        self.aktualisiere_ligatabellen()
         logger.info("=" * 80)
         logger.info("AUTOMATISCHER ABRUF GESTARTET")
         logger.info(f"Zeitpunkt: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")

@@ -39,6 +39,8 @@ from utils.logger import setup_logger
 from utils.match_utils import generate_filename_from_match
 from utils.pdf_converter import convert_docx_bytes_to_pdf
 from generator.docx_generator import SpesenGenerator
+from db.ligen import alle_staffeln, bestand, tabelle
+from utils.mailer import empfaenger, ist_konfiguriert, sende_bug_report
 from generator.spesen_calculator import (
     FREUNDSCHAFTSSPIEL,
     POKALSPIEL,
@@ -73,6 +75,7 @@ from core.errors import (
     NotFoundError,
     AuthorizationError,
     CredentialsMissingError,
+    ValidationError,
     api_error_handler,
     generic_exception_handler,
     DFBCredentialsInvalidError
@@ -878,6 +881,71 @@ async def get_own_saison(saison: str, current_user: dict = Depends(get_current_u
         raise NotFoundError(f"Zur Saison {saison} ist nichts gespeichert")
 
     return daten
+
+@app.get("/api/ligen")
+async def get_ligen(current_user: dict = Depends(get_current_user)):
+    """
+    Die abgeglichenen Ligatabellen, hoechste Spielklasse zuerst.
+
+    Dieselben Daten, aus denen die Spesen der Pokal- und Freundschaftsspiele
+    entstehen - wer einen Satz nachvollziehen will, sieht hier die Grundlage.
+    Nicht nach Nutzer getrennt: eine Ligatabelle ist fuer alle dieselbe.
+    """
+    staffeln = alle_staffeln()
+
+    return {
+        "bestand": bestand(),
+        "staffeln": [{**staffel, "tabelle": tabelle(staffel["staffel_id"])} for staffel in staffeln],
+    }
+
+
+@app.get("/api/bugreport/status")
+async def get_bug_report_status(current_user: dict = Depends(get_current_user)):
+    """
+    Ob auf diesem Server ueberhaupt Post verschickt werden kann.
+
+    Das Formular fragt vorher: ohne Postausgang soll es gar nicht erst zum
+    Absenden einladen, sondern sagen, was fehlt.
+    """
+    return {"verfuegbar": ist_konfiguriert(), "empfaenger": empfaenger()}
+
+
+class BugReportRequest(BaseModel):
+    """Ein Fehlerbericht aus dem gleichnamigen Reiter."""
+    titel: str
+    beschreibung: str
+    bereich: str = ""
+    schritte: str = ""
+
+
+@app.post("/api/bugreport")
+async def post_bug_report(
+    request: BugReportRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Schickt einen Fehlerbericht an die hinterlegte Adresse.
+
+    Absender ist der angemeldete Nutzer - seine Adresse wird aus der Datenbank
+    genommen und nicht aus dem Formular, sonst liesse sich ueber dieses
+    Formular in fremdem Namen schreiben.
+    """
+    titel = request.titel.strip()
+    beschreibung = request.beschreibung.strip()
+
+    if not titel or not beschreibung:
+        raise ValidationError("Titel und Beschreibung dürfen nicht leer sein")
+
+    sende_bug_report(
+        titel=titel,
+        beschreibung=beschreibung,
+        bereich=request.bereich.strip(),
+        schritte=request.schritte.strip(),
+        absender=current_user["email"],
+    )
+
+    return {"status": "gesendet"}
+
 
 # ===== Frontend Routes =====
 @app.get("/")
