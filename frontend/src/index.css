@@ -184,6 +184,31 @@
 }
 
 /*
+  Auf schmalen Schirmen ist die Ebene fast doppelt so tief wie breit, waehrend
+  die Kamera gleich nah steht. Die Linien faechern dann auf wie ein Trichter
+  und vom Feld bleibt ein verzerrter Strafraum im Bild. Nur die Kamera rueckt
+  deshalb weiter weg - Kippung und Groesse bleiben, denn die Masse des Feldes
+  stimmen bei 72 Grad bereits.
+*/
+@media (max-width: 640px) {
+  .spesen-feld {
+    perspective: 2200px;
+  }
+
+  /*
+    Dazu naeher heran: das ganze Feld waere auf 375 Pixeln Breite nur ein
+    flacher Streifen, der hinter Karte und Zahlenband verschwindet. Bei
+    gleichmaessiger Vergroesserung steht stattdessen ein Ausschnitt im Bild -
+    Mittelkreis und Mittellinie - ohne dass sich die Masse aendern. Der
+    Versatz zur Seite haelt die Mittellinie aus den mittig gesetzten Zahlen
+    heraus, die sonst genau auf ihr saessen.
+  */
+  .spesen-feld > * {
+    transform: rotateX(72deg) scale(2.3) translateX(-11%);
+  }
+}
+
+/*
   Gemaehter Rasen: senkrechte Bahnen wie nach dem Maehen, quer dazu Linien,
   die langsam auf den Betrachter zulaufen.
 */
