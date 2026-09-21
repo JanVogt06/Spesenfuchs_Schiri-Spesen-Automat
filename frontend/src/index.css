@@ -29,6 +29,8 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-nacht: var(--nacht);
+  --color-flutlicht: var(--flutlicht);
 }
 
 :root {
@@ -52,6 +54,13 @@
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.62 0.11 155);
+
+  /*
+    Der dunkle Block der Landingpage. Er sieht in beiden Themes gleich aus
+    und steht deshalb nur hier, nicht noch einmal unter .dark.
+  */
+  --nacht: oklch(0.17 0.028 158);
+  --flutlicht: oklch(0.8 0.16 158);
 }
 
 .dark {
@@ -133,4 +142,278 @@
 .leaflet-container .spesen-pin {
   background: transparent;
   border: 0;
+}
+
+/* ============================================================
+   Landingpage
+
+   Die oeffentliche Startseite ist die einzige Seite mit einem dunklen
+   Block und mit Bewegung. Der Block sieht in beiden Themes gleich aus:
+   die naechtlichen Laeufe sind das Versprechen der Anwendung, das Bild
+   dazu soll nicht davon abhaengen, wie der Besucher sein System
+   eingestellt hat.
+
+   Alles hier ist Dekoration. Unter prefers-reduced-motion steht jede
+   Animation still, und die Seite bleibt vollstaendig lesbar - siehe den
+   Block ganz am Ende.
+   ============================================================ */
+
+/* Grundflaeche des Nacht-Blocks: Grundton plus zwei weiche Lichtkegel */
+.spesen-nacht {
+  background-color: var(--nacht);
+  background-image:
+    radial-gradient(55rem 32rem at 50% -10%, oklch(0.55 0.15 158 / 0.4), oklch(0.55 0.15 158 / 0) 70%),
+    radial-gradient(34rem 24rem at 88% 4%, oklch(0.62 0.09 210 / 0.16), oklch(0.62 0.09 210 / 0) 70%);
+}
+
+/*
+  Das Spielfeld liegt flach unter dem Text, als Ebene in die Tiefe gekippt.
+  Der Verlauf als Maske laesst es zum Horizont hin verschwinden, sonst
+  endete es oben an einer harten Kante.
+*/
+.spesen-feld {
+  perspective: 800px;
+  perspective-origin: 50% 0%;
+}
+
+.spesen-feld > * {
+  transform: rotateX(72deg) scale(1.45);
+  transform-origin: 50% 100%;
+  -webkit-mask-image: linear-gradient(to top, black 12%, transparent 88%);
+  mask-image: linear-gradient(to top, black 12%, transparent 88%);
+}
+
+/*
+  Gemaehter Rasen: senkrechte Bahnen wie nach dem Maehen, quer dazu Linien,
+  die langsam auf den Betrachter zulaufen.
+*/
+.spesen-rasen {
+  background-image:
+    repeating-linear-gradient(90deg, oklch(1 0 0 / 0.04) 0 5rem, transparent 5rem 10rem),
+    repeating-linear-gradient(0deg, oklch(1 0 0 / 0.05) 0 1px, transparent 1px 5rem);
+  animation: spesen-rasen 8s linear infinite;
+}
+
+@keyframes spesen-rasen {
+  from { background-position: 0 0, 0 0; }
+  to   { background-position: 0 0, 0 5rem; }
+}
+
+/*
+  Flutlicht von oben. Der Verlauf muss innerhalb seines Elements auf 0
+  auslaufen, sonst schneidet dessen Unterkante ihn ab und man sieht eine
+  Kante quer durch den Block. Das Element ist deshalb so hoch wie der ganze
+  Abschnitt und der Verlauf hoert weit darin auf.
+*/
+.spesen-strahl {
+  background-image: radial-gradient(
+    55rem 26rem at 50% 0%,
+    oklch(0.85 0.12 158 / 0.22),
+    oklch(0.85 0.12 158 / 0) 70%
+  );
+}
+
+/* Flutlicht, das ganz langsam heller und wieder dunkler wird */
+.spesen-flutlicht {
+  animation: spesen-flutlicht 7s ease-in-out infinite;
+}
+
+@keyframes spesen-flutlicht {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 0.85; }
+}
+
+/*
+  Filmkorn ueber dem Nacht-Block. Grosse Farbverlaeufe zeigen auf 8-Bit-
+  Displays sonst Streifen; das Korn bricht sie auf.
+*/
+.spesen-koerner {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'><filter id='k'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3'/></filter><rect width='100%25' height='100%25' filter='url(%23k)'/></svg>");
+  opacity: 0.2;
+  mix-blend-mode: overlay;
+}
+
+/* Die Beispiel-Abrechnung schwebt leicht auf und ab */
+.spesen-schweben {
+  animation: spesen-schweben 6s ease-in-out infinite;
+}
+
+@keyframes spesen-schweben {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-0.5rem); }
+}
+
+/* Lichtstreifen, der ueber die Beispiel-Abrechnung wandert */
+.spesen-scan {
+  animation: spesen-scan 5s ease-in-out infinite;
+}
+
+@keyframes spesen-scan {
+  0%       { transform: translateY(-5rem); opacity: 0; }
+  15%, 65% { opacity: 1; }
+  100%     { transform: translateY(22rem); opacity: 0; }
+}
+
+/*
+  Laufband der Spesensaetze. Die Liste steht zweimal nebeneinander, je
+  Durchlauf eine eigene Gruppe mit gleichem Innenabstand - deshalb ist die
+  halbe Bahn genau eine Gruppe und der Sprung am Ende unsichtbar.
+*/
+.spesen-laufband {
+  animation: spesen-laufband 48s linear infinite;
+}
+
+.spesen-laufband:hover {
+  animation-play-state: paused;
+}
+
+@keyframes spesen-laufband {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* Ringe wie ein Pfiff, der sich ausbreitet */
+.spesen-ring {
+  animation: spesen-ring 7s ease-out infinite;
+}
+
+@keyframes spesen-ring {
+  0%   { transform: scale(0.35); opacity: 0; }
+  20%  { opacity: 0.55; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
+
+/* Pulsierender Ring am Live-Punkt */
+.spesen-puls {
+  animation: spesen-puls 2.6s ease-out infinite;
+}
+
+@keyframes spesen-puls {
+  0%        { transform: scale(1); opacity: 0.7; }
+  70%, 100% { transform: scale(2.6); opacity: 0; }
+}
+
+/*
+  Karten mit einem Lichtpunkt am Mauszeiger. --mx und --my setzt die Karte
+  selbst beim Bewegen der Maus.
+*/
+.spesen-glanz::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    16rem circle at var(--mx, 50%) var(--my, 0%),
+    color-mix(in oklab, var(--primary) 16%, transparent),
+    transparent 65%
+  );
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+}
+
+.spesen-glanz:hover::before {
+  opacity: 1;
+}
+
+/*
+  Abschnitte, die sich als Band von der Grundflaeche abheben. Bewusst
+  neutral aus der Textfarbe gemischt und nicht aus der Primaerfarbe: ein
+  gruener Schleier auf Weiss wirkt schmutzig, das Gruen bleibt den Akzenten
+  vorbehalten. --muted taugt dafuer nicht, das laege im hellen Theme fast
+  weiss auf weiss.
+*/
+.spesen-band {
+  background-color: color-mix(in oklab, var(--foreground) 4%, var(--background));
+}
+
+/*
+  Uebergang vom Nacht-Block in die helle Flaeche. Ohne ihn stossen dunkles
+  Gruen und Weiss hart aufeinander; der kurze Schatten von oben laesst den
+  Block in den Abschnitt darunter auslaufen.
+*/
+.spesen-uebergang {
+  background-image: linear-gradient(
+    to bottom,
+    color-mix(in oklab, var(--foreground) 8%, transparent),
+    transparent 16rem
+  );
+}
+
+.spesen-punkte {
+  background-image: radial-gradient(
+    color-mix(in oklab, var(--foreground) 14%, transparent) 1px,
+    transparent 1px
+  );
+  background-size: 1.75rem 1.75rem;
+  -webkit-mask-image: radial-gradient(55% 55% at 50% 45%, black, transparent);
+  mask-image: radial-gradient(55% 55% at 50% 45%, black, transparent);
+}
+
+/* Zeile der Ueberschrift, die aus ihrer Zeile heraus nach oben faehrt */
+.spesen-zeile {
+  animation: spesen-zeile 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes spesen-zeile {
+  from { transform: translateY(105%); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+
+/* Einblenden beim Laden (Hero) */
+.spesen-aufsteigen {
+  animation: spesen-aufsteigen 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes spesen-aufsteigen {
+  from { opacity: 0; transform: translateY(1.5rem); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Antwort einer aufgeklappten Frage */
+details[open] > .spesen-antwort {
+  animation: spesen-aufsteigen 0.4s ease both;
+}
+
+/*
+  Einblenden beim Scrollen. Die Klasse is-revealed setzt useRevealOnScroll.
+  Elemente mit data-reveal tragen deshalb keine eigenen Bewegungs-Utilities
+  von Tailwind - transform gehoert hier der Animation.
+*/
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(1.75rem);
+  transition:
+    opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+
+[data-reveal].is-revealed {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spesen-rasen,
+  .spesen-flutlicht,
+  .spesen-schweben,
+  .spesen-laufband,
+  .spesen-ring,
+  .spesen-puls,
+  .spesen-zeile,
+  .spesen-aufsteigen,
+  details[open] > .spesen-antwort {
+    animation: none !important;
+  }
+
+  /* Der wandernde Lichtstreifen hat ohne Bewegung keinen Sinn */
+  .spesen-scan {
+    display: none;
+  }
+
+  [data-reveal] {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
 }
