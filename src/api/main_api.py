@@ -39,7 +39,14 @@ from utils.logger import setup_logger
 from utils.match_utils import generate_filename_from_match
 from utils.pdf_converter import convert_docx_bytes_to_pdf
 from generator.docx_generator import SpesenGenerator
-from generator.spesen_calculator import calculate_spesen, format_spesen
+from generator.spesen_calculator import (
+    FREUNDSCHAFTSSPIEL,
+    POKALSPIEL,
+    PUNKTSPIEL,
+    calculate_spesen,
+    format_spesen,
+    wettbewerbsart,
+)
 from db.scrape_runs import (
     start_run,
     update_run,
@@ -184,52 +191,48 @@ def _add_spesen_to_match(match: dict) -> dict:
     spiel_info = match.get('spiel_info', {})
     schiedsrichter = match.get('schiedsrichter', [])
 
-    spielklasse = spiel_info.get('spielklasse', '').lower()
+    spielklasse = spiel_info.get('spielklasse', '')
     mannschaftsart = spiel_info.get('mannschaftsart', '')
+    art = wettbewerbsart(spielklasse)
 
-    # Prüfe ob Punktspiel (nicht Pokal, nicht Freundschaft)
-    is_punktspiel = 'pokal' not in spielklasse and 'freundschaft' not in spielklasse
+    # Stammt das Spiel aus der Datenbank, sind die Saetze dort beim ersten
+    # Scrape eingefroren worden. Die Anzeige muss dasselbe zeigen wie das
+    # spaeter erzeugte Dokument - sonst weicht die Karte von der Abrechnung ab,
+    # sobald sich die Spesenordnung aendert.
+    if 'sr_spesen' in match or 'sra_spesen' in match:
+        sr_spesen, sra_spesen = match.get('sr_spesen'), match.get('sra_spesen')
+    else:
+        sr_spesen, sra_spesen = calculate_spesen(spielklasse, mannschaftsart)
 
-    # Standard: keine Spesen
     spesen_info = {
-        'sr': None,
-        'sra': None,
-        'sr_formatted': '',
-        'sra_formatted': '',
-        'is_punktspiel': is_punktspiel,
-        'hinweis': None
+        'sr': sr_spesen,
+        'sra': sra_spesen,
+        'sr_formatted': format_spesen(sr_spesen),
+        'sra_formatted': format_spesen(sra_spesen),
+        'is_punktspiel': art == PUNKTSPIEL,
+        'sra_count': sum(1 for sr in schiedsrichter if sr.get('rolle', '').startswith('SRA')),
+        'hinweis': None,
     }
 
-    if is_punktspiel:
-        # Stammt das Spiel aus der Datenbank, sind die Saetze dort beim ersten
-        # Scrape eingefroren worden. Die Anzeige muss dasselbe zeigen wie das
-        # spaeter erzeugte Dokument - sonst weicht die Karte von der
-        # Abrechnung ab, sobald sich die Spesenordnung aendert.
-        if 'sr_spesen' in match or 'sra_spesen' in match:
-            sr_spesen, sra_spesen = match.get('sr_spesen'), match.get('sra_spesen')
-        else:
-            sr_spesen, sra_spesen = calculate_spesen(
-                spiel_info.get('spielklasse', ''),
-                mannschaftsart
+    # Ohne Satz gehoert ein Grund dazu, sonst steht der Schiedsrichter vor einem
+    # leeren Feld und weiss nicht, ob die Anwendung etwas uebersehen hat oder ob
+    # es hier nichts zu rechnen gibt.
+    if sr_spesen is None:
+        if art == POKALSPIEL:
+            spesen_info['hinweis'] = (
+                'Pokalspiel: der Satz richtet sich nach der höchstklassigen beteiligten '
+                'Mannschaft (§2 Abs. 3) und lässt sich aus der Ansetzung nicht ableiten'
             )
-
-        if sr_spesen is not None:
-            spesen_info['sr'] = sr_spesen
-            spesen_info['sr_formatted'] = format_spesen(sr_spesen)
-
-        if sra_spesen is not None:
-            spesen_info['sra'] = sra_spesen
-            spesen_info['sra_formatted'] = format_spesen(sra_spesen)
-
-        # Prüfe ob SRAs angesetzt sind
-        sra_count = sum(1 for sr in schiedsrichter if sr.get('rolle', '').startswith('SRA'))
-        spesen_info['sra_count'] = sra_count
-
-        # Hinweis wenn keine Spesen ermittelt werden konnten
-        if sr_spesen is None:
-            spesen_info['hinweis'] = 'Spesen konnten nicht automatisch ermittelt werden (überregionales Spiel oder unbekannte Spielklasse)'
-    else:
-        spesen_info['hinweis'] = 'Keine automatische Berechnung für Pokal-/Freundschaftsspiele'
+        elif art == FREUNDSCHAFTSSPIEL:
+            spesen_info['hinweis'] = (
+                'Freundschaftsspiel: der Satz richtet sich nach der aktuellen Spielklasse '
+                'des Gastgebers (§2 Abs. 4) und lässt sich aus der Ansetzung nicht ableiten'
+            )
+        else:
+            spesen_info['hinweis'] = (
+                'Spesen konnten nicht automatisch ermittelt werden '
+                '(überregionales Spiel oder unbekannte Spielklasse)'
+            )
 
     match['_spesen'] = spesen_info
     return match

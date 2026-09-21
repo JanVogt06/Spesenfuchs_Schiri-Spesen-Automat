@@ -10,7 +10,14 @@ from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 from utils.logger import setup_logger
 from utils.match_utils import parse_anpfiff, generate_filename_from_match, sanitize_team_name, extract_iso_date_from_anpfiff
-from generator.spesen_calculator import calculate_spesen, format_spesen, is_alte_herren
+from generator.spesen_calculator import (
+    FREUNDSCHAFTSSPIEL,
+    POKALSPIEL,
+    calculate_spesen,
+    format_spesen,
+    is_alte_herren,
+    wettbewerbsart,
+)
 
 logger = setup_logger("docx_generator")
 
@@ -73,10 +80,10 @@ class SpesenGenerator:
         checkboxes = {key: False for key in checkbox_keys}
 
         # Spielklasse prüfen
-        spielklasse = spiel_info.get('spielklasse', '').lower()
-        if 'pokal' in spielklasse:
+        art = wettbewerbsart(spiel_info.get('spielklasse', ''))
+        if art == POKALSPIEL:
             checkboxes['CHECKBOX_POKALSPIEL'] = True
-        elif 'freundschaft' in spielklasse:
+        elif art == FREUNDSCHAFTSSPIEL:
             checkboxes['CHECKBOX_FREUNDSCHAFT'] = True
         else:
             checkboxes['CHECKBOX_PUNKTSPIEL'] = True
@@ -278,11 +285,15 @@ class SpesenGenerator:
             spiel_info.get('mannschaftsart', '')
         )
 
-    def _calculate_spesen_for_match(self, match_data: dict, is_punktspiel: bool) -> tuple:
-        """Formatiert die Spesen für ein Spiel."""
-        if not is_punktspiel:
-            return ("", "")
+    def _calculate_spesen_for_match(self, match_data: dict) -> tuple:
+        """
+        Formatiert die Spesen für ein Spiel.
 
+        Ob es ueberhaupt einen Satz gibt, entscheidet allein der Rechner - auch
+        fuer Pokal- und Freundschaftsspiele. Ein zweiter Filter hier waere eine
+        zweite Meinung zur selben Frage, und genau so kam es frueher dazu, dass
+        in der Datenbank Punktspielsaetze fuer Pokalspiele lagen.
+        """
         sr_spesen, sra_spesen = self._spesen_for_match(match_data)
         sr_spesen_str = format_spesen(sr_spesen)
         sra_spesen_str = format_spesen(sra_spesen)
@@ -292,7 +303,7 @@ class SpesenGenerator:
 
         return (sr_spesen_str, sra_spesen_str)
 
-    def _build_expense_replacements(self, expenses: dict, is_punktspiel: bool,
+    def _build_expense_replacements(self, expenses: dict,
                                     match_data: dict, sra1_active: bool, sra2_active: bool) -> dict:
         """
         Baut die Platzhalter fuer Fahrtkosten (km x 0,30 EUR), OeVM und die
@@ -301,9 +312,7 @@ class SpesenGenerator:
         expenses = expenses or {}
 
         # Numerische Spesen fuer die Summenberechnung
-        sr_spesen_num, sra_spesen_num = (None, None)
-        if is_punktspiel:
-            sr_spesen_num, sra_spesen_num = self._spesen_for_match(match_data)
+        sr_spesen_num, sra_spesen_num = self._spesen_for_match(match_data)
 
         # Der km-Satz wird wie die Spesen beim Scrapen eingefroren
         km_satz = match_data.get('km_satz') or KM_SATZ_EURO
@@ -408,8 +417,7 @@ class SpesenGenerator:
         datum, anstoss = parse_anpfiff(spiel_info.get('anpfiff', ''))
         checkboxes = self._determine_checkboxes(match_data)
 
-        is_punktspiel = checkboxes['CHECKBOX_PUNKTSPIEL']
-        sr_spesen_str, sra_spesen_str = self._calculate_spesen_for_match(match_data, is_punktspiel)
+        sr_spesen_str, sra_spesen_str = self._calculate_spesen_for_match(match_data)
 
         sr = self._get_referee_by_role(schiedsrichter, 'SR')
         sra1 = self._get_referee_by_role(schiedsrichter, 'SRA 1')
@@ -423,7 +431,7 @@ class SpesenGenerator:
         sra2_spesen = sra_spesen_str if sra2.get('name') else ''
 
         expense_replacements = self._build_expense_replacements(
-            expenses, is_punktspiel, match_data,
+            expenses, match_data,
             sra1_active=bool(sra1.get('name')), sra2_active=bool(sra2.get('name'))
         )
 
