@@ -76,23 +76,6 @@ export function BugReportPage() {
                     </div>
                 )}
 
-                {gesendet && (
-                    <div className="flex items-start gap-2 rounded-lg bg-primary/10 px-4 py-3 ring-1 ring-primary/20">
-                        <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary"/>
-                        <p className="text-sm">
-                            Danke – der Bericht ist unterwegs. Für einen weiteren einfach das
-                            Formular erneut ausfüllen.
-                        </p>
-                    </div>
-                )}
-
-                {fehler && (
-                    <div className="flex items-start gap-2 rounded-lg bg-destructive/10 px-4 py-3 ring-1 ring-destructive/20">
-                        <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive"/>
-                        <p className="text-sm break-words text-destructive">{fehler}</p>
-                    </div>
-                )}
-
                 <form onSubmit={absenden} className="space-y-4 rounded-lg border p-4 sm:p-6">
                     <div className="space-y-2">
                         <Label htmlFor="titel">Worum geht es? *</Label>
@@ -150,6 +133,27 @@ export function BugReportPage() {
                         />
                     </div>
 
+                    {/* Rueckmeldung gehoert direkt an den Knopf. Stand sie oben ueber
+                        dem Formular, erschien sie nach dem Absenden ausserhalb des
+                        Sichtfelds - und ein Versand kann ueber zwanzig Sekunden
+                        dauern, bevor eine Zeitueberschreitung greift. */}
+                    {fehler && (
+                        <div className="flex items-start gap-2 rounded-lg bg-destructive/10 px-4 py-3 ring-1 ring-destructive/20">
+                            <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive"/>
+                            <p className="text-sm break-words text-destructive">{fehler}</p>
+                        </div>
+                    )}
+
+                    {gesendet && (
+                        <div className="flex items-start gap-2 rounded-lg bg-primary/10 px-4 py-3 ring-1 ring-primary/20">
+                            <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary"/>
+                            <p className="text-sm">
+                                Danke – der Bericht ist unterwegs. Für einen weiteren einfach das
+                                Formular erneut ausfüllen.
+                            </p>
+                        </div>
+                    )}
+
                     <div className="flex items-center gap-3">
                         <Button type="submit" disabled={!absendbar || (status ? !status.verfuegbar : false)}>
                             {isSending ? <Loader2 className="size-4 animate-spin"/> : <Send className="size-4"/>}
@@ -157,7 +161,9 @@ export function BugReportPage() {
                         </Button>
                         <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                             <Bug className="size-3.5"/>
-                            Felder mit * sind nötig
+                            {isSending
+                                ? 'Wird gesendet – das kann bis zu 20 Sekunden dauern'
+                                : 'Felder mit * sind nötig'}
                         </span>
                     </div>
                 </form>
