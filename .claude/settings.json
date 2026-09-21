@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "deny": [
+      "Read(data/.env)",
+      "Read(./data/.env)",
+      "Read(**/data/.env)",
+      "Read(data/.env.*)",
+      "Read(**/data/.env.*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash",
+            "statusMessage": "Prüfe auf Zugriff auf data/.env",
+            "command": "jq -r '.tool_input.command // \"\"' | grep -qE '(^|[^A-Za-z0-9_-])(\\./|/)?data/\\.env' && printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"data/.env enthaelt JWT_SECRET_KEY, ENCRYPTION_KEY und das SMTP-Passwort dieser Installation. Der Inhalt ist fuer Claude gesperrt - Aenderungen daran nimmt der Nutzer selbst vor. Fuer Struktur und Bedeutung der Schluessel dient .env.example.\"}}' || true"
+          }
+        ]
+      }
+    ]
+  }
+}
