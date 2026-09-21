@@ -105,18 +105,20 @@ def _hole(url: str) -> str:
 
 # ===== Namen vergleichbar machen =====
 
-# Rechtsformen und Vereinskuerzel, die zwischen DFBnet und fussball.de
-# wechseln koennen ("SG SV Alach I" gegen "SV Alach"). Die Nummer der
-# Mannschaft gehoert ausdruecklich NICHT hierher - sie ist der Unterschied
-# zwischen der ersten und der dritten Mannschaft und damit zwischen 50 und
-# 25 Euro.
-_KUERZEL = {
-    "sg", "spg", "sv", "fsv", "tsv", "fc", "sc", "vfb", "vfl", "vfr", "spvgg",
-    "bsg", "esv", "fsg", "tsg", "tus", "mtv", "bsv", "ssv", "svg", "lsv",
-    "spielvereinigung", "sportfreunde", "spfd", "ev", "e", "v",
-}
+# Nur die Kennzeichnung einer Spielgemeinschaft wird abgeschnitten: DFBnet
+# schreibt "SG SV Alach I", fussball.de "SV Alach". Alles andere bleibt stehen.
+#
+# Gemessen an den echten Namen dieses Bestandes: laesst man zusaetzlich die
+# Rechtsformen (SV, FC, ...) und Jahreszahlen weg, kommen zwei Zuordnungen
+# mehr zustande - darunter aber "SG Saalfeld 46 e.V." -> "FC Saalfeld", also
+# zwei verschiedene Vereine derselben Stadt. Zwei Treffer mehr sind diesen
+# Fehler nicht wert.
+_SPIELGEMEINSCHAFT = {"sg", "spg"}
 
 _NUMMER_ROEMISCH = {"i": 1, "ii": 2, "iii": 3, "iv": 4}
+
+# Roemische Ziffer, arabische Zahl oder "2." am Ende des Namens.
+_NUMMER_AM_ENDE = re.compile(r"(?:^|[\s(])(i{1,3}|iv|[2-9])\s*\.?\s*$")
 
 
 def mannschaftsnummer(name: str) -> int:
@@ -131,7 +133,7 @@ def mannschaftsnummer(name: str) -> int:
     des FC Saalfeld spielt Kreisliga, die erste Verbandsliga. Wer die Nummer
     wegwirft, verwechselt 25 Euro mit 50.
     """
-    treffer = re.search(r"(?:^|[\s(])(i{1,3}|iv|[2-9])\s*\.?\s*$", (name or "").strip().lower())
+    treffer = _NUMMER_AM_ENDE.search((name or "").strip().lower())
     if not treffer:
         return 1
 
@@ -142,21 +144,23 @@ def mannschaftsnummer(name: str) -> int:
 
 def vereinskern(name: str) -> str:
     """
-    Der Vereinsname ohne Rechtsform, Zeichensetzung und Mannschaftsnummer.
+    Der Vereinsname in vergleichbarer Form - ohne SG-Kennzeichnung,
+    Zeichensetzung und Mannschaftsnummer.
 
     Nur zum Vergleichen gedacht, nie zum Anzeigen. Zahlen im Namen bleiben
     stehen: "SV 09 Arnstadt" und "SV 1920 Arnstadt" waeren sonst derselbe
-    Verein.
+    Verein, und "FC Saalfeld" und "SG Saalfeld 46" ebenfalls.
     """
     text = unicodedata.normalize("NFKD", name or "")
-    text = text.replace("​", "").replace("ß", "ss")
+    text = text.replace("\u200b", "").replace("ß", "ss")
     text = text.encode("ascii", "ignore").decode().lower()
 
     # Mannschaftsnummer am Ende entfernen - sie wird getrennt verglichen
-    text = re.sub(r"(?:^|[\s(])(?:i{1,3}|iv|[2-9])\s*\.?\s*$", " ", text)
+    text = _NUMMER_AM_ENDE.sub(" ", text)
 
-    text = re.sub(r"[^a-z0-9]+", " ", text)
-    woerter = [w for w in text.split() if w and w not in _KUERZEL]
+    woerter = re.sub(r"[^a-z0-9]+", " ", text).split()
+    while woerter and woerter[0] in _SPIELGEMEINSCHAFT:
+        woerter = woerter[1:]
 
     return " ".join(woerter)
 
