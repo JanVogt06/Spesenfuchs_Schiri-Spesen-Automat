@@ -10,7 +10,7 @@ from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 from utils.logger import setup_logger
 from utils.match_utils import parse_anpfiff, generate_filename_from_match, sanitize_team_name, extract_iso_date_from_anpfiff
-from generator.spesen_calculator import calculate_spesen, format_spesen
+from generator.spesen_calculator import calculate_spesen, format_spesen, is_alte_herren
 
 logger = setup_logger("docx_generator")
 
@@ -81,17 +81,21 @@ class SpesenGenerator:
         else:
             checkboxes['CHECKBOX_PUNKTSPIEL'] = True
 
-        # Mannschaftsart prüfen
+        # Mannschaftsart prüfen. Die Reihenfolge zaehlt: Juniorinnen muessen vor
+        # den gleichnamigen Junioren-Zweigen stehen, sonst landet ein
+        # Maedchenspiel je nach Schreibweise in der falschen Zeile.
         mannschaftsart = spiel_info.get('mannschaftsart', '').lower()
-        if 'herren' in mannschaftsart or 'männer' in mannschaftsart:
-            if 'alte' in mannschaftsart:
+        if 'juniorinnen' in mannschaftsart or 'mädchen' in mannschaftsart:
+            # Das Formular hat fuer Juniorinnen nur die Zeile "Maedchen" -
+            # die Altersklassen darunter sind die maennlichen.
+            checkboxes['CHECKBOX_MAEDCHEN'] = True
+        elif 'herren' in mannschaftsart or 'männer' in mannschaftsart:
+            if is_alte_herren(mannschaftsart):
                 checkboxes['CHECKBOX_ALTE_HERREN'] = True
             else:
                 checkboxes['CHECKBOX_MAENNER'] = True
         elif 'frauen' in mannschaftsart:
             checkboxes['CHECKBOX_FRAUEN'] = True
-        elif 'mädchen' in mannschaftsart:
-            checkboxes['CHECKBOX_MAEDCHEN'] = True
         elif 'a-junioren' in mannschaftsart:
             checkboxes['CHECKBOX_A_JUN'] = True
         elif 'b-junioren' in mannschaftsart:
