@@ -690,6 +690,51 @@ def _migration_012_geocode_cache(conn: sqlite3.Connection) -> None:
     """)
 
 
+def _migration_013_alte_herren_saetze(conn: sqlite3.Connection) -> None:
+    """
+    Korrigiert die eingefrorenen Spesensaetze der Alt-Herren-Spiele.
+
+    Die Saetze werden beim Scrapen eingefroren, damit eine spaetere Aenderung
+    der Spesenordnung keine bereits abgegebene Abrechnung rueckwirkend
+    umschreibt. Dieser Schritt schreibt sie trotzdem neu - aber nicht wegen
+    einer geaenderten Ordnung, sondern weil der Rechner die Alten Herren
+    ueberhaupt nicht erkannt hat: gesucht wurde nach dem Wort "Alte Herren",
+    DFBnet liefert aber "Herren Ue32" bis "Herren Ue50".
+
+    Damit liefen alle Ue-Spiele durch die Maenner-Tabelle. Eine Kreisoberliga
+    Ue45 bekam deren 30/25 statt der 25/23 aus der Zeile "Kreis Alte Herren",
+    und die Landesmeisterschaften der Alten Herren (40/30) fanden gar keinen
+    Satz. Ein falscher eingefrorener Wert ist kein schuetzenswerter Stand,
+    deshalb werden genau diese Zeilen neu gerechnet - alle anderen bleiben
+    unberuehrt.
+    """
+    from generator.spesen_calculator import calculate_spesen, is_alte_herren
+
+    geaendert = 0
+
+    for row in conn.execute(
+        "SELECT id, spielklasse, mannschaftsart, sr_spesen, sra_spesen FROM matches"
+    ).fetchall():
+        if not is_alte_herren((row["mannschaftsart"] or "").lower()):
+            continue
+
+        sr, sra = calculate_spesen(row["spielklasse"] or "", row["mannschaftsart"] or "")
+        if (sr, sra) == (row["sr_spesen"], row["sra_spesen"]):
+            continue
+
+        conn.execute(
+            "UPDATE matches SET sr_spesen = ?, sra_spesen = ? WHERE id = ?",
+            (sr, sra, row["id"]),
+        )
+        geaendert += 1
+        logger.info(
+            f"Spiel {row['id']} ({row['mannschaftsart']}, {row['spielklasse']}): "
+            f"{row['sr_spesen']}/{row['sra_spesen']} -> {sr}/{sra}"
+        )
+
+    logger.info(f"Alt-Herren-Saetze korrigiert: {geaendert} Spiele")
+
+
 # (Version, Beschreibung, Funktion) - aufsteigend, Luecken sind nicht erlaubt.
 MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "baseline schema", _migration_001_baseline),
@@ -704,6 +749,7 @@ MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (10, "officiated games and season totals", _migration_010_saison),
     (11, "track which seasons are completely stored", _migration_011_saison_vollstaendig),
     (12, "cache geocoded addresses for the match map", _migration_012_geocode_cache),
+    (13, "refreeze expense rates for old boys matches", _migration_013_alte_herren_saetze),
 ]
 
 
