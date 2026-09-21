@@ -4,6 +4,7 @@ Basiert auf TFV Spesenordnung (Stand 01.07.2025), §2 Abs. 2
 
 WICHTIG: Gilt nur für Punktspiele! Pokal- und Freundschaftsspiele haben andere Regelungen.
 """
+import re
 from typing import Tuple, Optional
 
 from utils.logger import setup_logger
@@ -13,17 +14,20 @@ logger = setup_logger("spesen_calculator")
 
 # ===== SPESEN-TABELLEN gemäß §2 Abs. 2 =====
 
-# (2a) Männer/Alte Herren - Punkt-, Entscheidungs- und Qualifikationsspiele
+# (2a) Männer - Punkt-, Entscheidungs- und Qualifikationsspiele
 SPESEN_MAENNER = {
     "verbandsliga": (50.00, 40.00),
     "landesklasse": (40.00, 30.00),
-    "landesmeisterschaft": (40.00, 30.00),  # Alte Herren
     "kreisoberliga": (30.00, 25.00),
     "kreisliga": (25.00, 23.00),
     "kreisklasse": (25.00, 23.00),
 }
 
-# Alte Herren Sonderfälle
+# (2a) Alte Herren - eigene Zeilen derselben Tabelle. Auf Kreisebene gibt es
+# nur EINEN Satz ("Kreis Alte Herren"), unabhaengig davon ob die Staffel
+# Kreisoberliga, Kreisliga oder Kreisklasse heisst.
+SPESEN_ALTE_HERREN_LANDESMEISTERSCHAFT = (40.00, 30.00)
+SPESEN_ALTE_HERREN_KREIS = (25.00, 23.00)
 SPESEN_ALTE_HERREN_KLEINFELD = (20.00, None)
 
 # (2b) Frauen/Juniorinnen
@@ -97,6 +101,17 @@ def _is_maenner(mannschaftsart: str) -> bool:
     return any(x in mannschaftsart for x in ["herren", "männer"])
 
 
+def is_alte_herren(mannschaftsart: str) -> bool:
+    """
+    Prüft ob Alte Herren.
+
+    DFBnet schreibt die Mannschaftsart als "Herren Ü32" bis "Herren Ü50" -
+    das Wort "Alte Herren" steht dort nie. Eine Suche danach ginge deshalb
+    immer ins Leere und jedes Ü-Spiel liefe als normales Männerspiel durch.
+    """
+    return "alte herren" in mannschaftsart or re.search(r"ü\s*\d{2}", mannschaftsart) is not None
+
+
 def _is_frauen_oder_juniorinnen(mannschaftsart: str) -> bool:
     """Prüft ob Frauen oder Juniorinnen."""
     return any(x in mannschaftsart for x in ["frauen", "damen", "juniorinnen", "mädchen"])
@@ -116,9 +131,11 @@ def _is_kreisebene(spielklasse: str) -> bool:
 def _calc_maenner(spielklasse: str, mannschaftsart: str) -> Tuple[Optional[float], Optional[float]]:
     """Berechnet Spesen für Männer/Alte Herren gemäß §2 Abs. 2a."""
 
-    # Sonderfall: Alte Herren Kleinfeld
-    if "alte" in mannschaftsart and "kleinfeld" in spielklasse:
-        return SPESEN_ALTE_HERREN_KLEINFELD
+    # Alte Herren haben eigene Zeilen und duerfen die Maenner-Tabelle nicht
+    # sehen: eine Kreisoberliga Ue45 bekaeme dort die 30/25 der Maenner
+    # statt der 25/23 der Alten Herren.
+    if is_alte_herren(mannschaftsart):
+        return _calc_alte_herren(spielklasse)
 
     # Standard-Tabelle durchsuchen
     for key, spesen in SPESEN_MAENNER.items():
@@ -132,6 +149,36 @@ def _calc_maenner(spielklasse: str, mannschaftsart: str) -> Tuple[Optional[float
         return SPESEN_MAENNER["kreisliga"]
 
     logger.warning(f"Keine Spesen gefunden für Männer: {spielklasse}")
+    return (None, None)
+
+
+def _calc_alte_herren(spielklasse: str) -> Tuple[Optional[float], Optional[float]]:
+    """
+    Berechnet Spesen für Alte Herren gemäß §2 Abs. 2a.
+
+    Die Tabelle kennt fuer Alte Herren genau drei Zeilen: Landesmeister-
+    schaften, "Kreis Alte Herren" und "Kreis Kleinfeld Alte Herren". Auf
+    Kreisebene gilt derselbe Satz fuer jede Staffel - eine nach Kreisoberliga
+    und Kreisliga gestaffelte Verguetung wie bei den Maennern gibt es hier
+    nicht.
+    """
+    if _is_kreisebene(spielklasse):
+        if "kleinfeld" in spielklasse:
+            logger.debug(f"Alte Herren Kreis Kleinfeld: {SPESEN_ALTE_HERREN_KLEINFELD}")
+            return SPESEN_ALTE_HERREN_KLEINFELD
+
+        logger.debug(f"Alte Herren Kreisebene: {SPESEN_ALTE_HERREN_KREIS}")
+        return SPESEN_ALTE_HERREN_KREIS
+
+    # Die Ue-Wettbewerbe des TFV auf Landesebene sind die Landesmeisterschaften.
+    # DFBnet fuehrt sie als Spielklasse "Landesturnier" bzw.
+    # "Hallen-Landesturnier"; das Wort "Landesmeisterschaft" steht nur in der
+    # Staffel, die hier nicht vorliegt.
+    if "landesmeisterschaft" in spielklasse or "landesturnier" in spielklasse:
+        logger.debug(f"Alte Herren Landesmeisterschaft: {SPESEN_ALTE_HERREN_LANDESMEISTERSCHAFT}")
+        return SPESEN_ALTE_HERREN_LANDESMEISTERSCHAFT
+
+    logger.warning(f"Keine Spesen gefunden für Alte Herren: {spielklasse}")
     return (None, None)
 
 
