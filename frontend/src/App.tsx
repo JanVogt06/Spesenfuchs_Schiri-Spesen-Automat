@@ -7,6 +7,8 @@ import {SettingsPage} from './pages/Settings';
 import {SpesenPage} from './pages/Spesen';
 import {SaisonPage} from './pages/Saison';
 import {StammdatenPage} from './pages/Stammdaten';
+import {LigenPage} from './pages/Ligen';
+import {BugReportPage} from './pages/BugReport';
 import {isAuthenticated} from './lib/auth';
 import {Datenschutz} from './pages/Datenschutz';
 
@@ -51,6 +53,24 @@ function App() {
                     element={
                         <ProtectedRoute>
                             <SaisonPage/>
+                        </ProtectedRoute>
+                    }
+                />
+
+                <Route
+                    path="/ligen"
+                    element={
+                        <ProtectedRoute>
+                            <LigenPage/>
+                        </ProtectedRoute>
+                    }
+                />
+
+                <Route
+                    path="/fehler-melden"
+                    element={
+                        <ProtectedRoute>
+                            <BugReportPage/>
                         </ProtectedRoute>
                     }
                 />

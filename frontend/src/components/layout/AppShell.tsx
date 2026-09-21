@@ -2,7 +2,7 @@ import type {ReactNode} from 'react';
 import {useNavigate, useLocation, Link} from 'react-router-dom';
 import {Button} from '@/components/ui/button';
 import {logout} from '@/lib/auth';
-import {Receipt, Settings, LogOut, LayoutDashboard, IdCard, Trophy, FileText} from 'lucide-react';
+import {Receipt, Settings, LogOut, LayoutDashboard, IdCard, Trophy, FileText, Table2, Bug} from 'lucide-react';
 import {cn} from '@/lib/utils';
 
 interface AppShellProps {
@@ -19,7 +19,9 @@ export function AppShell({children, actions}: AppShellProps) {
         {label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard},
         {label: 'Spesen', path: '/spesen', icon: FileText},
         {label: 'Saison', path: '/saison', icon: Trophy},
+        {label: 'Ligen', path: '/ligen', icon: Table2},
         {label: 'Stammdaten', path: '/stammdaten', icon: IdCard},
+        {label: 'Fehler melden', path: '/fehler-melden', icon: Bug},
         {label: 'Einstellungen', path: '/settings', icon: Settings},
     ];
 
