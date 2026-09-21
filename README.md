@@ -15,8 +15,17 @@ eines Spiels liegt eine Karte, die die Anschriften der angesetzten
 Unparteiischen und die Spielstätte zeigt — so ist beim Eintragen der Kilometer
 sichtbar, wer wie weit fährt.
 
-Die Oberfläche hat vier Reiter: *Dashboard* mit der Übersicht, *Spesen* mit den
-Abrechnungen zum Herunterladen, *Saison* und *Stammdaten*.
+Bei Pokal- und Freundschaftsspielen richtet sich der Satz nicht nach der
+Spielklasse des Spiels, sondern nach der der beteiligten Vereine — in der
+Ansetzung steht die nicht. Für den Herrenbereich holt die Anwendung deshalb
+nachts die Tabellen der Thüringenliga und der drei Landesklasse-Staffeln von
+FUSSBALL.DE; der Reiter *Ligen* zeigt sie. Lässt sich eine Mannschaft nicht
+zweifelsfrei zuordnen oder ist eine überregional spielende beteiligt, bleibt
+das Spesenfeld leer statt geraten.
+
+Die Oberfläche hat sechs Reiter: *Dashboard* mit der Übersicht, *Spesen* mit den
+Abrechnungen zum Herunterladen, *Saison*, *Ligen*, *Stammdaten* und
+*Fehler melden*.
 
 Self-hosted: ein Container, eine `docker-compose.yml`, ein `data`-Ordner.
 
@@ -77,7 +86,7 @@ neben der Compose-Datei — es übersteht Neustarts und Updates:
 | Pfad | Inhalt |
 | --- | --- |
 | `data/.env` | `JWT_SECRET_KEY` und `ENCRYPTION_KEY` |
-| `data/app.db` | Nutzer, eigene Stammdaten, Spiele, Unparteiische, Fahrtkosten, geleitete Spiele je Saison, aufgelöste Adressen der Karte, Abruf-Protokoll, Login- und Download-Log |
+| `data/app.db` | Nutzer, eigene Stammdaten, Spiele, Unparteiische, Fahrtkosten, geleitete Spiele je Saison, aufgelöste Adressen der Karte, Ligatabellen, Abruf-Protokoll, Login- und Download-Log |
 
 Erzeugte Dokumente werden nicht gespeichert: sie entstehen bei jedem Download
 neu aus den Daten in `app.db`. Ein Backup der Datenbank ist damit ein
@@ -142,6 +151,57 @@ Photon-Index für Deutschland sind 9 GB Download. Dem stehen geschätzt hundert
 Abfragen über die Lebensdauer eines Kontos gegenüber. Wer es dennoch will,
 setzt `NOMINATIM_URL` auf den eigenen Dienst — im Code ändert sich nichts, und
 zu einem anderen Dienst aufgelöste Adressen werden getrennt gespeichert.
+
+## Ligen und die Spesen der Pokal- und Freundschaftsspiele
+
+Die Spesenordnung des TFV knüpft den Satz bei Pokalspielen an die
+höchstklassige beteiligte Mannschaft (§2 Abs. 3) und bei Freundschaftsspielen
+an die Spielklasse des Gastgebers (§2 Abs. 4). DFBnet nennt in der Ansetzung
+aber nur „Kreispokal" oder „Kreisfreundschaftsspiele" — die Liga der Vereine
+steht dort nicht.
+
+Deshalb holt die Anwendung nachts vor dem DFBnet-Abruf die Tabellen von
+FUSSBALL.DE: Thüringenliga und Landesklasse als Grundlage der Sätze, dazu
+Regionalliga Nordost und NOFV-Oberliga, um eine überregionale Beteiligung zu
+**erkennen**. Aus überregionalen Ligen wird nicht abgerechnet — ist eine
+solche Mannschaft beteiligt, bleibt das Feld leer.
+
+Die Staffel-Kennungen von FUSSBALL.DE wechseln mit jeder Saison und stehen
+deshalb nirgends im Code. Gesucht werden sie ausgehend von einem Verein, von
+dem die eigenen Ansetzungen bereits wissen, dass er in der gesuchten Liga
+spielt. Wer nie ein Spiel in Verbandsliga oder Landesklasse hatte, bekommt
+keine Tabellen — und für Pokal- und Freundschaftsspiele keine Sätze.
+
+Zugeordnet wird über Vereinsnamen und **Mannschaftsnummer**. Die Nummer ist
+nicht verhandelbar: die dritte Mannschaft des FC Saalfeld spielt Kreisliga,
+die erste Verbandsliga. Bleibt eine Zuordnung mehrdeutig oder ergebnislos,
+bleibt das Spesenfeld leer. Ein leeres Feld trägt der Schiedsrichter in der
+Kabine nach, ein plausibel aussehender falscher Betrag fällt niemandem auf.
+
+Abgedeckt ist damit der **Herrenbereich**. Bei Juniorinnen gibt es nichts
+nachzuschlagen (20 € in allen Spiel- und Altersklassen), bei Alten Herren auf
+Kreisebene ebenso wenig (ein Satz für alle Kreisstaffeln). Für Junioren und
+Frauen bleiben Pokal- und Freundschaftsspiele ohne Satz: dort müssten die
+Ligatabellen derselben Mannschaftsart vorliegen, und ein Verein ohne
+Herrenmannschaft stünde in keiner davon.
+
+## Fehler melden
+
+Der gleichnamige Reiter schickt einen Bericht per Mail. Ohne Postausgang ist
+das Formular sichtbar, sagt aber, dass nichts versendet werden kann — still
+verworfen wird kein Bericht.
+
+| Variable | Standard | Zweck |
+| --- | --- | --- |
+| `SMTP_HOST` | – | Postausgangsserver, ohne ihn ist der Versand aus |
+| `SMTP_PORT` | `587` | `465` spricht sofort TLS, sonst STARTTLS |
+| `SMTP_USER` / `SMTP_PASSWORD` | – | Zugangsdaten des Postfachs |
+| `SMTP_FROM` | `SMTP_USER` | Absenderadresse |
+| `BUGREPORT_EMPFAENGER` | `spesen-generator@jan-vogt.dev` | Empfänger der Berichte |
+
+Als Absender steht die Adresse des Postausgangs in der Mail, die des Melders
+im `Reply-To` — andersherum würde jeder Empfänger mit SPF- oder
+DMARC-Prüfung die Nachricht abweisen.
 
 ## Aktualisieren
 
