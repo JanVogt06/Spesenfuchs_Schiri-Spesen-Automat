@@ -44,6 +44,24 @@ SPESEN_JUNIOREN_LANDESEBENE_DJUN = (20.00, None)  # D-Junioren, Talenteliga, Kle
 SPESEN_JUNIOREN_KREISEBENE_AB = (23.00, 18.00)  # A-, B-Junioren
 SPESEN_JUNIOREN_KREISEBENE_JUNG = (20.00, 15.00)  # C-Junioren und jünger
 
+# Die Spielklassen, die der TFV auf Landesebene fuehrt. Bewusst eine
+# geschlossene Liste statt eines Auffangzweigs: DFBnet normalisiert die
+# Spielklasse ueber die Verbandsgrenze hinweg - ein Spiel des HFV oder FLB
+# steht dort ebenfalls als "Landesliga" oder "Verbandsliga", der Verband ist
+# nur an der Staffel zu erkennen, die hier nicht vorliegt. Ein Auffangzweig
+# gaebe solchen Spielen still die 25/20 der TFV-Landesebene, obwohl nach
+# §2 Abs. 6 die Saetze des ausrichtenden Verbandes gelten, die diese Ordnung
+# nicht kennt. Lieber kein Satz und ein Hinweis als ein falscher Betrag.
+SPIELKLASSEN_JUNIOREN_LANDESEBENE = (
+    "verbandsliga",
+    "landesklasse",
+    "landesliga",
+    "talenteliga",
+    "kleinfeld",
+    "fair-play-liga",
+    "kinderfussball",
+)
+
 
 def calculate_spesen(spielklasse: str, mannschaftsart: str) -> Tuple[Optional[float], Optional[float]]:
     """
@@ -226,7 +244,11 @@ def _calc_junioren(spielklasse: str, mannschaftsart: str) -> Tuple[Optional[floa
             logger.debug(f"Junioren Kreisebene (A/B): {SPESEN_JUNIOREN_KREISEBENE_AB}")
             return SPESEN_JUNIOREN_KREISEBENE_AB
 
-    # Landesebene
+    # Landesebene - nur die Spielklassen des TFV
+    if not any(k in spielklasse for k in SPIELKLASSEN_JUNIOREN_LANDESEBENE):
+        logger.warning(f"Keine Spesen gefunden für Junioren: {spielklasse}")
+        return (None, None)
+
     if ist_d_junior_oder_juenger or "talenteliga" in spielklasse or "kleinfeld" in spielklasse:
         # D-Junioren, Talenteliga, Kleinfeld: 20€, kein SRA
         logger.debug(f"Junioren Landesebene (D/Talenteliga/Kleinfeld): {SPESEN_JUNIOREN_LANDESEBENE_DJUN}")
