@@ -172,6 +172,33 @@ def finde_mannschaft(name: str) -> Optional[Dict]:
     return dict(treffer[0])
 
 
+# Ab diesem Rang gilt eine Mannschaft als ueberregional (Regionalliga und
+# hoeher, dazu die Oberligen). Fuer diese Spiele bleiben die Pokalspesen leer.
+RANG_UEBERREGIONAL = RANG["oberliga"]
+
+
+def kennt_ueberregionale_ligen() -> bool:
+    """
+    Sind die ueberregionalen Tabellen ueberhaupt vorhanden?
+
+    Entscheidet darueber, ob aus "steht in keiner Tabelle" geschlossen werden
+    darf, dass eine Mannschaft unterhalb der Landesklasse spielt. Fehlen die
+    ueberregionalen Staffeln, koennte sie ebenso gut Oberliga spielen - dann
+    ist nichts zu schliessen und es gibt keine Spesen.
+    """
+    conn = get_connection()
+
+    try:
+        row = conn.execute(
+            "SELECT COUNT(*) AS n FROM liga_staffeln WHERE rang <= ?",
+            (RANG_UEBERREGIONAL,),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    return bool(row and row["n"])
+
+
 def bestand() -> Dict[str, object]:
     """Kurzer Ueberblick fuer Oberflaeche und Protokoll."""
     conn = get_connection()

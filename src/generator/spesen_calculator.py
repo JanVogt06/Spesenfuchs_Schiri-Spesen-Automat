@@ -96,6 +96,23 @@ STAFFELN_FREMDER_VERBAND = (
 # genug fuer eine Einschlussliste - alles andere in diesem Feld ist Fliesstext.
 VERBANDSKUERZEL_TFV = ("tfv", "mt", "mth", "wt", "nt", "ot", "e-s", "jso", "ntkfa")
 
+# (3a)/(4) Pokal und Freundschaftsspiele im Herrenbereich. Der Satz richtet
+# sich nach der Spielklasse der beteiligten Mannschaften, nicht nach der des
+# Spiels; nachgeschlagen wird sie in den naechtlich abgeglichenen Ligatabellen
+# (db.ligen).
+#
+# Bewusst nur die beiden Thueringer Spielklassen. Die Zeilen der Ordnung fuer
+# 3. Liga, Regionalliga und Oberliga fehlen hier, weil ueberregionale Spiele
+# gar nicht abgerechnet werden sollen - die ueberregionalen Tabellen dienen
+# allein dazu, eine solche Beteiligung zu ERKENNEN und dann nichts einzutragen.
+# Bei Freundschaftsspielen kommt hinzu, dass die Ordnung fuer die Regionalliga
+# zwei Saetze nebeneinander nennt ("170 €/120 €"), ohne zu sagen, wann welcher
+# gilt.
+SPESEN_HERREN_NACH_SPIELKLASSE = {
+    "verbandsliga": (50.00, 40.00),
+    "landesklasse": (40.00, 30.00),
+}
+
 PUNKTSPIEL = "punktspiel"
 POKALSPIEL = "pokalspiel"
 FREUNDSCHAFTSSPIEL = "freundschaftsspiel"
@@ -121,8 +138,9 @@ def wettbewerbsart(spielklasse: str) -> str:
     return PUNKTSPIEL
 
 
-def calculate_spesen(spielklasse: str, mannschaftsart: str,
-                     staffel: str = "") -> Tuple[Optional[float], Optional[float]]:
+def calculate_spesen(spielklasse: str, mannschaftsart: str, staffel: str = "",
+                     heim_team: str = "",
+                     gast_team: str = "") -> Tuple[Optional[float], Optional[float]]:
     """
     Berechnet SR- und SRA-Spesen gemäß TFV Spesenordnung.
 
@@ -132,6 +150,9 @@ def calculate_spesen(spielklasse: str, mannschaftsart: str,
         staffel: Staffel aus DFBnet (z.B. "1. Altmark West Liga"). Optional,
             aber ohne sie sind Spiele fremder Landesverbaende nicht zu
             erkennen - siehe STAFFELN_FREMDER_VERBAND.
+        heim_team, gast_team: Die Mannschaften. Optional, aber ohne sie bleiben
+            Pokal- und Freundschaftsspiele im Herrenbereich ohne Satz: dort
+            entscheidet die Spielklasse der Vereine.
 
     Returns:
         Tuple (sr_spesen, sra_spesen) - sra_spesen kann None sein wenn kein SRA vorgesehen
@@ -154,7 +175,9 @@ def calculate_spesen(spielklasse: str, mannschaftsart: str,
         return (None, None)
 
     if wettbewerbsart(spielklasse) != PUNKTSPIEL:
-        return _calc_pokal_oder_freundschaft(spielklasse_lower, mannschaftsart_lower)
+        return _calc_pokal_oder_freundschaft(
+            spielklasse_lower, mannschaftsart_lower, heim_team, gast_team
+        )
 
     # Kategorie bestimmen und entsprechende Berechnung aufrufen
     if _is_maenner(mannschaftsart_lower):
@@ -262,7 +285,8 @@ def _calc_maenner(spielklasse: str, mannschaftsart: str) -> Tuple[Optional[float
     return (None, None)
 
 
-def _calc_pokal_oder_freundschaft(spielklasse: str, mannschaftsart: str) -> Tuple[Optional[float], Optional[float]]:
+def _calc_pokal_oder_freundschaft(spielklasse: str, mannschaftsart: str,
+                                  heim_team: str, gast_team: str) -> Tuple[Optional[float], Optional[float]]:
     """
     Berechnet Spesen für Pokal- und Freundschaftsspiele gemäß §2 Abs. 3 und 4.
 
@@ -270,18 +294,18 @@ def _calc_pokal_oder_freundschaft(spielklasse: str, mannschaftsart: str) -> Tupl
     der beteiligten Mannschaften: beim Pokal nach der hoechstklassigen
     ("Die Entschaedigungssaetze richten sich nach der hoechstklassigen am Spiel
     beteiligten Mannschaft"), beim Freundschaftsspiel nach der des Gastgebers
-    ("Entscheidend ist die aktuelle Spielklasse des Gastgebers"). Beides steht
-    in den Ansetzungsdaten von DFBnet nicht drin - dort ist die Spielklasse
+    ("Entscheidend ist die aktuelle Spielklasse des Gastgebers"). In den
+    Ansetzungsdaten von DFBnet steht davon nichts - dort ist die Spielklasse
     "Kreispokal" oder "Kreisfreundschaftsspiele", nicht die Liga der Vereine.
 
-    Deshalb wird hier nur gerechnet, wo das Ergebnis von der Spielklasse der
-    Beteiligten gar nicht abhaengen KANN, weil die Ordnung fuer die
-    Mannschaftsart ohnehin nur einen einzigen Satz kennt. Alles andere bleibt
-    leer: ein leeres Feld traegt der Schiedsrichter in der Kabine selbst nach,
-    ein plausibel aussehender falscher Betrag faellt niemandem auf.
+    Drei Wege zu einem Satz, in dieser Reihenfolge:
 
-    Die vollstaendige Abdeckung braucht die aktuelle Spielklasse der Vereine
-    aus einer anderen Quelle; bis dahin ist Schweigen die richtige Antwort.
+    1. Klassenunabhaengige Faelle. Wo die Ordnung fuer eine Mannschaftsart nur
+       einen einzigen Satz kennt, gibt es nichts nachzuschlagen.
+    2. Herren: Nachschlagen in den Ligatabellen (siehe _calc_herren_nach_liga).
+    3. Sonst nichts. Ein leeres Feld traegt der Schiedsrichter in der Kabine
+       selbst nach, ein plausibel aussehender falscher Betrag faellt niemandem
+       auf.
     """
     # Juniorinnen: 20 Euro "in allen Spiel- und Altersklassen" (Abs. 2b). Abs. 3
     # Nr. 2 und Abs. 4 verweisen beide dorthin zurueck, und da die Zeile keine
@@ -300,11 +324,86 @@ def _calc_pokal_oder_freundschaft(spielklasse: str, mannschaftsart: str) -> Tupl
         logger.debug(f"Alte Herren Kreisebene (klassenunabhängig): {SPESEN_ALTE_HERREN_KREIS}")
         return SPESEN_ALTE_HERREN_KREIS
 
+    if _is_maenner(mannschaftsart) and not is_alte_herren(mannschaftsart):
+        return _calc_herren_nach_liga(spielklasse, heim_team, gast_team)
+
     logger.info(
         f"Kein klassenunabhängiger Satz für {spielklasse}/{mannschaftsart} - "
         "Pokal/Freundschaft richtet sich nach der Spielklasse der Vereine"
     )
+
     return (None, None)
+
+
+def _calc_herren_nach_liga(spielklasse: str, heim_team: str,
+                           gast_team: str) -> Tuple[Optional[float], Optional[float]]:
+    """
+    Schlaegt die Spielklasse der beteiligten Herrenmannschaften nach.
+
+    Nachgeschlagen wird in den naechtlich abgeglichenen Ligatabellen. Die
+    decken die Thueringer Landesebene ab (Verbandsliga, Landesklasse) und
+    zusaetzlich Regionalliga und Oberliga - letztere nicht, um daraus
+    abzurechnen, sondern um eine ueberregionale Beteiligung zu erkennen.
+
+    Die Regeln, alle in dieselbe Richtung vorsichtig:
+
+    - Kreispokal: nie ein Satz. Alle Beteiligten spielen Kreisebene, und dort
+      unterscheidet Abs. 2a zwischen Kreisoberliga (30/25) und Kreisliga
+      (25/23) - welche der beiden, verraet die Ansetzung nicht.
+    - Ist eine Mannschaft ueberregional, bleibt es leer.
+    - Eine Mannschaft, die in keiner Tabelle steht, spielt unterhalb der
+      Landesklasse und kann den Satz nicht anheben. Dieser Schluss gilt aber
+      nur, solange die ueberregionalen Tabellen ueberhaupt vorhanden sind -
+      sonst koennte sie ebenso gut Oberliga spielen.
+    - Beim Freundschaftsspiel zaehlt allein der Gastgeber, beim Pokal die
+      hoehere der beiden Klassen.
+    """
+    from db.ligen import finde_mannschaft, kennt_ueberregionale_ligen, RANG_UEBERREGIONAL
+
+    if "pokal" in spielklasse and _is_kreisebene(spielklasse):
+        logger.info("Kreispokal: Kreisoberliga oder Kreisliga nicht unterscheidbar")
+        return (None, None)
+
+    ist_pokal = "pokal" in spielklasse
+    beteiligte = [heim_team, gast_team] if ist_pokal else [heim_team]
+    if not all(beteiligte):
+        return (None, None)
+
+    gefunden = []
+    for name in beteiligte:
+        mannschaft = finde_mannschaft(name)
+
+        if mannschaft and mannschaft["rang"] <= RANG_UEBERREGIONAL:
+            logger.info(
+                f"{name} spielt {mannschaft['anzeigename']} - überregionale Beteiligung, "
+                "kein Satz aus dieser Ordnung"
+            )
+            return (None, None)
+
+        if mannschaft:
+            gefunden.append(mannschaft)
+
+    if not gefunden:
+        logger.info(f"Keine der Mannschaften ({', '.join(beteiligte)}) steht in einer Ligatabelle")
+        return (None, None)
+
+    # "Steht in keiner Tabelle" heisst nur dann "unterhalb der Landesklasse",
+    # wenn nach oben hin alles erfasst ist.
+    if len(gefunden) < len(beteiligte) and not kennt_ueberregionale_ligen():
+        logger.info("Überregionale Tabellen fehlen - unbekannte Mannschaft nicht einzuordnen")
+        return (None, None)
+
+    hoechste = min(gefunden, key=lambda m: m["rang"])
+    spesen = SPESEN_HERREN_NACH_SPIELKLASSE.get(hoechste["spielklasse"])
+
+    if not spesen:
+        logger.info(f"Kein Satz für Spielklasse {hoechste['spielklasse']}")
+        return (None, None)
+
+    logger.debug(f"Herren {spielklasse}: maßgeblich {hoechste['mannschaft']} "
+                 f"({hoechste['anzeigename']}) -> {spesen}")
+
+    return spesen
 
 
 def _calc_alte_herren(spielklasse: str) -> Tuple[Optional[float], Optional[float]]:

@@ -56,7 +56,9 @@ def persist_matches(user_id: int, matches_data: List[dict], vollstaendig: bool =
             sr_spesen, sra_spesen = calculate_spesen(
                 spiel_info.get('spielklasse', ''),
                 spiel_info.get('mannschaftsart', ''),
-                spiel_info.get('staffel', '')
+                spiel_info.get('staffel', ''),
+                spiel_info.get('heim_team', ''),
+                spiel_info.get('gast_team', '')
             )
 
             upsert_match(user_id, match_data, datum, sr_spesen, sra_spesen, KM_SATZ_EURO)

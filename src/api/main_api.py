@@ -203,7 +203,8 @@ def _add_spesen_to_match(match: dict) -> dict:
         sr_spesen, sra_spesen = match.get('sr_spesen'), match.get('sra_spesen')
     else:
         sr_spesen, sra_spesen = calculate_spesen(
-            spielklasse, mannschaftsart, spiel_info.get('staffel', '')
+            spielklasse, mannschaftsart, spiel_info.get('staffel', ''),
+            spiel_info.get('heim_team', ''), spiel_info.get('gast_team', '')
         )
 
     spesen_info = {
