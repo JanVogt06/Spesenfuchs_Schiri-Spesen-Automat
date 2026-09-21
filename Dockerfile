@@ -16,6 +16,11 @@ RUN npm run build
 # ===== Backend Stage =====
 FROM python:3.14-slim
 
+# Die Version kommt beim Release aus dem Git-Tag. Ohne Angabe bleibt es beim
+# Rueckfallwert in core/config.py - ein Bau von Hand ist kein Release.
+ARG APP_VERSION=""
+ENV APP_VERSION=${APP_VERSION}
+
 LABEL org.opencontainers.image.title="Spesenfuchs" \
       org.opencontainers.image.description="Schiri-Spesen-Automat: erstellt Spesenabrechnungen automatisch aus DFB.net-Ansetzungen" \
       org.opencontainers.image.source="https://github.com/JanVogt06/spesenfuchs" \

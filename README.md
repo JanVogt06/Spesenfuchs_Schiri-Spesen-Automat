@@ -270,6 +270,13 @@ und `linux/arm64`), veröffentlicht es unter
 git tag v1.2.0 && git push origin v1.2.0
 ```
 
+Die Versionsnummer im Code muss dabei **nicht** mitgezogen werden: der Workflow
+reicht den Tag als Bauargument `APP_VERSION` ins Image, und der Health-Endpunkt,
+der Betreff der Fehlerberichte und der User-Agent gegenüber FUSSBALL.DE und
+Nominatim melden genau diesen Wert. Ein Lauf aus dem Quellcode fällt auf die
+Konstante in [`src/core/config.py`](src/core/config.py) zurück — ein Bau von Hand
+ist kein Release.
+
 Der Workflow lässt sich unter *Actions* auch ohne Tag starten (`workflow_dispatch`),
 etwa um nur den Image-Bau zu prüfen; das Ergebnis landet dann als `edge` und ohne
 Release. Der arm64-Teil wird auf dem Runner emuliert und dauert deutlich länger

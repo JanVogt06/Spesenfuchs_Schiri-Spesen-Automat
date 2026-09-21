@@ -33,9 +33,15 @@ _GENERATED_SECRETS = {
 }
 
 
-# Anwendungsversion. Beim Release mit dem Git-Tag mitziehen (Tag v1.3.0 ->
-# "1.3.0"); der Health-Endpunkt meldet genau diesen Wert.
-APP_VERSION = "1.7.0"
+# Anwendungsversion. Im veroeffentlichten Image setzt sie der Release-Workflow
+# aus dem Git-Tag (v1.8.2 -> "1.8.2"), siehe ARG APP_VERSION im Dockerfile.
+#
+# Der Wert darunter ist nur der Rueckfall fuer einen Lauf aus dem Quellcode.
+# Frueher war er die einzige Quelle und musste beim Taggen von Hand mitgezogen
+# werden - was dreimal vergessen wurde, sodass v1.8.1 sich selbst als 1.7.0
+# ausgab: im Health-Endpunkt, im Betreff der Fehlerberichte und im User-Agent
+# gegenueber fussball.de und Nominatim.
+APP_VERSION = os.getenv("APP_VERSION") or "1.8.2"
 
 
 def get_data_dir() -> Path:
