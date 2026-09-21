@@ -831,6 +831,60 @@ def _migration_015_fremde_verbaende(conn: sqlite3.Connection) -> None:
     logger.info(f"Spiele fremder Verbände korrigiert: {geaendert}")
 
 
+def _migration_016_ligen(conn: sqlite3.Connection) -> None:
+    """
+    Die Thueringer Herren-Ligen und ihre Tabellen.
+
+    Bei Pokal- und Freundschaftsspielen richtet sich der Spesensatz nach der
+    Spielklasse der beteiligten Vereine (§2 Abs. 3 und 4), nicht nach der des
+    Spiels - in der Ansetzung steht aber nur "Kreispokal". Diese Tabellen
+    schliessen die Luecke; sie werden naechtlich aus fussball.de gefuellt und
+    zeigen nebenbei den Reiter *Ligen*.
+
+    Zwei Entwurfsentscheidungen:
+
+    1. kern und nummer liegen als eigene Spalten daneben, nicht als Ausdruck
+       im SELECT. Nur so laesst sich ueber sie ein Index legen, und nur so ist
+       die Zuordnungsregel an genau einer Stelle festgeschrieben (siehe
+       db.ligen.finde_mannschaft).
+
+    2. Der Schluessel ist die team_id von fussball.de, nicht der Name. Eine
+       Mannschaft kann im Laufe der Saison umbenannt werden - dann soll ihre
+       Zeile ersetzt und nicht verdoppelt werden.
+    """
+    _run_script(conn, """
+        CREATE TABLE liga_staffeln (
+            staffel_id TEXT PRIMARY KEY,
+            pfad TEXT NOT NULL,
+            spielklasse TEXT NOT NULL,
+            verband TEXT NOT NULL,
+            anzeigename TEXT NOT NULL,
+            rang INTEGER NOT NULL,
+            aktualisiert_at TEXT NOT NULL
+        );
+
+        CREATE TABLE liga_tabellen (
+            staffel_id TEXT NOT NULL,
+            team_id TEXT NOT NULL,
+            platz INTEGER NOT NULL,
+            mannschaft TEXT NOT NULL,
+            kern TEXT NOT NULL,
+            nummer INTEGER NOT NULL,
+            spiele INTEGER NOT NULL,
+            siege INTEGER NOT NULL,
+            unentschieden INTEGER NOT NULL,
+            niederlagen INTEGER NOT NULL,
+            tore INTEGER NOT NULL,
+            gegentore INTEGER NOT NULL,
+            punkte INTEGER NOT NULL,
+            PRIMARY KEY (staffel_id, team_id),
+            FOREIGN KEY (staffel_id) REFERENCES liga_staffeln (staffel_id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX idx_liga_tabellen_zuordnung ON liga_tabellen (kern, nummer);
+    """)
+
+
 # (Version, Beschreibung, Funktion) - aufsteigend, Luecken sind nicht erlaubt.
 MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "baseline schema", _migration_001_baseline),
@@ -848,6 +902,7 @@ MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (13, "refreeze expense rates for old boys matches", _migration_013_alte_herren_saetze),
     (14, "clear league rates frozen on cup and friendly matches", _migration_014_pokal_freundschaft_saetze),
     (15, "drop tfv rates from other associations matches", _migration_015_fremde_verbaende),
+    (16, "thuringian league tables for cup and friendly rates", _migration_016_ligen),
 ]
 
 

@@ -231,7 +231,8 @@ def _vereinsseite(suchbegriff: str) -> Optional[str]:
     return _hole(treffer[0])
 
 
-def entdecke_staffeln(ankerverein: str, spielklasse: str, verband: str = "thueringen") -> List[Staffel]:
+def entdecke_staffeln(ankerverein: str, spielklasse: str, verband: str = "thueringen",
+                      mit_nachbarstaffeln: bool = True) -> List[Staffel]:
     """
     Sucht die Staffeln einer Spielklasse, ausgehend von einem Verein, der darin
     spielt.
@@ -247,6 +248,11 @@ def entdecke_staffeln(ankerverein: str, spielklasse: str, verband: str = "thueri
 
     Mehrstaffelige Ligen (Landesklasse 1 bis 3) sind mit einem Aufruf
     vollstaendig: die Staffelseiten verlinken einander.
+
+    mit_nachbarstaffeln=False bleibt bei der Staffel des Ankervereins. Noetig
+    bei ueberregionalen Ligen: von der Regionalliga Nordost fuehrt die Kette
+    durch alle fuenf Regionalligen, von der NOFV-Oberliga durch alle deutschen
+    Oberligen. Gebraucht wird aber nur die, in der der Anker wirklich spielt.
     """
     seite = _vereinsseite(ankerverein)
     if not seite:
@@ -261,7 +267,7 @@ def entdecke_staffeln(ankerverein: str, spielklasse: str, verband: str = "thueri
     # Mehrstaffelige Ligen haengen als Kette aneinander: jede Staffelseite
     # verlinkt per rel="next" die naechste, nicht alle auf einmal. Also der
     # Kette folgen, bis sie endet oder sich schliesst.
-    offen = list(staffeln.values())
+    offen = list(staffeln.values()) if mit_nachbarstaffeln else []
     while offen:
         aktuell = offen.pop()
         try:
@@ -270,14 +276,15 @@ def entdecke_staffeln(ankerverein: str, spielklasse: str, verband: str = "thueri
             logger.warning(f"Staffel {aktuell.slug} nicht erreichbar: {fehler}")
             continue
 
-        naechste = re.search(r'rel="next"\s+href="([^"]+)"', seite)
-        if not naechste:
-            continue
-
-        for nachbar in _staffeln_auf_seite(naechste.group(1), spielklasse, verband):
-            if nachbar.staffel_id not in staffeln:
-                staffeln[nachbar.staffel_id] = nachbar
-                offen.append(nachbar)
+        # In beide Richtungen: die Seite verlinkt nur ihren direkten Nachbarn,
+        # und der Ausgangsverein kann in der mittleren oder letzten Staffel
+        # stehen. Wer nur rel="next" folgt, findet von Staffel 3 aus keine
+        # einzige weitere.
+        for richtung in re.findall(r'rel="(?:next|prev)"\s+href="([^"]+)"', seite):
+            for nachbar in _staffeln_auf_seite(richtung, spielklasse, verband):
+                if nachbar.staffel_id not in staffeln:
+                    staffeln[nachbar.staffel_id] = nachbar
+                    offen.append(nachbar)
 
     # Anzeigenamen nachtragen, wo der Link keinen Text hatte (die
     # next-Verkettung ist ein Pfeil-Icon ohne Beschriftung).
