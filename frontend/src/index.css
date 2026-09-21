@@ -96,3 +96,41 @@
     }
   }
 }
+
+/*
+  Karte (Leaflet). Die Kacheln kommen als fertige Bilder vom Kachelserver und
+  sind immer hell. Im dunklen Theme werden sie deshalb umgekehrt statt gegen
+  einen dunklen Kachelsatz getauscht - ein zweiter Kachelserver waere eine
+  weitere Abhaengigkeit fuer eine reine Stilfrage. Die Drehung um 180 Grad
+  holt die Farbtoene nach der Invertierung zurueck, sonst waere Wasser orange.
+  Die Pins selbst liegen in einer anderen Ebene und bleiben unberuehrt.
+*/
+.dark .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9) saturate(0.8);
+}
+
+.dark .leaflet-container {
+  background: var(--muted);
+}
+
+/* Popup und Attribution an die Flaechen der Anwendung angleichen */
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: var(--popover);
+  color: var(--popover-foreground);
+}
+
+.leaflet-container .leaflet-control-attribution {
+  background: color-mix(in oklab, var(--card) 85%, transparent);
+  color: var(--muted-foreground);
+}
+
+.leaflet-container .leaflet-control-attribution a {
+  color: var(--muted-foreground);
+}
+
+/* Der divIcon-Container von Leaflet bringt eigene Flaechen mit, die hier stoeren */
+.leaflet-container .spesen-pin {
+  background: transparent;
+  border: 0;
+}

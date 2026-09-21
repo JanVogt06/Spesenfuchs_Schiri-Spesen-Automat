@@ -5,8 +5,9 @@ import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import {Separator} from '@/components/ui/separator';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
+import {MatchMap} from '@/components/matches/MatchMap';
 import {cn} from '@/lib/utils';
-import {Calendar, ChevronDown, ChevronUp, Download, Users, MapPin, Euro, Car, Check, Loader2, Info} from 'lucide-react';
+import {Calendar, ChevronDown, ChevronUp, Download, Users, MapPin, Map, Euro, Car, Check, Loader2, Info} from 'lucide-react';
 
 /** "12,5" oder "12.5" -> 12.5; leer -> null; ungültig -> undefined */
 function parseGermanNumber(value: string): number | null | undefined {
@@ -422,6 +423,22 @@ export function MatchCard({
                         gespeichert. Für die Gesamtsumme muss bei jeder Person ein Wert stehen
                         (0 eintragen, wenn keine Kosten anfallen).
                     </p>
+
+                    {/*
+                      Die Karte schluckt ihre Klicks: ein Zug an der Karte darf die
+                      Spielkarte nicht für den Sammel-Download auswählen. Die Ausnahmen
+                      in handleCardClick greifen hier nicht, weil Leaflet auf Flächen
+                      reagiert, nicht auf Bedienelemente.
+                    */}
+                    {match._id && (
+                        <div onClick={(e) => e.stopPropagation()}>
+                            <h5 className="mb-2 flex items-center gap-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                                <Map className="size-3.5"/>
+                                Anfahrt
+                            </h5>
+                            <MatchMap matchId={match._id}/>
+                        </div>
+                    )}
                 </div>
             </div>
         );

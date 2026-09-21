@@ -77,6 +77,43 @@ export async function saveMatchExpenses(
     return response.data;
 }
 
+/** Eine Person oder die Spielstätte an einem Punkt der Karte */
+export interface GeoEintrag {
+    rolle: string;
+    name: string;
+}
+
+export interface GeoPunkt {
+    typ: 'spielstaette' | 'person';
+    adresse: string;
+    lat: number;
+    lon: number;
+    /** 'ort' heißt: nur der Ortsmittelpunkt, die genaue Anschrift war nicht auffindbar */
+    genauigkeit: 'adresse' | 'ort';
+    /** Mehrere, wenn zwei Angesetzte unter derselben Anschrift wohnen */
+    eintraege: GeoEintrag[];
+}
+
+export interface GeoDaten {
+    punkte: GeoPunkt[];
+    ohne_treffer: { rolle: string; name: string; adresse: string }[];
+    /** Der Geocoder hat nicht geantwortet - ein erneuter Versuch kann klappen */
+    gestoert: boolean;
+    kacheln: { url: string; attribution: string };
+}
+
+/**
+ * Koordinaten der Anschriften eines Spiels für die Karte.
+ *
+ * Der erste Aufruf zu einem Spiel kann ein paar Sekunden dauern: die
+ * Adressen werden dann einmalig beim Geocoder nachgeschlagen. Danach
+ * antwortet der Server aus seinem Zwischenspeicher.
+ */
+export async function getMatchGeo(matchId: number): Promise<GeoDaten> {
+    const response = await api.get<GeoDaten>(`/api/matches/${matchId}/geo`);
+    return response.data;
+}
+
 // API Funktionen
 export async function getAllMatches(): Promise<MatchData[]> {
     const response = await api.get<MatchData[]>('/api/matches');
