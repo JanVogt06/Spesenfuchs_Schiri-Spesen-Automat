@@ -43,7 +43,6 @@ output/
 
 # Nur fuer Betrieb und Entwicklung, nicht im Image
 docker-compose.yml
-sync_from_server.sh
 
 # Docs
 *.md

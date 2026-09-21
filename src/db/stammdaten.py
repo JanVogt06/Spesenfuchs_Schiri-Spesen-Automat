@@ -7,8 +7,7 @@ user_id ist zugleich Primaerschluessel.
 
 Die persoenlichen Felder liegen Fernet-verschluesselt in der Datenbank, wie
 schon die DFBnet-Zugangsdaten. Anschrift, Geburtsdatum und Telefonnummern
-stuenden sonst im Klartext in app.db - einer Datei, die sync_from_server.sh
-regelmaessig vom Server auf einen Arbeitsplatzrechner zieht. Verschluesselt
+stuenden sonst im Klartext in app.db. Verschluesselt
 kostet das nichts: gelesen wird immer nur die eine Zeile des angemeldeten
 Users, es wird nie ueber diesen Feldern gefiltert oder sortiert.
 """

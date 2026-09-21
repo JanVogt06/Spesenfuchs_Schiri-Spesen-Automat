@@ -231,8 +231,6 @@ Ohne gesetzte Umgebungsvariablen liegt `DATA_DIR` auf `./data` im Projekt — di
 lokale Entwicklung benutzt also dieselbe Struktur wie der Server. `data/` ist in
 `.gitignore`, für die Vorlage der Secrets siehe [.env.example](.env.example).
 
-Daten vom Server nach `./data` holen: [`sync_from_server.sh`](sync_from_server.sh).
-
 Die DOCX→PDF-Konvertierung braucht LibreOffice; im Container ist
 `libreoffice-writer` enthalten, lokal muss es installiert sein — ohne
 LibreOffice funktioniert nur der DOCX-Download.
