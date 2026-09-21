@@ -250,12 +250,6 @@ function Beispielkarte() {
             </div>
 
             <div className="relative overflow-hidden rounded-xl border border-white/15 bg-[oklch(0.22_0.03_158/0.85)] p-5 shadow-2xl shadow-black/50 backdrop-blur-md">
-                {/* Lichtstreifen, als wuerde das Dokument gerade erzeugt */}
-                <div
-                    aria-hidden
-                    className="spesen-scan pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-transparent via-flutlicht/20 to-transparent"
-                />
-
                 <div className="relative flex items-start justify-between gap-3">
                     <div>
                         <p className="text-sm font-semibold">SV Grün-Weiß – FC Kreisstadt</p>

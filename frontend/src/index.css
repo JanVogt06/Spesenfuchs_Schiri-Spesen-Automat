@@ -243,17 +243,6 @@
   50%      { transform: translateY(-0.5rem); }
 }
 
-/* Lichtstreifen, der ueber die Beispiel-Abrechnung wandert */
-.spesen-scan {
-  animation: spesen-scan 5s ease-in-out infinite;
-}
-
-@keyframes spesen-scan {
-  0%       { transform: translateY(-5rem); opacity: 0; }
-  15%, 65% { opacity: 1; }
-  100%     { transform: translateY(22rem); opacity: 0; }
-}
-
 /*
   Laufband der Spesensaetze. Die Liste steht zweimal nebeneinander, je
   Durchlauf eine eigene Gruppe mit gleichem Innenabstand - deshalb ist die
@@ -404,11 +393,6 @@ details[open] > .spesen-antwort {
   .spesen-aufsteigen,
   details[open] > .spesen-antwort {
     animation: none !important;
-  }
-
-  /* Der wandernde Lichtstreifen hat ohne Bewegung keinen Sinn */
-  .spesen-scan {
-    display: none;
   }
 
   [data-reveal] {
