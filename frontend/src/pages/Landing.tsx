@@ -41,8 +41,10 @@ interface Vorteil {
     description: string;
     /** Kachel ueber zwei Spalten, mit waagerechtem Aufbau */
     breit?: boolean;
-    /** Die eine dunkle Kachel, die den Nacht-Block von oben aufgreift */
+    /** Dunkle Kachel, die den Nacht-Block von oben aufgreift */
     nacht?: boolean;
+    /** Uhr auf der Kachel - nur dort, wo es um den naechtlichen Lauf geht */
+    uhr?: boolean;
 }
 
 const FEATURES: Vorteil[] = [
@@ -50,6 +52,7 @@ const FEATURES: Vorteil[] = [
         icon: MoonStar,
         breit: true,
         nacht: true,
+        uhr: true,
         title: 'Läuft, während du schläfst',
         description: 'Jede Nacht um 3 Uhr werden deine Ansetzungen automatisch aus DFBnet geladen und abgerechnet.',
     },
@@ -76,6 +79,7 @@ const FEATURES: Vorteil[] = [
     {
         icon: Users,
         breit: true,
+        nacht: true,
         title: 'Für jeden Schiedsrichter',
         description: 'Eigener Account und eigene Daten, vom Kreisliga-Neuling bis zum Oberliga-Routinier.',
     },
@@ -513,29 +517,35 @@ function Nachtuhr() {
     );
 }
 
-/** Die dunkle Kachel im hellen Raster, mit Rasen und Uhr */
+/**
+ * Die dunklen Kacheln im hellen Raster. Es sind zwei, diagonal gegenueber:
+ * eine allein waere ein Ausreisser, zwei ergeben einen Rhythmus.
+ */
 function NachtKachel({feature}: { feature: Vorteil }) {
     return (
-        <div className="spesen-nacht relative isolate flex h-full flex-col justify-between gap-6 overflow-hidden rounded-2xl border border-white/10 p-6 text-white sm:flex-row sm:items-center">
+        <div className="spesen-nacht relative isolate flex h-full flex-col gap-5 overflow-hidden rounded-2xl border border-white/10 p-6 text-white sm:flex-row sm:items-center sm:gap-6">
             <div aria-hidden className="spesen-feld pointer-events-none absolute inset-x-0 bottom-0 h-3/4">
                 <div className="absolute inset-0">
                     <div className="spesen-rasen absolute inset-0"/>
                 </div>
             </div>
 
+            <span className="relative grid size-10 shrink-0 place-items-center rounded-xl bg-flutlicht/15 text-flutlicht sm:size-14">
+                <feature.icon className="size-5 sm:size-6"/>
+            </span>
+
             <div className="relative">
-                <span className="mb-4 grid size-10 place-items-center rounded-xl bg-flutlicht/15 text-flutlicht">
-                    <feature.icon className="size-5"/>
-                </span>
                 <h3 className="font-medium">{feature.title}</h3>
-                <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-white/55">
+                <p className={`mt-1.5 text-sm leading-relaxed text-white/55 ${feature.uhr ? 'max-w-sm' : ''}`}>
                     {feature.description}
                 </p>
             </div>
 
-            <div className="relative">
-                <Nachtuhr/>
-            </div>
+            {feature.uhr && (
+                <div className="relative sm:ml-auto">
+                    <Nachtuhr/>
+                </div>
+            )}
         </div>
     );
 }
