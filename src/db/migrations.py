@@ -735,6 +735,56 @@ def _migration_013_alte_herren_saetze(conn: sqlite3.Connection) -> None:
     logger.info(f"Alt-Herren-Saetze korrigiert: {geaendert} Spiele")
 
 
+def _migration_014_pokal_freundschaft_saetze(conn: sqlite3.Connection) -> None:
+    """
+    Loescht die eingefrorenen Punktspielsaetze von Pokal- und Freundschaftsspielen.
+
+    Bis hierher hat der Rechner jedem Spiel einen Satz aus der Punktspieltabelle
+    gegeben, auch einem Kreispokalspiel oder einem Kreisfreundschaftsspiel. Dass
+    das nie auf dem Papier landete, lag allein daran, dass Anzeige und Generator
+    getrennt noch einmal geprueft haben, ob ein Punktspiel vorliegt - der falsche
+    Wert stand trotzdem in der Datenbank.
+
+    Diese Pruefung faellt jetzt weg, weil der Rechner selbst entscheidet. Damit
+    wuerden die alten Werte auf einmal gedruckt, und zwar falsch: nach §2 Abs. 3
+    richtet sich der Pokalsatz nach der hoechstklassigen beteiligten Mannschaft,
+    nach Abs. 4 der Freundschaftssatz nach der Spielklasse des Gastgebers. Ein
+    Kreispokalspiel zweier Kreisoberligisten kostet 30/25, nicht die 25/23, die
+    hier eingefroren sind.
+
+    Neu gerechnet wird nur, was der Rechner heute noch verantworten kann -
+    Juniorinnen und Alte Herren auf Kreisebene, deren Satz die Ordnung
+    klassenunabhaengig festlegt. Der Rest wird geleert. Punktspiele bleiben
+    unberuehrt: dort schuetzt das Einfrieren eine bereits abgegebene Abrechnung.
+    """
+    from generator.spesen_calculator import PUNKTSPIEL, calculate_spesen, wettbewerbsart
+
+    geleert = gesetzt = 0
+
+    for row in conn.execute(
+        "SELECT id, spielklasse, mannschaftsart, sr_spesen, sra_spesen FROM matches"
+    ).fetchall():
+        if wettbewerbsart(row["spielklasse"] or "") == PUNKTSPIEL:
+            continue
+
+        sr, sra = calculate_spesen(row["spielklasse"] or "", row["mannschaftsart"] or "")
+        if (sr, sra) == (row["sr_spesen"], row["sra_spesen"]):
+            continue
+
+        conn.execute(
+            "UPDATE matches SET sr_spesen = ?, sra_spesen = ? WHERE id = ?",
+            (sr, sra, row["id"]),
+        )
+        if sr is None:
+            geleert += 1
+        else:
+            gesetzt += 1
+
+    logger.info(
+        f"Pokal-/Freundschaftsspiele: {geleert} Saetze geleert, {gesetzt} neu gesetzt"
+    )
+
+
 # (Version, Beschreibung, Funktion) - aufsteigend, Luecken sind nicht erlaubt.
 MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "baseline schema", _migration_001_baseline),
@@ -750,6 +800,7 @@ MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (11, "track which seasons are completely stored", _migration_011_saison_vollstaendig),
     (12, "cache geocoded addresses for the match map", _migration_012_geocode_cache),
     (13, "refreeze expense rates for old boys matches", _migration_013_alte_herren_saetze),
+    (14, "clear league rates frozen on cup and friendly matches", _migration_014_pokal_freundschaft_saetze),
 ]
 
 
