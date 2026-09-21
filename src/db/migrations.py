@@ -713,12 +713,14 @@ def _migration_013_alte_herren_saetze(conn: sqlite3.Connection) -> None:
     geaendert = 0
 
     for row in conn.execute(
-        "SELECT id, spielklasse, mannschaftsart, sr_spesen, sra_spesen FROM matches"
+        "SELECT id, spielklasse, mannschaftsart, staffel, sr_spesen, sra_spesen FROM matches"
     ).fetchall():
         if not is_alte_herren((row["mannschaftsart"] or "").lower()):
             continue
 
-        sr, sra = calculate_spesen(row["spielklasse"] or "", row["mannschaftsart"] or "")
+        sr, sra = calculate_spesen(
+            row["spielklasse"] or "", row["mannschaftsart"] or "", row["staffel"] or ""
+        )
         if (sr, sra) == (row["sr_spesen"], row["sra_spesen"]):
             continue
 
@@ -762,12 +764,14 @@ def _migration_014_pokal_freundschaft_saetze(conn: sqlite3.Connection) -> None:
     geleert = gesetzt = 0
 
     for row in conn.execute(
-        "SELECT id, spielklasse, mannschaftsart, sr_spesen, sra_spesen FROM matches"
+        "SELECT id, spielklasse, mannschaftsart, staffel, sr_spesen, sra_spesen FROM matches"
     ).fetchall():
         if wettbewerbsart(row["spielklasse"] or "") == PUNKTSPIEL:
             continue
 
-        sr, sra = calculate_spesen(row["spielklasse"] or "", row["mannschaftsart"] or "")
+        sr, sra = calculate_spesen(
+            row["spielklasse"] or "", row["mannschaftsart"] or "", row["staffel"] or ""
+        )
         if (sr, sra) == (row["sr_spesen"], row["sra_spesen"]):
             continue
 
@@ -783,6 +787,48 @@ def _migration_014_pokal_freundschaft_saetze(conn: sqlite3.Connection) -> None:
     logger.info(
         f"Pokal-/Freundschaftsspiele: {geleert} Saetze geleert, {gesetzt} neu gesetzt"
     )
+
+
+def _migration_015_fremde_verbaende(conn: sqlite3.Connection) -> None:
+    """
+    Nimmt den Spielen anderer Landesverbaende die TFV-Saetze wieder ab.
+
+    Bis hierher hat der Rechner nur Spielklasse und Mannschaftsart gesehen.
+    DFBnet normalisiert die Spielklasse aber ueber die Verbandsgrenze hinweg:
+    ein Kreisoberligaspiel in der Altmark steht dort als "Kreisoberliga" wie
+    jedes Thueringer auch, ein NOFV-Spiel der C-Junioren als "Landesliga". So
+    bekamen Spiele der Nachbarverbaende die Saetze des TFV, obwohl nach §2
+    Abs. 6 der ausrichtende Verband nach eigenen Pauschalen zahlt.
+
+    Erkennbar ist das erst an der Staffel ("1. Altmark West Liga",
+    "U14-Talente-Spielrunde-Nordost"), die der Rechner jetzt mitbekommt. Hier
+    werden die betroffenen Zeilen nachgezogen - wie in Migration 013 ist ein
+    falscher eingefrorener Wert kein schuetzenswerter Stand.
+    """
+    from generator.spesen_calculator import calculate_spesen
+
+    geaendert = 0
+
+    for row in conn.execute(
+        "SELECT id, spielklasse, mannschaftsart, staffel, sr_spesen, sra_spesen FROM matches"
+    ).fetchall():
+        sr, sra = calculate_spesen(
+            row["spielklasse"] or "", row["mannschaftsart"] or "", row["staffel"] or ""
+        )
+        if (sr, sra) == (row["sr_spesen"], row["sra_spesen"]):
+            continue
+
+        conn.execute(
+            "UPDATE matches SET sr_spesen = ?, sra_spesen = ? WHERE id = ?",
+            (sr, sra, row["id"]),
+        )
+        geaendert += 1
+        logger.info(
+            f"Spiel {row['id']} ({row['mannschaftsart']}, {row['spielklasse']}, "
+            f"{row['staffel']}): {row['sr_spesen']}/{row['sra_spesen']} -> {sr}/{sra}"
+        )
+
+    logger.info(f"Spiele fremder Verbände korrigiert: {geaendert}")
 
 
 # (Version, Beschreibung, Funktion) - aufsteigend, Luecken sind nicht erlaubt.
@@ -801,6 +847,7 @@ MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (12, "cache geocoded addresses for the match map", _migration_012_geocode_cache),
     (13, "refreeze expense rates for old boys matches", _migration_013_alte_herren_saetze),
     (14, "clear league rates frozen on cup and friendly matches", _migration_014_pokal_freundschaft_saetze),
+    (15, "drop tfv rates from other associations matches", _migration_015_fremde_verbaende),
 ]
 
 
