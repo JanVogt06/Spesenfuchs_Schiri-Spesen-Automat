@@ -12,6 +12,7 @@ Bericht fuer abgeschickt und niemand hat ihn je gesehen.
 """
 import os
 import smtplib
+import socket
 from email.message import EmailMessage
 from typing import Optional
 
@@ -44,13 +45,42 @@ class MailNichtKonfiguriert(APIError):
 class MailVersandFehlgeschlagen(APIError):
     """502 - Der Postausgang hat den Bericht nicht angenommen."""
 
-    def __init__(self, details: Optional[str] = None):
+    def __init__(self, message: str, details: Optional[str] = None):
         super().__init__(
             status_code=502,
             error_code="MAIL_SEND_FAILED",
-            message="Der Fehlerbericht konnte nicht versendet werden. Bitte später erneut versuchen.",
+            message=message,
             details=details,
         )
+
+
+def _fehlermeldung(fehler: Exception, host: str, port: int) -> str:
+    """
+    Uebersetzt einen SMTP-Fehler in einen Satz, der zur Ursache fuehrt.
+
+    Die Unterscheidung ist die halbe Fehlersuche: eine Zeitueberschreitung
+    heisst, dass der Server gar nicht erst herauskommt - meist blockt der
+    Anbieter ausgehende Mailports. Ein abgelehnter Login heisst dagegen, dass
+    die Verbindung steht und nur die Zugangsdaten nicht passen. Wer das
+    verwechselt, sucht stundenlang an der falschen Stelle.
+    """
+    if isinstance(fehler, smtplib.SMTPAuthenticationError):
+        return (f"{host} hat die Zugangsdaten abgelehnt. Bei web.de und GMX muss der Zugriff "
+                "durch Mailprogramme erst freigeschaltet werden; mit Zwei-Faktor-Anmeldung "
+                "wird ein App-Passwort gebraucht.")
+
+    if isinstance(fehler, (TimeoutError, socket.timeout)):
+        return (f"Keine Verbindung zu {host}:{port} - Zeitüberschreitung. Der Server kommt auf "
+                "diesem Port nicht hinaus; viele Anbieter sperren ausgehende Mailports, "
+                "manche geben sie auf Anfrage frei.")
+
+    if isinstance(fehler, ConnectionRefusedError):
+        return f"{host}:{port} hat die Verbindung abgelehnt. Stimmen Adresse und Port?"
+
+    if isinstance(fehler, socket.gaierror):
+        return f"{host} ist nicht auflösbar. Stimmt die Schreibweise, und hat der Server einen Namensdienst?"
+
+    return "Der Fehlerbericht konnte nicht versendet werden. Bitte später erneut versuchen."
 
 
 def empfaenger() -> str:
@@ -130,6 +160,8 @@ def sende_bug_report(titel: str, beschreibung: str, bereich: str,
     except (smtplib.SMTPException, OSError) as fehler:
         # Der Fehlertext kann Zugangsdaten enthalten, deshalb nur der Typ
         logger.error(f"Fehlerbericht nicht versendet: {type(fehler).__name__}: {fehler}")
-        raise MailVersandFehlgeschlagen(type(fehler).__name__) from fehler
+        raise MailVersandFehlgeschlagen(
+            _fehlermeldung(fehler, host, port), type(fehler).__name__
+        ) from fehler
 
     logger.info(f"Fehlerbericht von {absender} an {empfaenger()} versendet")
