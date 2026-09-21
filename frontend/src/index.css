@@ -199,12 +199,10 @@
     Dazu naeher heran: das ganze Feld waere auf 375 Pixeln Breite nur ein
     flacher Streifen, der hinter Karte und Zahlenband verschwindet. Bei
     gleichmaessiger Vergroesserung steht stattdessen ein Ausschnitt im Bild -
-    Mittelkreis und Mittellinie - ohne dass sich die Masse aendern. Der
-    Versatz zur Seite haelt die Mittellinie aus den mittig gesetzten Zahlen
-    heraus, die sonst genau auf ihr saessen.
+    Mittelkreis und Mittellinie - ohne dass sich die Masse aendern.
   */
   .spesen-feld > * {
-    transform: rotateX(72deg) scale(2.3) translateX(-11%);
+    transform: rotateX(72deg) scale(2.3);
   }
 }
 
