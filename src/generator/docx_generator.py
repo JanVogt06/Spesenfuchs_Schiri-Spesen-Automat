@@ -314,6 +314,18 @@ class SpesenGenerator:
         # Numerische Spesen fuer die Summenberechnung
         sr_spesen_num, sra_spesen_num = self._spesen_for_match(match_data)
 
+        # Ist schon der SR-Satz unbekannt, ist fuer dieses Spiel gar kein Satz
+        # ermittelt - ueberregional, oder ein Pokal-/Freundschaftsspiel, dessen
+        # Satz von der Spielklasse der Vereine abhaengt. Dann darf auch keine
+        # Summe gedruckt werden: sie bestuende nur aus den Fahrtkosten, saehe
+        # aber wie der Endbetrag aus, und wer die Spesen von Hand nachtraegt,
+        # laesst darunter eine zu niedrige Summe stehen.
+        #
+        # Ein fehlender SRA-Satz bei bekanntem SR-Satz heisst dagegen "kein SRA
+        # vorgesehen" (z.B. Juniorinnen) - dort bleibt die Summe aus
+        # Fahrtkosten und OeVM richtig.
+        saetze_bekannt = sr_spesen_num is not None
+
         # Der km-Satz wird wie die Spesen beim Scrapen eingefroren
         km_satz = match_data.get('km_satz') or KM_SATZ_EURO
 
@@ -345,7 +357,8 @@ class SpesenGenerator:
             # Summe erst, wenn die Person angesetzt ist und ihre Fahrtkosten erfasst sind.
             # Sonst stuende dort ein Betrag, zu dem die Fahrtkosten noch fehlen.
             komponenten = [v for v in (spesen_num, km_kosten, oevm_betrag) if v is not None]
-            summe = round(sum(komponenten), 2) if komponenten and active and erfasst else None
+            berechenbar = komponenten and active and erfasst and saetze_bekannt
+            summe = round(sum(komponenten), 2) if berechenbar else None
             replacements[f'{prefix}_Summe'] = format_spesen(summe) if summe else ''
 
             if active:
@@ -355,7 +368,7 @@ class SpesenGenerator:
                     einzelsummen.append(summe)
 
         # Gesamtsumme ueber alle angesetzten Personen
-        if alle_aktiven_erfasst and einzelsummen:
+        if saetze_bekannt and alle_aktiven_erfasst and einzelsummen:
             replacements['Summe'] = format_spesen(round(sum(einzelsummen), 2))
         else:
             replacements['Summe'] = ''
