@@ -657,6 +657,39 @@ def _migration_011_saison_vollstaendig(conn: sqlite3.Connection) -> None:
         ALTER TABLE season_education ADD COLUMN vollstaendig INTEGER NOT NULL DEFAULT 0;
     """)
 
+def _migration_012_geocode_cache(conn: sqlite3.Connection) -> None:
+    """
+    Zwischenspeicher fuer Adresse -> Koordinate.
+
+    Die Karte im Reiter Fahrtkosten braucht Laengen- und Breitengrade, DFBnet
+    liefert aber nur Klartext-Adressen. Sie werden bei Bedarf einmal beim
+    Geocoder nachgeschlagen und danach hier behalten: dieselbe Spielstaette
+    und dieselben Kollegen tauchen ueber eine Saison hinweg immer wieder auf,
+    und der oeffentliche Nominatim-Dienst darf nicht in Serie befragt werden.
+
+    Zwei Entwurfsentscheidungen:
+
+    1. Der Schluessel enthaelt den Provider. Wer spaeter einen eigenen
+       Geocoder eintraegt, bekommt dessen Ergebnisse - und nicht die des
+       vorherigen Dienstes, die vielleicht anders ausfallen.
+
+    2. Ein Fehlschlag wird als Zeile mit lat/lon NULL festgehalten. Ohne das
+       liefe jeder Aufruf der Karte erneut in dieselbe erfolglose Anfrage.
+       Gesucht wird trotzdem irgendwann wieder: der Geocoder kennt die
+       Adresse vielleicht spaeter (siehe MISS_GUELTIG_TAGE im Geocoder).
+    """
+    _run_script(conn, """
+        CREATE TABLE geocode_cache (
+            anfrage TEXT NOT NULL,
+            provider TEXT NOT NULL,
+            lat REAL,
+            lon REAL,
+            resolved_at TEXT NOT NULL,
+            PRIMARY KEY (anfrage, provider)
+        );
+    """)
+
+
 # (Version, Beschreibung, Funktion) - aufsteigend, Luecken sind nicht erlaubt.
 MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "baseline schema", _migration_001_baseline),
@@ -670,6 +703,7 @@ MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (9, "referee coredata per user", _migration_009_stammdaten),
     (10, "officiated games and season totals", _migration_010_saison),
     (11, "track which seasons are completely stored", _migration_011_saison_vollstaendig),
+    (12, "cache geocoded addresses for the match map", _migration_012_geocode_cache),
 ]
 
 

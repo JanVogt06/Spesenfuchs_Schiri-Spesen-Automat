@@ -58,6 +58,7 @@ from db.database import (
     log_download,
 )
 from db.stammdaten import get_stammdaten
+from utils.geocoder import geocode, GeocoderNichtErreichbar
 from db.season import get_saisons, get_saison
 from api.auth import router as auth_router, get_current_user
 from core.errors import (
@@ -464,6 +465,125 @@ async def save_match_expenses(
         "expenses": aktualisiert['_expenses'],
         "spesen": aktualisiert['_spesen'],
     }
+
+
+# ===== Karte: Anschriften der Angesetzten und der Spielort =====
+
+# Kachel-Quelle der Karte. Voreinstellung ist der Standard-Stil von
+# OpenStreetMap; wer eigene Kacheln ausliefert, setzt beides passend. Die
+# Angabe geht an den Browser, nicht an den Server - die Karte laedt die
+# Kacheln selbst.
+MAP_TILE_URL = os.getenv(
+    "MAP_TILE_URL",
+    "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+)
+MAP_TILE_ATTRIBUTION = os.getenv(
+    "MAP_TILE_ATTRIBUTION",
+    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>-Mitwirkende',
+)
+
+
+def _geo_eintraege(match: dict) -> List[dict]:
+    """Die Anschriften eines Spiels in der Reihenfolge, in der sie auf die Karte sollen."""
+    eintraege = []
+
+    spielstaette = match.get("spielstaette") or {}
+    if spielstaette.get("adresse"):
+        eintraege.append({
+            "typ": "spielstaette",
+            "rolle": "Spielort",
+            "name": spielstaette.get("name") or "Spielstätte",
+            "adresse": spielstaette["adresse"],
+            "ort": None,
+        })
+
+    for person in match.get("schiedsrichter") or []:
+        # Nur besetzte Rollen mit verwertbarer Anschrift. Eine blosse
+        # Strasse ohne Ort waere in ganz Deutschland mehrdeutig.
+        if not person.get("name") or not person.get("plz_ort"):
+            continue
+
+        strasse = (person.get("strasse") or "").strip()
+        plz_ort = person["plz_ort"].strip()
+        eintraege.append({
+            "typ": "person",
+            "rolle": person.get("rolle") or "Unparteiischer",
+            "name": person["name"],
+            "adresse": f"{strasse}, {plz_ort}" if strasse else plz_ort,
+            "ort": plz_ort,
+        })
+
+    return eintraege
+
+
+def _build_geo(match: dict) -> dict:
+    """
+    Loest die Anschriften eines Spiels zu Koordinaten auf.
+
+    Zwei Personen unter derselben Anschrift (Familie im selben Gespann ist
+    keine Seltenheit) wuerden als zwei Pins uebereinander liegen und einander
+    verdecken. Sie werden deshalb zu einem Punkt zusammengefasst, der beide
+    Rollen nennt.
+    """
+    punkte: List[dict] = []
+    ohne_treffer: List[dict] = []
+    nach_koordinate: Dict[tuple, dict] = {}
+    gestoert = False
+
+    for eintrag in _geo_eintraege(match):
+        try:
+            treffer = geocode(eintrag["adresse"], eintrag["ort"])
+        except GeocoderNichtErreichbar:
+            gestoert = True
+            treffer = None
+
+        if not treffer:
+            ohne_treffer.append({
+                "rolle": eintrag["rolle"],
+                "name": eintrag["name"],
+                "adresse": eintrag["adresse"],
+            })
+            continue
+
+        # Auf etwa elf Meter runden: naeher beieinander sind zwei Pins auf
+        # keinem sinnvollen Zoom noch zu unterscheiden.
+        schluessel = (round(treffer["lat"], 4), round(treffer["lon"], 4))
+        vorhanden = nach_koordinate.get(schluessel)
+
+        if vorhanden:
+            vorhanden["eintraege"].append({"rolle": eintrag["rolle"], "name": eintrag["name"]})
+            continue
+
+        punkt = {
+            "typ": eintrag["typ"],
+            "adresse": eintrag["adresse"],
+            "lat": treffer["lat"],
+            "lon": treffer["lon"],
+            "genauigkeit": treffer["genauigkeit"],
+            "eintraege": [{"rolle": eintrag["rolle"], "name": eintrag["name"]}],
+        }
+        nach_koordinate[schluessel] = punkt
+        punkte.append(punkt)
+
+    return {
+        "punkte": punkte,
+        "ohne_treffer": ohne_treffer,
+        "gestoert": gestoert,
+        "kacheln": {"url": MAP_TILE_URL, "attribution": MAP_TILE_ATTRIBUTION},
+    }
+
+
+@app.get("/api/matches/{match_id}/geo")
+async def get_match_geo(match_id: int, current_user: dict = Depends(get_current_user)):
+    """
+    Die Anschriften eines Spiels als Koordinaten fuer die Karte.
+
+    Laeuft im Threadpool: der erste Aufruf zu einem Spiel fragt bis zu vier
+    Adressen beim Geocoder nach, und der haelt einen Mindestabstand zwischen
+    den Anfragen ein. Ab dem zweiten Aufruf kommt alles aus der Datenbank.
+    """
+    match = _owned_match(match_id, current_user['id'])
+    return await run_in_threadpool(_build_geo, match)
 
 
 # ===== Download-Endpunkte: Dokumente entstehen bei jedem Abruf neu =====
