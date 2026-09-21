@@ -69,6 +69,33 @@ SPIELKLASSEN_JUNIOREN_LANDESEBENE = (
 )
 
 
+# Staffelbezeichnungen, an denen ein Spiel ausserhalb des TFV zu erkennen ist.
+# Noetig, weil DFBnet die Spielklasse ueber die Verbandsgrenze hinweg
+# normalisiert: ein Punktspiel in der Altmark steht dort als "Kreisoberliga",
+# ein NOFV-Spiel der C-Junioren als "Landesliga". Erst die Staffel nennt den
+# Wettbewerb beim Namen ("1. Altmark West Liga", "U14-Talente-Spielrunde-
+# Nordost"). Nach §2 Abs. 6 zahlt dort der ausrichtende Verband nach eigenen
+# Pauschalen, die diese Ordnung nicht kennt.
+#
+# Bewusst eine Ausschlussliste. Eine Einschlussliste ist nicht moeglich: eine
+# gewoehnliche Thueringer Staffel heisst schlicht "Kreisliga Staffel 1" und
+# nennt ihren Verband nirgends. Die Liste kann deshalb nie vollstaendig sein -
+# sie nimmt aber immer nur Saetze weg und vergibt nie welche, ein blinder
+# Fleck kostet also hoechstens Abdeckung, nie Richtigkeit.
+STAFFELN_FREMDER_VERBAND = (
+    "nofv", "nordost", "dfb",
+    "sachsen", "altmark", "hessen", "brandenburg", "bayern", "baden",
+    "württemberg", "wuerttemberg", "niedersachsen", "westfalen", "pfalz",
+    "saarland", "bremen", "hamburg", "holstein", "mecklenburg", "berlin",
+    "mittelrhein", "niederrhein", "rheinland",
+)
+
+# Die Verbandskuerzel, die in den Kurzschluesseln von Freundschaftsspielen und
+# Turnieren fuer Thueringen stehen ("FS/H/K-FS/MT/1" = Kreis Mittelthueringen,
+# "FS/AJ/L-FS/TFV/1" = Landesverband). Nur hier ist der Verband strukturiert
+# genug fuer eine Einschlussliste - alles andere in diesem Feld ist Fliesstext.
+VERBANDSKUERZEL_TFV = ("tfv", "mt", "mth", "wt", "nt", "ot", "e-s", "jso", "ntkfa")
+
 PUNKTSPIEL = "punktspiel"
 POKALSPIEL = "pokalspiel"
 FREUNDSCHAFTSSPIEL = "freundschaftsspiel"
@@ -94,13 +121,17 @@ def wettbewerbsart(spielklasse: str) -> str:
     return PUNKTSPIEL
 
 
-def calculate_spesen(spielklasse: str, mannschaftsart: str) -> Tuple[Optional[float], Optional[float]]:
+def calculate_spesen(spielklasse: str, mannschaftsart: str,
+                     staffel: str = "") -> Tuple[Optional[float], Optional[float]]:
     """
     Berechnet SR- und SRA-Spesen gemäß TFV Spesenordnung.
 
     Args:
         spielklasse: Spielklasse aus DFBnet (z.B. "Verbandsliga", "1.Kreisklasse")
         mannschaftsart: Mannschaftsart aus DFBnet (z.B. "Herren", "B-Junioren")
+        staffel: Staffel aus DFBnet (z.B. "1. Altmark West Liga"). Optional,
+            aber ohne sie sind Spiele fremder Landesverbaende nicht zu
+            erkennen - siehe STAFFELN_FREMDER_VERBAND.
 
     Returns:
         Tuple (sr_spesen, sra_spesen) - sra_spesen kann None sein wenn kein SRA vorgesehen
@@ -118,6 +149,10 @@ def calculate_spesen(spielklasse: str, mannschaftsart: str) -> Tuple[Optional[fl
         logger.info(f"Überregionales Spiel (kein TFV): {spielklasse}")
         return (None, None)
 
+    if _ist_fremder_verband(staffel):
+        logger.info(f"Spiel eines anderen Verbandes, §2 Abs. 6: {staffel}")
+        return (None, None)
+
     if wettbewerbsart(spielklasse) != PUNKTSPIEL:
         return _calc_pokal_oder_freundschaft(spielklasse_lower, mannschaftsart_lower)
 
@@ -131,6 +166,29 @@ def calculate_spesen(spielklasse: str, mannschaftsart: str) -> Tuple[Optional[fl
     else:
         logger.warning(f"Unbekannte Mannschaftsart: {mannschaftsart}")
         return (None, None)
+
+
+def _ist_fremder_verband(staffel: str) -> bool:
+    """
+    Prüft, ob die Staffel ein Spiel ausserhalb des TFV bezeichnet.
+
+    Zwei Wege, weil das Feld zwei Formen kennt: Punktspielstaffeln sind
+    Fliesstext ("1. Altmark West Liga") und werden gegen Stichwoerter geprueft,
+    Freundschaftsspiele und Turniere tragen einen Kurzschluessel
+    ("FS/H/K-FS/MT/1", "TU/H/VTUR/WT/1"), dessen vorletztes Feld den Verband
+    oder Kreis nennt und sich deshalb gegen eine Einschlussliste pruefen laesst.
+    """
+    if not staffel:
+        return False
+
+    s = staffel.lower()
+
+    if any(wort in s for wort in STAFFELN_FREMDER_VERBAND):
+        return True
+
+    schluessel = re.match(r"^(?:fs|tu)/[^/]+/[^/]+/([^/]+)/\d+$", s)
+
+    return bool(schluessel) and schluessel.group(1) not in VERBANDSKUERZEL_TFV
 
 
 def _is_ueberregional(spielklasse: str) -> bool:

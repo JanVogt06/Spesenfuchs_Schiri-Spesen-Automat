@@ -282,7 +282,8 @@ class SpesenGenerator:
         spiel_info = match_data.get('spiel_info', {})
         return calculate_spesen(
             spiel_info.get('spielklasse', ''),
-            spiel_info.get('mannschaftsart', '')
+            spiel_info.get('mannschaftsart', ''),
+            spiel_info.get('staffel', '')
         )
 
     def _calculate_spesen_for_match(self, match_data: dict) -> tuple:
