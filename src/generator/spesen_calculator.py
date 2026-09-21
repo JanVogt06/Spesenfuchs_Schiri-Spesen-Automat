@@ -1,8 +1,14 @@
 """
-Spesen Calculator - Berechnet SR/SRA-Spesen für Punktspiele
-Basiert auf TFV Spesenordnung (Stand 01.07.2025), §2 Abs. 2
+Spesen Calculator - Berechnet SR/SRA-Spesen nach der TFV Spesenordnung
+(Stand 01.07.2025), §2.
 
-WICHTIG: Gilt nur für Punktspiele! Pokal- und Freundschaftsspiele haben andere Regelungen.
+Der Rechner ist die EINZIGE Stelle, die entscheidet, ob es fuer ein Spiel
+einen Satz gibt. Frueher galt er nur fuer Punktspiele, waehrend Aufrufer
+getrennt pruefen mussten, ob ein Pokal- oder Freundschaftsspiel vorliegt -
+drei Stellen mit derselben Regel, und die eingefrorenen Saetze in der
+Datenbank waren trotzdem die eines Punktspiels. Jetzt liefert er fuer
+Pokal- und Freundschaftsspiele selbst das Richtige: einen Satz nur dort, wo
+er von der Spielklasse der Beteiligten unabhaengig ist, sonst nichts.
 """
 import re
 from typing import Tuple, Optional
@@ -63,9 +69,34 @@ SPIELKLASSEN_JUNIOREN_LANDESEBENE = (
 )
 
 
+PUNKTSPIEL = "punktspiel"
+POKALSPIEL = "pokalspiel"
+FREUNDSCHAFTSSPIEL = "freundschaftsspiel"
+
+
+def wettbewerbsart(spielklasse: str) -> str:
+    """
+    Ordnet eine DFBnet-Spielklasse einer der drei Wettbewerbsarten zu.
+
+    Einzige Quelle fuer diese Unterscheidung - sie entscheidet sowohl ueber
+    den Spesensatz als auch darueber, welches Kaestchen im Formular
+    angekreuzt wird. Turniere haben im Formular kein eigenes Kaestchen und
+    zaehlen wie der Rest zu den Punktspielen; §2 Abs. 2 fuehrt Turnierserien
+    ausdruecklich dort mit auf.
+    """
+    s = (spielklasse or "").lower()
+
+    if "pokal" in s:
+        return POKALSPIEL
+    if "freundschaft" in s:
+        return FREUNDSCHAFTSSPIEL
+
+    return PUNKTSPIEL
+
+
 def calculate_spesen(spielklasse: str, mannschaftsart: str) -> Tuple[Optional[float], Optional[float]]:
     """
-    Berechnet SR- und SRA-Spesen für Punktspiele gemäß TFV Spesenordnung.
+    Berechnet SR- und SRA-Spesen gemäß TFV Spesenordnung.
 
     Args:
         spielklasse: Spielklasse aus DFBnet (z.B. "Verbandsliga", "1.Kreisklasse")
@@ -86,6 +117,9 @@ def calculate_spesen(spielklasse: str, mannschaftsart: str) -> Tuple[Optional[fl
     if _is_ueberregional(spielklasse_lower):
         logger.info(f"Überregionales Spiel (kein TFV): {spielklasse}")
         return (None, None)
+
+    if wettbewerbsart(spielklasse) != PUNKTSPIEL:
+        return _calc_pokal_oder_freundschaft(spielklasse_lower, mannschaftsart_lower)
 
     # Kategorie bestimmen und entsprechende Berechnung aufrufen
     if _is_maenner(mannschaftsart_lower):
@@ -167,6 +201,51 @@ def _calc_maenner(spielklasse: str, mannschaftsart: str) -> Tuple[Optional[float
         return SPESEN_MAENNER["kreisliga"]
 
     logger.warning(f"Keine Spesen gefunden für Männer: {spielklasse}")
+    return (None, None)
+
+
+def _calc_pokal_oder_freundschaft(spielklasse: str, mannschaftsart: str) -> Tuple[Optional[float], Optional[float]]:
+    """
+    Berechnet Spesen für Pokal- und Freundschaftsspiele gemäß §2 Abs. 3 und 4.
+
+    Beide richten sich nicht nach der Spielklasse des Spiels, sondern nach der
+    der beteiligten Mannschaften: beim Pokal nach der hoechstklassigen
+    ("Die Entschaedigungssaetze richten sich nach der hoechstklassigen am Spiel
+    beteiligten Mannschaft"), beim Freundschaftsspiel nach der des Gastgebers
+    ("Entscheidend ist die aktuelle Spielklasse des Gastgebers"). Beides steht
+    in den Ansetzungsdaten von DFBnet nicht drin - dort ist die Spielklasse
+    "Kreispokal" oder "Kreisfreundschaftsspiele", nicht die Liga der Vereine.
+
+    Deshalb wird hier nur gerechnet, wo das Ergebnis von der Spielklasse der
+    Beteiligten gar nicht abhaengen KANN, weil die Ordnung fuer die
+    Mannschaftsart ohnehin nur einen einzigen Satz kennt. Alles andere bleibt
+    leer: ein leeres Feld traegt der Schiedsrichter in der Kabine selbst nach,
+    ein plausibel aussehender falscher Betrag faellt niemandem auf.
+
+    Die vollstaendige Abdeckung braucht die aktuelle Spielklasse der Vereine
+    aus einer anderen Quelle; bis dahin ist Schweigen die richtige Antwort.
+    """
+    # Juniorinnen: 20 Euro "in allen Spiel- und Altersklassen" (Abs. 2b). Abs. 3
+    # Nr. 2 und Abs. 4 verweisen beide dorthin zurueck, und da die Zeile keine
+    # Klasse unterscheidet, gibt es nichts nachzuschlagen.
+    if "juniorinnen" in mannschaftsart or "mädchen" in mannschaftsart:
+        logger.debug(f"Juniorinnen (klassenunabhängig): {SPESEN_JUNIORINNEN_DEFAULT}")
+        return SPESEN_JUNIORINNEN_DEFAULT
+
+    # Alte Herren auf Kreisebene: "Kreis Alte Herren" ist eine einzige Zeile
+    # fuer jede Kreisstaffel. Wer auch immer im Kreispokal antritt oder
+    # Gastgeber eines Kreisfreundschaftsspiels ist - der Satz ist derselbe.
+    if is_alte_herren(mannschaftsart) and _is_kreisebene(spielklasse):
+        if "kleinfeld" in spielklasse:
+            return SPESEN_ALTE_HERREN_KLEINFELD
+
+        logger.debug(f"Alte Herren Kreisebene (klassenunabhängig): {SPESEN_ALTE_HERREN_KREIS}")
+        return SPESEN_ALTE_HERREN_KREIS
+
+    logger.info(
+        f"Kein klassenunabhängiger Satz für {spielklasse}/{mannschaftsart} - "
+        "Pokal/Freundschaft richtet sich nach der Spielklasse der Vereine"
+    )
     return (None, None)
 
 
