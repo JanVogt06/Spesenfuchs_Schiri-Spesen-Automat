@@ -1,7 +1,7 @@
 import {Button} from '@/components/ui/button';
 import {Card, CardContent} from '@/components/ui/card';
 import {useNavigate} from 'react-router-dom';
-import {ArrowLeft, Shield, Server, Mail, Receipt} from 'lucide-react';
+import {ArrowLeft, Shield, Server, Mail, Receipt, Map as MapIcon} from 'lucide-react';
 
 export function Datenschutz() {
     const navigate = useNavigate();
@@ -70,6 +70,41 @@ export function Datenschutz() {
                         Saison werden bei jedem Abruf vollständig ersetzt und spiegeln damit den
                         aktuellen Stand in DFBnet; abgeschlossene Saisons werden nur einmal gelesen
                         und danach nur noch angefasst, wenn etwas fehlt.
+                    </p>
+                </>
+            ),
+        },
+        {
+            icon: MapIcon,
+            title: 'Karte der Anfahrt',
+            content: (
+                <>
+                    <p className="mb-2 text-sm leading-relaxed text-muted-foreground">
+                        Zu jedem Spiel lässt sich eine Karte mit den Anschriften der angesetzten
+                        Unparteiischen und der Spielstätte anzeigen. Dafür verlassen Daten den
+                        Server – das sind die beiden einzigen Stellen, an denen das geschieht:
+                    </p>
+                    <ul className="list-inside list-disc space-y-1 text-sm text-muted-foreground">
+                        <li>
+                            Um aus einer Anschrift einen Punkt auf der Karte zu machen, wird sie an
+                            einen Geocoding-Dienst geschickt – voreingestellt ist der öffentliche
+                            Dienst von OpenStreetMap (nominatim.openstreetmap.org). Übertragen wird
+                            allein die Adresse, nicht der Name der Person und nicht, zu welchem
+                            Spiel sie gehört. Das Ergebnis wird dauerhaft in der Datenbank
+                            gespeichert, sodass dieselbe Adresse nur ein einziges Mal übermittelt
+                            wird.
+                        </li>
+                        <li>
+                            Die Kartenbilder lädt dein Browser direkt beim Kachelserver von
+                            OpenStreetMap. Dieser erfährt dabei deine IP-Adresse und welchen
+                            Kartenausschnitt du betrachtest – und damit ungefähr, wo die
+                            angezeigten Anschriften liegen.
+                        </li>
+                    </ul>
+                    <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                        Wer den Betrieb selbst übernimmt, kann beides auf einen eigenen Dienst
+                        umstellen; dann verlässt auch dafür nichts mehr den eigenen Server. Wird
+                        die Karte nie geöffnet, wird auch keine Adresse übermittelt.
                     </p>
                 </>
             ),

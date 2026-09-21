@@ -10,7 +10,10 @@ Anwendung auch die eigenen Stammdaten aus DFB.net und zeigt sie im Reiter
 Datenbank. Der Reiter *Saison* zeigt alle geleiteten Spiele je Saison mit
 Ergebnis, Kartenstatistik und Gespann, dazu Einsatzbilanz und Lehrabende.
 Abgeschlossene Saisons werden nur einmal gelesen — erneut geholt werden die
-laufende Saison und jede, deren Bestand unvollständig ist.
+laufende Saison und jede, deren Bestand unvollständig ist. Bei den Fahrtkosten
+eines Spiels liegt eine Karte, die die Anschriften der angesetzten
+Unparteiischen und die Spielstätte zeigt — so ist beim Eintragen der Kilometer
+sichtbar, wer wie weit fährt.
 
 Die Oberfläche hat vier Reiter: *Dashboard* mit der Übersicht, *Spesen* mit den
 Abrechnungen zum Herunterladen, *Saison* und *Stammdaten*.
@@ -74,7 +77,7 @@ neben der Compose-Datei — es übersteht Neustarts und Updates:
 | Pfad | Inhalt |
 | --- | --- |
 | `data/.env` | `JWT_SECRET_KEY` und `ENCRYPTION_KEY` |
-| `data/app.db` | Nutzer, eigene Stammdaten, Spiele, Unparteiische, Fahrtkosten, geleitete Spiele je Saison, Abruf-Protokoll, Login- und Download-Log |
+| `data/app.db` | Nutzer, eigene Stammdaten, Spiele, Unparteiische, Fahrtkosten, geleitete Spiele je Saison, aufgelöste Adressen der Karte, Abruf-Protokoll, Login- und Download-Log |
 
 Erzeugte Dokumente werden nicht gespeichert: sie entstehen bei jedem Download
 neu aus den Daten in `app.db`. Ein Backup der Datenbank ist damit ein
@@ -109,6 +112,36 @@ Zwei Stellschrauben für den Download-Pfad: `PDF_MAX_CONCURRENCY` (Standard 2)
 begrenzt, wie viele LibreOffice-Prozesse gleichzeitig laufen dürfen — jeder
 belegt 150–300 MB. `MAX_BULK_DOWNLOAD` (Standard 50) begrenzt, wie viele Spiele
 in einem ZIP stecken dürfen.
+
+## Karte
+
+Die Karte bei den Fahrtkosten braucht Koordinaten, DFBnet liefert aber nur
+Anschriften im Klartext. Sie werden beim ersten Öffnen einer Karte einmalig
+aufgelöst und danach dauerhaft in `app.db` behalten — dieselbe Spielstätte und
+dieselben Kollegen tauchen über eine Saison hinweg immer wieder auf, sodass es
+insgesamt bei einer Handvoll Abfragen bleibt. Wird nie eine Karte geöffnet,
+wird auch nie eine Adresse verschickt.
+
+Voreingestellt sind die öffentlichen Dienste von OpenStreetMap. Beide lassen
+sich auf eine eigene Instanz umstellen:
+
+| Variable | Standard | Zweck |
+| --- | --- | --- |
+| `NOMINATIM_URL` | `https://nominatim.openstreetmap.org` | Adresse → Koordinate |
+| `GEOCODER_MIN_INTERVAL` | `1.0` | Mindestabstand zwischen zwei Abfragen in Sekunden |
+| `MAP_TILE_URL` | `https://tile.openstreetmap.org/{z}/{x}/{y}.png` | Kartenbilder, vom Browser geladen |
+| `MAP_TILE_ATTRIBUTION` | OpenStreetMap-Mitwirkende | Quellenangabe in der Karte |
+
+Der Mindestabstand hält die Nutzungsbedingungen des öffentlichen Nominatim ein
+(eine Abfrage pro Sekunde aus einem einzelnen Strang). Wer selbst hostet, darf
+ihn herunterdrehen.
+
+Ein eigener Geocoder lohnt sich für diese Datenmenge kaum: ein Nominatim mit
+ganz Deutschland belegt 50–108 GB und importiert stundenlang, ein
+Photon-Index für Deutschland sind 9 GB Download. Dem stehen geschätzt hundert
+Abfragen über die Lebensdauer eines Kontos gegenüber. Wer es dennoch will,
+setzt `NOMINATIM_URL` auf den eigenen Dienst — im Code ändert sich nichts, und
+zu einem anderen Dienst aufgelöste Adressen werden getrennt gespeichert.
 
 ## Aktualisieren
 
