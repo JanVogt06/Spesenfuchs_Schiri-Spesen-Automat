@@ -208,7 +208,7 @@ export function Anfahrtskarte({dunkel = false, beschriftet = true, className}: {
     const weg = dunkel ? 'stroke-flutlicht/80' : 'stroke-primary/80';
     const haupt = dunkel ? 'fill-flutlicht' : 'fill-primary';
     const neben = dunkel ? 'fill-white/70' : 'fill-foreground/55';
-    const schrift = dunkel ? 'fill-white/75' : 'fill-foreground/70';
+    const schrift = dunkel ? 'fill-white/75 stroke-nacht' : 'fill-foreground/70 stroke-card';
 
     return (
         <svg viewBox="0 0 240 140" fill="none" aria-hidden className={className}>
@@ -239,10 +239,10 @@ export function Anfahrtskarte({dunkel = false, beschriftet = true, className}: {
             <Nadel x={214} y={118} className={neben}/>
 
             {beschriftet && (
-                <g fontSize="9" fontWeight="600" className={schrift}>
-                    <text x="50" y="112">SR</text>
+                <g fontSize="9" fontWeight="600" strokeWidth="3" strokeLinejoin="round" paintOrder="stroke" className={schrift}>
+                    <text x="40" y="131" textAnchor="middle">SR</text>
                     <text x="68" y="28">SRA 1</text>
-                    <text x="176" y="112" textAnchor="end">SRA 2</text>
+                    <text x="214" y="131" textAnchor="middle">SRA 2</text>
                     <text x="153" y="97" textAnchor="middle">Spielstätte</text>
                 </g>
             )}
@@ -356,27 +356,38 @@ export function Saisontafel() {
     );
 }
 
+/*
+ * Die hellen Belege stehen in Kacheln von fester Hoehe, die als @container
+ * ausgezeichnet sind (siehe Funktionskachel in Landing.tsx). Wird eine Kachel
+ * schmaler als 13rem - am Handy mit 320 px -, ruecken die Belege per zoom ein
+ * Stueck zusammen, statt umzubrechen und unten aus der Kachel zu laufen.
+ */
+const SCHMAL = '@max-[13rem]:[zoom:0.85]';
+
 /** Ein Pokalspiel und wie der Satz dazu zustande kommt */
 export function Ligenauszug() {
     return (
-        <div aria-hidden className="w-full rounded-xl border bg-card p-3 text-xs shadow-sm">
-            <div className="flex items-center justify-between text-muted-foreground">
+        <div aria-hidden className={`w-full max-w-[20rem] rounded-xl border bg-card p-3 text-xs shadow-sm ${SCHMAL}`}>
+            <div className="flex items-center justify-between gap-3 text-muted-foreground">
                 <span className="font-medium text-foreground">Landespokal</span>
-                <span>TSV Musterdorf – SV Grün-Weiß</span>
+                <span className="tabular-nums">Mi 26.11.</span>
             </div>
-            <div className="mt-2.5 grid gap-1">
-                <div className="flex items-center justify-between rounded-md px-2 py-1">
+            <div className="mt-2 grid gap-0.5 whitespace-nowrap">
+                <div className="flex items-center justify-between gap-2 rounded-md px-2 py-[3px]">
                     <span>TSV Musterdorf</span>
                     <span className="text-muted-foreground">Landesklasse</span>
                 </div>
-                <div className="flex items-center justify-between rounded-md bg-primary/10 px-2 py-1">
+                <div className="flex items-center justify-between gap-2 rounded-md bg-primary/10 px-2 py-[3px]">
                     <span className="font-medium">SV Grün-Weiß</span>
                     <span className="font-medium text-primary">Thüringenliga</span>
                 </div>
             </div>
-            <div className="mt-2.5 flex items-center justify-between border-t pt-2">
-                <span className="text-muted-foreground">höchste Klasse zählt</span>
-                <span className="font-semibold text-primary tabular-nums">50,00 € / 40,00 €</span>
+            <div className="mt-2 border-t pt-1.5">
+                <p className="text-muted-foreground">höchste Klasse zählt</p>
+                <p className="flex items-center justify-between gap-2 whitespace-nowrap">
+                    <span className="text-muted-foreground">SR / SRA</span>
+                    <span className="font-semibold text-primary tabular-nums">50,00 € / 40,00 €</span>
+                </p>
             </div>
         </div>
     );
@@ -394,16 +405,16 @@ function Stammzeile({name, children}: { name: string; children: React.ReactNode 
 /** Ausschnitt aus dem Reiter "Stammdaten" - ohne Namen, die Angaben verdeckt */
 export function Stammdatenauszug() {
     return (
-        <div aria-hidden className="w-full rounded-xl border bg-card p-3 text-xs shadow-sm">
+        <div aria-hidden className={`w-full max-w-[20rem] rounded-xl border bg-card p-3 text-xs shadow-sm ${SCHMAL}`}>
             <div className="flex items-center gap-3">
                 <span className="grid size-9 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground">
                     <User className="size-4"/>
                 </span>
-                <div className="grid gap-1.5">
-                    <span className="h-2 w-24 rounded-full bg-foreground/15"/>
-                    <span className="h-2 w-16 rounded-full bg-foreground/10"/>
+                <div className="grid min-w-0 flex-1 gap-1.5">
+                    <span className="h-2 w-full max-w-24 rounded-full bg-foreground/15"/>
+                    <span className="h-2 w-2/3 max-w-16 rounded-full bg-foreground/10"/>
                 </div>
-                <span className="ml-auto inline-flex items-center gap-1 text-muted-foreground">
+                <span className="inline-flex shrink-0 items-center gap-1 text-muted-foreground">
                     <Lock className="size-3"/>
                     verschlüsselt
                 </span>
@@ -437,8 +448,8 @@ function Blatt({endung, vorne}: { endung: string; vorne?: boolean }) {
                 <span className="h-1 w-6 rounded-full bg-foreground/10"/>
             </div>
             <span
-                className={`absolute right-1.5 bottom-1.5 left-1.5 rounded px-1 py-0.5 text-center text-[9px] font-semibold tracking-wide ${
-                    vorne ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                className={`absolute bottom-1.5 left-1.5 rounded px-1 py-0.5 text-center text-[9px] font-semibold tracking-wide ${
+                    vorne ? 'right-1.5 bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
                 }`}
             >
                 {endung}
@@ -447,15 +458,18 @@ function Blatt({endung, vorne}: { endung: string; vorne?: boolean }) {
     );
 }
 
-/** Word und PDF je Spiel, alles zusammen als ZIP */
+/**
+ * Word und PDF je Spiel, alles zusammen als ZIP. Wird die Kachel zu schmal,
+ * rutscht das ZIP unter die Blaetter, statt in zwei Zeilen umzubrechen.
+ */
 export function Dokumente() {
     return (
-        <div aria-hidden className="flex w-full items-center justify-center gap-6">
-            <div className="flex items-end pl-5">
+        <div aria-hidden className="flex w-full flex-wrap items-center justify-center gap-x-5 gap-y-3">
+            <div className="flex items-end">
                 <Blatt endung="DOCX"/>
                 <Blatt endung="PDF" vorne/>
             </div>
-            <span className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-xs font-medium shadow-sm">
+            <span className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-xs font-medium whitespace-nowrap shadow-sm">
                 <FileArchive className="size-3.5 text-primary"/>
                 Alle als ZIP
             </span>

@@ -789,7 +789,9 @@ function Funktionskachel({funktion}: { funktion: Funktion }) {
             onMouseMove={zeigerBewegt}
             className="spesen-glanz spesen-kachel group relative isolate flex h-full flex-col overflow-hidden rounded-2xl border bg-card p-4 transition duration-300 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5 motion-safe:hover:-translate-y-1 sm:p-5"
         >
-            <div className="relative flex h-40 items-center justify-center overflow-hidden rounded-xl border bg-muted/40 p-3 dark:bg-white/[0.025]">
+            {/* @container: die Belege richten sich nach der Breite der Kachel,
+                nicht nach der des Fensters (siehe SCHMAL in Schaufenster.tsx) */}
+            <div className="@container relative flex h-44 items-center justify-center overflow-hidden rounded-xl border bg-muted/40 p-3 dark:bg-white/[0.025]">
                 {funktion.bild}
             </div>
             <div className="relative mt-4 px-1">
@@ -803,8 +805,9 @@ function Funktionskachel({funktion}: { funktion: Funktion }) {
 }
 
 /**
- * Die Funktionen als Aufstellung. Ab sm ein Raster in 2 + 1 + 1 und
- * 1 + 1 + 2, dunkel oben links und unten rechts. Am Handy stehen die zwei
+ * Die Funktionen als Aufstellung. Ab xl ein Raster in 2 + 1 + 1 und
+ * 1 + 1 + 2, dunkel oben links und unten rechts; zwischen sm und xl zwei
+ * Spalten, in vier waeren die hellen Kacheln dort zu schmal fuer ihre Belege. Am Handy stehen die zwei
  * dunklen Kacheln breit, die vier hellen dazwischen in einer Reihe zum
  * Wischen - sechs gestapelte Kaesten waeren fast zwei Bildschirme Scrollen.
  * Ab sm loest sich die Reihe per display: contents ins Raster auf.
@@ -839,7 +842,7 @@ function Aufstellung() {
                     </p>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <div data-reveal className="sm:col-span-2">
                         <LaufKachel/>
                     </div>
