@@ -251,10 +251,11 @@ export function Anfahrtschip() {
             className="overflow-hidden rounded-2xl border border-white/15 bg-[oklch(0.2_0.03_158)] text-white shadow-2xl shadow-black/60"
         >
             <Anfahrtskarte dunkel beschriftet={false} className="block h-auto w-full bg-[oklch(0.17_0.025_158)]"/>
-            <div className="flex items-center gap-2 border-t border-white/10 px-3 py-2 text-[11px]">
+            {/* Rechtsbuendig: links schiebt sich im Hero die Abrechnung darueber */}
+            <div className="flex items-center justify-end gap-2 border-t border-white/10 px-3 py-2 text-[11px]">
                 <Route className="size-3.5 text-flutlicht"/>
                 <span className="text-white/70">Anfahrt SR</span>
-                <span className="ml-auto font-medium text-white tabular-nums">42 km</span>
+                <span className="font-medium text-white tabular-nums">42 km</span>
             </div>
         </div>
     );

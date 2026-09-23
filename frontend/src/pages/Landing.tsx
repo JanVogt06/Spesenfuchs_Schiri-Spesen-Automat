@@ -383,6 +383,13 @@ function Kopfzeile({angemeldet, heroRef}: { angemeldet: boolean; heroRef: RefObj
  * vorne die fertige Abrechnung, daneben die Karte zur Anfahrt. Die Ebenen
  * verschieben sich leicht gegeneinander, wenn der Mauszeiger sich bewegt -
  * gesteuert ueber --zx/--zy am Rahmen, damit React dafuer nicht neu rendert.
+ *
+ * Die Abrechnung haengt oben an einer festen Hoehe statt unten am Rahmen:
+ * ihre Oberkante liegt so knapp unter der Trennlinie nach der zweiten
+ * Ansetzung (Kopf 38 px, Zeilen je 54 px, also bei 146 px), dass sie auch
+ * beim Schweben keine Zeile mitten durch den Text schneidet. Zwischen lg und
+ * xl ist die Spalte zu schmal fuer drei Ebenen - dort entfaellt die Karte
+ * und die Abrechnung wird breiter.
  */
 function Buehne({rahmen}: { rahmen: RefObject<HTMLDivElement | null> }) {
     const ebene = (tiefe: number): CSSProperties => ({
@@ -392,7 +399,7 @@ function Buehne({rahmen}: { rahmen: RefObject<HTMLDivElement | null> }) {
     return (
         <div
             ref={rahmen}
-            className="relative mx-auto h-[31rem] w-full max-w-[40rem] select-none [perspective:1400px]"
+            className="relative mx-auto h-[30rem] w-full max-w-[40rem] select-none [perspective:1400px]"
         >
             <div
                 className="absolute inset-0 transition-transform duration-500 ease-out"
@@ -402,13 +409,13 @@ function Buehne({rahmen}: { rahmen: RefObject<HTMLDivElement | null> }) {
                     <Spieleliste/>
                 </div>
 
-                <div className="absolute right-0 bottom-3 z-10 w-[34%] transition-transform duration-500 ease-out" style={ebene(22)}>
+                <div className="absolute right-0 bottom-3 z-10 w-[34%] transition-transform duration-500 ease-out lg:max-xl:hidden" style={ebene(22)}>
                     <div className="spesen-schweben" style={{animationDelay: '-3s'}}>
                         <Anfahrtschip/>
                     </div>
                 </div>
 
-                <div className="absolute bottom-0 left-0 z-20 w-[72%] transition-transform duration-500 ease-out" style={ebene(10)}>
+                <div className="absolute top-[9.5rem] left-0 z-20 w-[72%] transition-transform duration-500 ease-out lg:max-xl:w-[82%]" style={ebene(10)}>
                     <div className="spesen-schweben">
                         <Abrechnungskarte/>
                     </div>
