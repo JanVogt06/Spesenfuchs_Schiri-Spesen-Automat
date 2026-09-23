@@ -1205,11 +1205,15 @@ class DFBScraper:
         Bewusst aus dem Auswahlfeld gelesen und nirgends fest hinterlegt: wie
         weit die Liste zurückreicht, hängt daran, seit wann jemand pfeift.
         """
-        dropdowns = self._spiele_dropdowns()
-        if not dropdowns:
-            raise Exception("Kein Saison-Auswahlfeld gefunden")
+        # Die Eintraege kommen erst mit der Saisonliste. Ohne Warten ergab
+        # ein langsames DFBnet eine leere Liste - und still gar keine Saison.
+        auswahl = self._spiele_karte().locator('dfb-dropdown-input').first
+        try:
+            auswahl.locator('button.dropdown-item').first.wait_for(state="attached", timeout=30000)
+        except Exception as e:
+            raise Exception(f"Kein Saison-Auswahlfeld mit Eintraegen gefunden: {e}") from e
 
-        return self._dropdown_optionen(dropdowns[0])
+        return self._dropdown_optionen(auswahl)
 
     def extract_saison_bilanz(self, saison: str, timeout_ms: int = 45000) -> dict:
         """
@@ -1359,6 +1363,7 @@ class DFBScraper:
             Tuple (zeilen, treffer, benutzte_seitengroesse)
         """
         zeilen, treffer = [], None
+        gelesen = False
 
         for groesse in self._SEITENGROESSEN:
             if groesse != aktuelle_groesse:
@@ -1373,10 +1378,8 @@ class DFBScraper:
                     logger.warning(f"Seitengroesse {groesse} nicht setzbar: {e}")
                     continue
 
-            zeilen, treffer = self._warte_auf_spieltabelle(kennung, seitengroesse=groesse)
-
-            if treffer is not None and treffer > groesse:
-                zeilen = self._blaettere_durch(zeilen, treffer, groesse)
+            zeilen, treffer = self._lies_seiten(kennung, groesse)
+            gelesen = True
 
             if treffer is not None and len(zeilen) == treffer:
                 return zeilen, treffer, aktuelle_groesse
@@ -1386,7 +1389,32 @@ class DFBScraper:
                 f"{treffer} Spielen - versuche eine kleinere Seitengroesse"
             )
 
+        # Liess sich keine einzige Seitengroesse setzen - etwa weil DFBnet die
+        # Beschriftung aendert -, wird mit der eingestellten gelesen, statt
+        # die Saison gar nicht erst anzusehen.
+        if not gelesen:
+            eingestellt = self._eingestellte_seitengroesse()
+            logger.warning(f"Saison {saison}: lese mit der eingestellten Seitengroesse {eingestellt}")
+            zeilen, treffer = self._lies_seiten(kennung, eingestellt)
+
         return zeilen, treffer, aktuelle_groesse
+
+    def _lies_seiten(self, kennung, groesse: int):
+        """Liest die erste Seite und blaettert, wenn die Saison laenger ist."""
+        zeilen, treffer = self._warte_auf_spieltabelle(kennung, seitengroesse=groesse)
+
+        if treffer is not None and treffer > groesse:
+            zeilen = self._blaettere_durch(zeilen, treffer, groesse)
+
+        return zeilen, treffer
+
+    def _eingestellte_seitengroesse(self) -> int:
+        """Die Seitengroesse, die die Tabelle gerade zeigt - im Zweifel 100."""
+        try:
+            wert = self._dropdown_wert(self._spiele_dropdowns()[-1])
+            return int(wert.split()[0])
+        except Exception:
+            return 100
 
     def scrape_saisons(self, progress_callback=None, ueberspringen=None) -> dict:
         """
