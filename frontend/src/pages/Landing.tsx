@@ -739,19 +739,26 @@ function Kachelkopf({icon: Icon, title, hell}: { icon: LucideIcon; title: string
     );
 }
 
-/** Die Nacht-Kachel mit der Uhr: der Lauf um 3 Uhr */
+/**
+ * Die Nacht-Kachel mit der Uhr: der Lauf um 3 Uhr. Am Handy steht die Uhr
+ * klein neben der Ueberschrift, damit der Text die ganze Breite bekommt -
+ * daneben gequetscht brach er bei 320 px in acht Zeilen um.
+ */
 function LaufKachel() {
     return (
-        <NachtFlaeche className="flex items-center gap-5 sm:gap-8">
+        <NachtFlaeche className="flex items-center gap-8">
             <div className="relative min-w-0 flex-1">
-                <Kachelkopf icon={MoonStar} title="Läuft, während du schläfst" hell/>
+                <div className="flex items-center justify-between gap-3">
+                    <Kachelkopf icon={MoonStar} title="Läuft, während du schläfst" hell/>
+                    <Nachtuhr className="size-14 shrink-0 sm:hidden"/>
+                </div>
                 <p className="mt-3 max-w-md text-sm leading-relaxed text-white/65">
                     Jede Nacht um 3 Uhr holt Spesenfuchs deine neuen Ansetzungen aus DFBnet und legt die
                     Abrechnungen an. Eilig? Dann startest du den Abruf selbst.
                 </p>
             </div>
-            <div className="relative flex shrink-0 flex-col items-center gap-2">
-                <Nachtuhr className="size-20 sm:size-28"/>
+            <div className="relative hidden shrink-0 flex-col items-center gap-2 sm:flex">
+                <Nachtuhr className="size-28 lg:size-36"/>
                 <span className="text-[11px] tracking-wide text-white/55 tabular-nums">03:00 Uhr</span>
             </div>
         </NachtFlaeche>
