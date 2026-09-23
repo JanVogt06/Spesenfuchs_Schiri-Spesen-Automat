@@ -463,7 +463,7 @@ function Anzeigetafel() {
         <div ref={tafel} className="relative border-t border-white/10 bg-[oklch(0.145_0.026_158/0.88)]">
             <div className={`${RAHMEN} grid ${felder.length === 3 ? 'grid-cols-3' : 'grid-cols-2'} divide-x divide-white/10`}>
                 {felder.map((feld) => (
-                    <div key={feld.kurz} className="px-1 py-4 text-center sm:py-7">
+                    <div key={feld.kurz} className="px-1 py-4 text-center sm:py-7 lg:py-5">
                         <p className="spesen-leuchtziffer text-2xl font-semibold tracking-tight text-flutlicht tabular-nums sm:text-4xl lg:text-5xl">
                             {feld.wert}
                         </p>
@@ -591,7 +591,7 @@ function Hero({angemeldet, heroRef, ctaRef}: {
             <div aria-hidden className="spesen-strahl spesen-flutlicht pointer-events-none absolute inset-0"/>
             <div aria-hidden className="spesen-koerner pointer-events-none absolute inset-0"/>
 
-            <div className={`${RAHMEN} relative grid flex-1 items-center gap-12 pt-24 pb-12 sm:pt-32 md:gap-14 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.02fr)] lg:content-center lg:gap-10 lg:pt-24 lg:pb-14 xl:gap-16`}>
+            <div className={`${RAHMEN} relative grid flex-1 items-center gap-12 pt-24 pb-12 sm:pt-32 md:gap-14 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.02fr)] lg:content-center lg:gap-10 lg:pt-20 lg:pb-10 xl:gap-16`}>
                 <div className="text-center lg:text-left">
                     <p
                         className="spesen-aufsteigen mb-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-medium text-white/80 backdrop-blur"
