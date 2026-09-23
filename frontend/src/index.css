@@ -375,6 +375,29 @@
 }
 
 /*
+  Innenrahmen der Landingpage (RAHMEN in Landing.tsx). Mit viewport-fit=cover
+  reicht die Seite am iPhone quer bis unter die Kamera-Aussparung; der Rand
+  waechst dann auf die sicheren Raender mit.
+*/
+.spesen-rahmen {
+  --spesen-rand: 1rem;
+  padding-left: max(var(--spesen-rand), env(safe-area-inset-left));
+  padding-right: max(var(--spesen-rand), env(safe-area-inset-right));
+}
+
+@media (min-width: 640px) {
+  .spesen-rahmen {
+    --spesen-rand: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .spesen-rahmen {
+    --spesen-rand: 2.5rem;
+  }
+}
+
+/*
   Grundschrift und Grund hinter der Seite, solange die Landingpage offen ist
   (siehe useStartseitenRahmen in Landing.tsx). Die Anwendung selbst behaelt
   am Handy ihre 14px.

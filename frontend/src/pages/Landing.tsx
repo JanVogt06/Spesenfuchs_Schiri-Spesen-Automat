@@ -63,8 +63,12 @@ const QUELLE = (
     </span>
 );
 
-/** Innenrahmen aller Abschnitte, damit die Kanten untereinander fluchten */
-const RAHMEN = 'mx-auto w-full max-w-[90rem] px-4 sm:px-6 lg:px-10';
+/**
+ * Innenrahmen aller Abschnitte, damit die Kanten untereinander fluchten. Den
+ * seitlichen Rand setzt .spesen-rahmen (1rem, ab sm 1.5rem, ab lg 2.5rem),
+ * am iPhone quer mindestens so breit wie die sicheren Raender.
+ */
+const RAHMEN = 'spesen-rahmen mx-auto w-full max-w-[90rem]';
 
 interface Funktion {
     icon: LucideIcon;
@@ -587,8 +591,8 @@ function Satzband() {
             </div>
 
             {/* ab sm */}
-            <div className="hidden items-stretch sm:flex">
-                <p className="flex shrink-0 items-center border-r border-white/10 px-6 text-xs font-medium text-white/60 lg:px-10">
+            <div className="hidden items-stretch pr-[env(safe-area-inset-right)] sm:flex">
+                <p className="flex shrink-0 items-center border-r border-white/10 pr-6 pl-[max(1.5rem,env(safe-area-inset-left))] text-xs font-medium text-white/60 lg:pr-10 lg:pl-10">
                     {QUELLE}
                 </p>
                 <div className="relative min-w-0 flex-1 overflow-hidden py-3">
@@ -1303,6 +1307,12 @@ function Anpfiffleiste({angemeldet, sichtbar}: { angemeldet: boolean; sichtbar: 
  * fuer eine Seite, die einladen soll, ist das zu klein), der Nacht-Ton als
  * Grund hinter der Seite (sonst blitzt beim Ueberscrollen auf iOS Weiss ueber
  * dem dunklen Hero auf) und die passende Farbe fuer die Browserleiste.
+ *
+ * Dazu viewport-fit=cover: erst damit meldet das iPhone seine sicheren
+ * Raender (env(safe-area-inset-*)), und die Anpfiff-Leiste rueckt ueber den
+ * Home-Balken. Nur hier, nicht in index.html - die Anwendung rechnet nicht
+ * mit diesen Raendern und liefe quer sonst unter die Kamera-Aussparung. Die
+ * Landingpage selbst haelt sie ueber .spesen-rahmen frei.
  */
 const THEMEFARBE = '#05130b';
 
@@ -1320,8 +1330,17 @@ function useStartseitenRahmen() {
         }
         meta.content = THEMEFARBE;
 
+        const viewport = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
+        const viewportVorher = viewport?.content;
+        if (viewport && !viewport.content.includes('viewport-fit')) {
+            viewport.content = `${viewport.content}, viewport-fit=cover`;
+        }
+
         return () => {
             wurzel.classList.remove('spesen-startseite');
+            if (viewport && viewportVorher !== undefined) {
+                viewport.content = viewportVorher;
+            }
             if (vorher === null) {
                 meta.remove();
             } else {
