@@ -181,6 +181,10 @@
   transform-origin: 50% 100%;
   -webkit-mask-image: linear-gradient(to top, black 12%, transparent 88%);
   mask-image: linear-gradient(to top, black 12%, transparent 88%);
+  /* Der Rasen ragt oben ueber die Ebene hinaus (siehe .spesen-rasen); ohne
+     no-repeat wiederholte sich die Maske dort und liesse ihn durchscheinen. */
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
 }
 
 /*
@@ -209,17 +213,25 @@
 /*
   Gemaehter Rasen: senkrechte Bahnen wie nach dem Maehen, quer dazu Linien,
   die langsam auf den Betrachter zulaufen.
+
+  Bewegt wird die ganze Flaeche per transform, nicht das Hintergrundbild:
+  background-position zwingt den Browser, jedes Bild neu zu zeichnen - auf
+  schwachen Handys kostet das Akku und Scrollruhe, nur fuer Dekoration. Die
+  Flaeche ist dafuer eine Linienweite hoeher und laeuft genau um diese Weite,
+  so dass der Sprung am Ende unsichtbar bleibt.
 */
 .spesen-rasen {
+  top: -5rem;
   background-image:
     repeating-linear-gradient(90deg, oklch(1 0 0 / 0.04) 0 5rem, transparent 5rem 10rem),
     repeating-linear-gradient(0deg, oklch(1 0 0 / 0.05) 0 1px, transparent 1px 5rem);
   animation: spesen-rasen 8s linear infinite;
+  will-change: transform;
 }
 
 @keyframes spesen-rasen {
-  from { background-position: 0 0, 0 0; }
-  to   { background-position: 0 0, 0 5rem; }
+  from { transform: translateY(0); }
+  to   { transform: translateY(5rem); }
 }
 
 /*
