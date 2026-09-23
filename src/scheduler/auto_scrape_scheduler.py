@@ -37,7 +37,7 @@ def run_scrape_for_user(user_id: int, email: str, dfb_username: str, dfb_passwor
     process_logger = setup_logger("auto_scheduler_worker")
 
     try:
-        process_logger.info(f"[User {user_id}] Starte Abruf für {email}")
+        process_logger.info(f"[User {user_id}] Starte Abruf")
         update_run(run_id, status="scraping", step="DFB Scraping...")
 
         def fortschritt(current, total, step):

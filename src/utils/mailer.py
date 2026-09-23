@@ -164,4 +164,4 @@ def sende_bug_report(titel: str, beschreibung: str, bereich: str,
             _fehlermeldung(fehler, host, port), type(fehler).__name__
         ) from fehler
 
-    logger.info(f"Fehlerbericht von {absender} an {empfaenger()} versendet")
+    logger.info(f"Fehlerbericht an {empfaenger()} versendet")

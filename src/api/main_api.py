@@ -323,7 +323,7 @@ async def generate_spesen(
     scrape_runs, die das Frontend pollt, und danach Spiele in der Datenbank.
     """
     user_id = current_user['id']
-    logger.info(f"User {current_user['email']} startet Abruf")
+    logger.info(f"[User {user_id}] startet Abruf")
 
     from db.database import get_dfb_credentials
     from core.encryption import decrypt_credential
@@ -790,7 +790,7 @@ async def trigger_scheduler_now(current_user: dict = Depends(get_current_user)):
                        "Der manuelle Sammel-Abruf ist abgeschaltet. "
                        "Zum Freigeben ALLOW_SCHEDULER_TRIGGER=1 setzen.")
 
-    logger.warning(f"Manueller Scheduler-Trigger durch User {current_user['email']}")
+    logger.warning(f"Manueller Scheduler-Trigger durch User {current_user['id']}")
 
     scheduler = get_scheduler()
     asyncio.create_task(scheduler.scrape_all_users())
