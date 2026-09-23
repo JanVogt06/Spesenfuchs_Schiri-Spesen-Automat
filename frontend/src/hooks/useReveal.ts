@@ -54,6 +54,44 @@ export function useRevealOnScroll(): void {
 }
 
 /**
+ * Ob ein Element gerade im Fenster steht.
+ *
+ * `rand` verschiebt die Grenze wie rootMargin beim IntersectionObserver,
+ * z.B. '-56px 0px 0px 0px', damit eine feste Kopfzeile nicht mitzaehlt. Mit
+ * `einmal` bleibt der Wert nach dem ersten Sichtbarwerden auf true stehen.
+ * Ohne Beobachter im Browser gilt das Element als sichtbar - was davon
+ * abhaengt, soll dann lieber einfach da sein.
+ */
+export function useImBild<T extends Element>(
+    ref: RefObject<T | null>,
+    {rand = '0px', einmal = false, anfang = true}: { rand?: string; einmal?: boolean; anfang?: boolean } = {},
+): boolean {
+    const [imBild, setImBild] = useState(anfang);
+
+    useEffect(() => {
+        const element = ref.current;
+        if (!element || !('IntersectionObserver' in window)) {
+            return;
+        }
+
+        const beobachter = new IntersectionObserver(
+            ([eintrag]) => {
+                setImBild(eintrag.isIntersecting);
+                if (einmal && eintrag.isIntersecting) {
+                    beobachter.disconnect();
+                }
+            },
+            {rootMargin: rand},
+        );
+
+        beobachter.observe(element);
+        return () => beobachter.disconnect();
+    }, [ref, rand, einmal]);
+
+    return imBild;
+}
+
+/**
  * Wie weit ein Bereich durch das Fenster gewandert ist, von 0 bis 1.
  *
  * 0, solange seine Oberkante noch im unteren Fuenftel steht, 1, sobald seine
