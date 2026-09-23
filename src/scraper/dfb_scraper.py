@@ -247,7 +247,9 @@ class DFBScraper:
             # Update page reference
             self.page = new_page
 
-            logger.info(f"Neue Seite geöffnet: {self.page.url}")
+            # Ohne Query: nach dem Anmelde-Ruecksprung kann dort ein
+            # Autorisierungscode stehen, und das Protokoll liegt auf der Platte.
+            logger.info(f"Neue Seite geöffnet: {self.page.url.split('?')[0]}")
             logger.info("Erfolgreich zu Eigene Daten navigiert")
 
         except Exception as e:
