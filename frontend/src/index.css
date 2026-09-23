@@ -364,6 +364,16 @@
   );
 }
 
+/* Im dunklen Theme laeuft der Nacht-Ton selbst weich aus - ein heller
+   Schein darunter machte die Kante erst sichtbar. */
+.dark .spesen-uebergang {
+  background-image: linear-gradient(
+    to bottom,
+    color-mix(in oklab, var(--nacht) 85%, transparent),
+    transparent 16rem
+  );
+}
+
 /*
   Grundschrift und Grund hinter der Seite, solange die Landingpage offen ist
   (siehe useStartseitenRahmen in Landing.tsx). Die Anwendung selbst behaelt
@@ -372,6 +382,26 @@
 html.spesen-startseite {
   font-size: 16px;
   background-color: var(--nacht);
+}
+
+/*
+  Dunkles Theme der Landingpage: die Flaechen zwischen den Nacht-Bloecken
+  bekommen einen Hauch Rasengruen, statt neutral grau zu werden. So wirkt die
+  ganze Seite wie ein Abendspiel und nicht wie gruener Kopf, graue Mitte.
+  Die Tokens gelten nur hier; die Anwendung bleibt unberuehrt.
+*/
+.dark .spesen-landing {
+  --background: oklch(0.155 0.014 158);
+  --card: oklch(0.195 0.018 158);
+  --popover: oklch(0.195 0.018 158);
+  --muted: oklch(0.25 0.018 158);
+  --secondary: oklch(0.25 0.018 158);
+  --accent: oklch(0.25 0.018 158);
+  --border: oklch(0.9 0.05 158 / 10%);
+}
+
+.dark .spesen-band {
+  background-color: color-mix(in oklab, var(--nacht) 55%, var(--background));
 }
 
 /* Ziffern und Wort mit leichtem Flutlicht-Schein */
