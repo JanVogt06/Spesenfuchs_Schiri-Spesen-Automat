@@ -1,7 +1,8 @@
 import logging
+import multiprocessing
 import os
 import sys
-from logging.handlers import RotatingFileHandler
+from logging.handlers import RotatingFileHandler, WatchedFileHandler
 from pathlib import Path
 from typing import Optional
 
@@ -38,12 +39,15 @@ def _hole_datei_handler() -> Optional[logging.Handler]:
     einem NAS oft nicht erreichbar. Die Datei liegt im data-Ordner neben der
     Datenbank und laesst sich ueber jeden Dateimanager oeffnen.
 
-    Die naechtlichen Abrufe laufen in eigenen Prozessen, die unter Python
-    3.14 per forkserver starten und keine Handler erben. Deshalb entsteht der
-    Handler hier, in jedem Prozess neu, statt einmal beim Start. Alle
-    Prozesse haengen an dieselbe Datei an; nur das seltene Rotieren koennen
-    zwei gleichzeitig laufende Prozesse durcheinanderbringen, und dann geht
-    allenfalls ein Stueck Protokoll verloren.
+    Die Abrufe laufen in eigenen Prozessen, die unter Python 3.14 per
+    forkserver starten und keine Handler erben. Deshalb entsteht der Handler
+    hier, in jedem Prozess neu, statt einmal beim Start.
+
+    Rotieren darf nur der Hauptprozess. Rotierten zwei Prozesse dieselbe
+    Datei, benennte jeder sie fuer sich um, und ein Teil des Protokolls
+    landete in einer Datei, die gleich darauf ueberschrieben wird. Die
+    Abrufprozesse haengen deshalb nur an und oeffnen die Datei neu, sobald der
+    Hauptprozess sie weggerollt hat.
     """
     global _datei_handler
 
@@ -51,9 +55,12 @@ def _hole_datei_handler() -> Optional[logging.Handler]:
         pfad = _log_datei()
         try:
             pfad.parent.mkdir(parents=True, exist_ok=True)
-            handler = RotatingFileHandler(
-                pfad, maxBytes=5 * 1024 * 1024, backupCount=4, encoding="utf-8"
-            )
+            if multiprocessing.parent_process() is None:
+                handler = RotatingFileHandler(
+                    pfad, maxBytes=5 * 1024 * 1024, backupCount=4, encoding="utf-8"
+                )
+            else:
+                handler = WatchedFileHandler(pfad, encoding="utf-8")
             handler.setFormatter(_FORMAT)
             _datei_handler = handler
         except OSError as e:
