@@ -577,13 +577,13 @@ function Satzband() {
             {/* Handy */}
             <div className="py-3 sm:hidden">
                 <p className="px-4 text-[11px] font-medium tracking-wide text-white/60">{QUELLE}</p>
-                <div className="mt-2 flex snap-x snap-mandatory scroll-px-4 gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <ul className="mt-2 flex snap-x snap-mandatory scroll-px-4 gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     {SPESENSAETZE.map((satz) => (
-                        <span key={satz.klasse} className="snap-start">
+                        <li key={satz.klasse} className="snap-start">
                             <Satzchip satz={satz}/>
-                        </span>
+                        </li>
                     ))}
-                </div>
+                </ul>
             </div>
 
             {/* ab sm */}
@@ -596,13 +596,17 @@ function Satzband() {
                     <div className="spesen-laufband-rand pointer-events-none absolute inset-y-0 right-0 z-10 w-16 bg-gradient-to-l from-[oklch(0.145_0.026_158)] to-transparent"/>
                     <div className={`spesen-laufband flex w-max ${angehalten ? 'is-angehalten' : ''}`}>
                         {[0, 1].map((durchlauf) => (
-                            <div
+                            <ul
                                 key={durchlauf}
                                 aria-hidden={durchlauf === 1 || undefined}
                                 className="spesen-laufband-gruppe flex shrink-0 gap-3 pr-3"
                             >
-                                {SPESENSAETZE.map((satz) => <Satzchip key={satz.klasse} satz={satz}/>)}
-                            </div>
+                                {SPESENSAETZE.map((satz) => (
+                                    <li key={satz.klasse}>
+                                        <Satzchip satz={satz}/>
+                                    </li>
+                                ))}
+                            </ul>
                         ))}
                     </div>
                 </div>
