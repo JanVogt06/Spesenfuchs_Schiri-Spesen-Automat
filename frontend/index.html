@@ -2,9 +2,19 @@
 <html lang="de">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/appicon.png" />
+    <!-- Die Icons liegen unter src/assets, damit Vite sie nach /assets baut:
+         das Backend liefert ausser /assets und /appicon.png jede Adresse als
+         index.html aus. -->
+    <link rel="icon" type="image/png" sizes="64x64" href="./src/assets/favicon-64.png" />
+    <link rel="apple-touch-icon" href="./src/assets/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Spesenfuchs — Schiri-Spesen-Automat</title>
+    <meta name="description" content="Spesenabrechnungen für Schiedsrichter im Thüringer Fußball-Verband: jede Nacht aus deinen DFBnet-Ansetzungen, nach TFV-Spesenordnung, als Word und PDF. Kostenlos." />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="de_DE" />
+    <meta property="og:site_name" content="Spesenfuchs" />
+    <meta property="og:title" content="Spesenfuchs — Abpfiff für den Papierkram" />
+    <meta property="og:description" content="Spesenabrechnungen für Schiedsrichter im TFV, jede Nacht aus deinen DFBnet-Ansetzungen. Du trägst nur noch die Kilometer ein. Kostenlos." />
     <script>
       // Theme sofort anwenden um Flackern zu verhindern
       (function() {
