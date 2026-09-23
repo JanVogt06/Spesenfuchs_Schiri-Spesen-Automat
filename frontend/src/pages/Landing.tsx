@@ -52,7 +52,16 @@ const SPESENSAETZE = [
     {klasse: 'Alte Herren, Kreisebene', sr: '25,00 €', sra: '23,00 €'},
 ];
 
-const QUELLE = 'TFV-Spesenordnung §2 · SR / SRA · Stand 01.07.2025';
+/*
+ * Quelle der Saetze; der Stand bricht nur als Ganzes um. Das umschliessende
+ * span haelt den Text zusammen, wenn er in einem Flex-Element steht - dort
+ * fiele sonst das Leerzeichen vor "Stand" weg.
+ */
+const QUELLE = (
+    <span>
+        TFV-Spesenordnung §2 · SR / SRA · <span className="whitespace-nowrap">Stand 01.07.2025</span>
+    </span>
+);
 
 /** Innenrahmen aller Abschnitte, damit die Kanten untereinander fluchten */
 const RAHMEN = 'mx-auto w-full max-w-[90rem] px-4 sm:px-6 lg:px-10';
@@ -591,7 +600,10 @@ function Hero({angemeldet, heroRef, ctaRef}: {
             <div aria-hidden className="spesen-strahl spesen-flutlicht pointer-events-none absolute inset-0"/>
             <div aria-hidden className="spesen-koerner pointer-events-none absolute inset-0"/>
 
-            <div className={`${RAHMEN} relative grid flex-1 items-center gap-12 pt-24 pb-12 sm:pt-32 md:gap-14 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.02fr)] lg:content-center lg:gap-10 lg:pt-20 lg:pb-10 xl:gap-16`}>
+            {/* grid-cols-1 haelt die Spalte auf Bildschirmbreite; ein Raster ohne
+                Spalten waechst sonst mit dem breitesten Inhalt und schneidet bei
+                320 px den Text ab. */}
+            <div className={`${RAHMEN} relative grid flex-1 grid-cols-1 items-center gap-12 pt-24 pb-12 sm:pt-32 md:gap-14 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.02fr)] lg:content-center lg:gap-10 lg:pt-20 lg:pb-10 xl:gap-16`}>
                 <div className="text-center lg:text-left">
                     <p
                         className="spesen-aufsteigen mb-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-medium text-white/80 backdrop-blur"

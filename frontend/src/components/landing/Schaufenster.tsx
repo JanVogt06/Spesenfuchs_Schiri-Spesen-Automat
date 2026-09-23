@@ -31,6 +31,13 @@ const GESPANN = [
     {rolle: 'SRA 2', satz: '40,00', km: '55', summe: '56,50'},
 ];
 
+/*
+ * Spalten der Abrechnung. Schmal (die Karte am Handy, 320 px) ruecken sie
+ * enger zusammen, damit kein Betrag umbricht.
+ */
+const SPALTEN = 'grid grid-cols-[2.75rem_minmax(0,1fr)_auto_3.75rem] gap-x-2 px-2.5 ' +
+    'min-[400px]:grid-cols-[3.25rem_minmax(0,1fr)_auto_4.75rem] min-[400px]:gap-x-3 min-[400px]:px-3';
+
 function Dateiknopf({label}: { label: string }) {
     return (
         <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.04] px-2.5 py-1 text-xs font-medium text-white/85">
@@ -55,7 +62,7 @@ export function Abrechnungskarte() {
 
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold">SV Grün-Weiß – FC Kreisstadt</p>
+                    <p className="text-sm leading-snug font-semibold">SV Grün-Weiß – FC Kreisstadt</p>
                     <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-white/55">
                         <span className="inline-flex items-center gap-1.5">
                             <Calendar className="size-3.5"/>
@@ -73,7 +80,7 @@ export function Abrechnungskarte() {
             </div>
 
             <div className="mt-4 rounded-xl border border-white/10 bg-black/20 text-sm">
-                <div className="grid grid-cols-[3.25rem_1fr_auto_4.75rem] gap-x-3 border-b border-white/10 px-3 py-2 text-[10px] font-medium tracking-wider text-white/40 uppercase">
+                <div className={`${SPALTEN} border-b border-white/10 py-2 text-[10px] font-medium tracking-wider text-white/40 uppercase`}>
                     <span>Rolle</span>
                     <span>Satz</span>
                     <span>Fahrt</span>
@@ -82,7 +89,7 @@ export function Abrechnungskarte() {
                 {GESPANN.map((zeile) => (
                     <div
                         key={zeile.rolle}
-                        className="grid grid-cols-[3.25rem_1fr_auto_4.75rem] items-center gap-x-3 px-3 py-1.5 tabular-nums"
+                        className={`${SPALTEN} items-center py-1.5 tabular-nums whitespace-nowrap`}
                     >
                         <span className="text-white/60">{zeile.rolle}</span>
                         <span className="font-medium text-flutlicht">{zeile.satz} €</span>
@@ -93,7 +100,7 @@ export function Abrechnungskarte() {
                         <span className="text-right text-white/85">{zeile.summe} €</span>
                     </div>
                 ))}
-                <div className="mt-1 flex items-center justify-between border-t border-white/10 px-3 py-2">
+                <div className="mt-1 flex items-center justify-between border-t border-white/10 px-2.5 py-2 min-[400px]:px-3">
                     <span className="text-white/55">Gesamt</span>
                     <span className="font-semibold tabular-nums">170,50 €</span>
                 </div>
