@@ -15,7 +15,7 @@ from generator.docx_generator import KM_SATZ_EURO
 from generator.spesen_calculator import calculate_spesen
 from db.matches import upsert_match, mark_missing_matches, build_match_key
 from db.stammdaten import upsert_stammdaten
-from db.season import replace_saison, get_komplette_saisons
+from db.season import replace_saison, get_komplette_saisons, count_saison_spiele
 from utils.logger import setup_logger
 from utils.match_utils import extract_iso_date_from_anpfiff, parse_saison_datum
 
@@ -124,6 +124,13 @@ def persist_saisons(user_id: int, saisons: dict) -> int:
     for saison, daten in saisons.items():
         if not daten.get("vollstaendig"):
             logger.warning(f"Saison {saison} unvollstaendig gelesen - bleibt unveraendert")
+            continue
+
+        # Eine gespeicherte Saison mit Spielen wird nie durch eine leere
+        # ersetzt. Das waere ein Anzeigefehler von DFBnet und kein Rueckzug
+        # aller Spiele - der Bestand ginge dabei verloren.
+        if not daten.get("spiele") and count_saison_spiele(user_id, saison):
+            logger.warning(f"Saison {saison} leer gelesen, gespeichert sind Spiele - bleibt unveraendert")
             continue
 
         try:

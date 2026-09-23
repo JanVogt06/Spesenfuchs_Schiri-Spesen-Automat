@@ -250,6 +250,19 @@ def get_komplette_saisons(user_id: int) -> set:
         conn.close()
 
 
+def count_saison_spiele(user_id: int, saison: str) -> int:
+    """Wie viele geleitete Spiele zu einer Saison eines Users gespeichert sind."""
+    conn = get_connection()
+
+    try:
+        return conn.execute(
+            "SELECT COUNT(*) FROM season_matches WHERE user_id = ? AND saison = ?",
+            (user_id, saison),
+        ).fetchone()[0]
+    finally:
+        conn.close()
+
+
 def get_saisons(user_id: int) -> List[Dict]:
     """
     Alle gespeicherten Saisons eines Users, neueste zuerst.

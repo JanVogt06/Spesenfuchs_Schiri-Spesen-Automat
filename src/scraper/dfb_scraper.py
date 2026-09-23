@@ -971,10 +971,17 @@ class DFBScraper:
 
     # Die Seite meldet ihre Gesamtzahl als "(85 Treffer)". Das ist der einzige
     # verlässliche Anker dafür, ob wirklich alles gelesen wurde.
+    #
+    # Solange die Karte nachlädt (dfb-spinner), steht dort oft noch die Zahl
+    # der vorigen Auswahl - dann gibt es noch keine Zahl. Eine Saison ohne
+    # Spiele zeigt gar keine Trefferzahl, nur "Keine Spiele vorhanden"; ohne
+    # diesen Fall wartete jeder Lauf dreimal bis zum Timeout und verwarf sie.
     _TREFFER_JS = r"""
         (karte) => {
+            if (karte.querySelector('dfb-spinner')) return null;
             const m = karte.textContent.match(/\((\d+)\s*Treffer\)/);
-            return m ? Number(m[1]) : null;
+            if (m) return Number(m[1]);
+            return karte.textContent.includes('Keine Spiele vorhanden') ? 0 : null;
         }
     """
 
@@ -1306,6 +1313,21 @@ class DFBScraper:
 
         return einsaetze, lehrgaenge
 
+    @staticmethod
+    def _geleitet_laut_bilanz(einsaetze: list) -> int:
+        """
+        Geleitete Spiele laut Bilanz - aus der Summenzeile, sonst aufaddiert.
+
+        DFBnet schreibt "-" fuer null; alles, was keine Zahl ist, zaehlt so.
+        """
+        summe = [zeile for zeile in einsaetze if zeile["rolle"] == "Summe"]
+        gesamt = 0
+        for zeile in summe or einsaetze:
+            wert = (zeile.get("geleitet") or "").strip()
+            if wert.isdigit():
+                gesamt += int(wert)
+        return gesamt
+
     # DFBnet liefert bei mindestens einer Saison (beobachtet: 24/25) mit "100
     # Ergebnisse pro Seite" dauerhaft eine LEERE Tabelle, waehrend 50, 20 und
     # 10 dort einwandfrei laufen. Ein Timing-Problem ist es nicht - die Seite
@@ -1429,6 +1451,16 @@ class DFBScraper:
                 # sie wuerde sonst als fertig gelten und nie wieder gelesen.
                 if not bilanz["einsaetze"]:
                     logger.warning(f"Saison {saison}: keine Einsatzbilanz gelesen")
+                    vollstaendig = False
+
+                # Null Spiele glaubt der Lauf nur, wenn auch die Bilanz nichts
+                # Geleitetes kennt. Sonst hat DFBnet die Tabelle bloss leer
+                # angezeigt - und replace_saison wuerde die Saison leeren.
+                geleitet = self._geleitet_laut_bilanz(bilanz["einsaetze"])
+                if vollstaendig and not zeilen and geleitet:
+                    logger.warning(
+                        f"Saison {saison}: Tabelle leer, laut Bilanz aber {geleitet} geleitet"
+                    )
                     vollstaendig = False
 
                 ergebnis[saison] = {
