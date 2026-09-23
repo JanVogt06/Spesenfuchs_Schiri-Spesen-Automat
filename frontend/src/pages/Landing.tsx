@@ -836,7 +836,8 @@ function Aufstellung() {
                             Mehr als eine Abrechnung
                         </h2>
                     </div>
-                    <p className="max-w-xl text-[15px] leading-relaxed text-muted-foreground sm:text-base lg:justify-self-end">
+                    {/* foreground/70 statt muted: auf dem grauen Band kaeme muted nur auf 4,3:1 */}
+                    <p className="max-w-xl text-[15px] leading-relaxed text-foreground/70 sm:text-base lg:justify-self-end">
                         Rund um jede Ansetzung liegt alles an einem Ort: Anfahrt, Einstufung, Dokumente, deine
                         Stammdaten und die ganze Saison – aus deinen DFBnet-Daten, ohne Abtippen.
                     </p>
