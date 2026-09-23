@@ -155,8 +155,11 @@ const FAIRPLAY = [
     },
 ];
 
+/** Verweise in einer Antwort: im Fliesstext unterstrichen, damit sie auch ohne Farbe auffallen */
+const ANTWORT_LINK = 'font-medium text-primary underline underline-offset-2 hover:no-underline';
+
 /** Eine Antwort ist Fliesstext oder, wo sie aufzaehlt, eine kurze Liste */
-const FAQS: { question: string; answer: string | string[] }[] = [
+const FAQS: { question: string; answer: ReactNode | string[] }[] = [
     {
         question: 'Ist Spesenfuchs wirklich kostenlos?',
         answer: 'Ja. Spesenfuchs kostet nichts – für alle Schiedsrichter in Thüringen, ohne versteckte Kosten ' +
@@ -212,8 +215,16 @@ const FAQS: { question: string; answer: string | string[] }[] = [
     },
     {
         question: 'Wie lösche ich meinen Account?',
-        answer: 'Schreib eine Mail an spesen-generator@jan-vogt.dev – dann werden dein Konto und alle ' +
-            'zugehörigen Daten gelöscht. Einzelheiten stehen in der Datenschutzerklärung.',
+        answer: (
+            <>
+                Schreib eine Mail an{' '}
+                <a href="mailto:spesen-generator@jan-vogt.dev" className={ANTWORT_LINK}>
+                    spesen-generator@jan-vogt.dev
+                </a>{' '}
+                – dann werden dein Konto und alle zugehörigen Daten gelöscht. Einzelheiten stehen in der{' '}
+                <Link to="/datenschutz" className={ANTWORT_LINK}>Datenschutzerklärung</Link>.
+            </>
+        ),
     },
 ];
 
@@ -1156,7 +1167,7 @@ function Fragen() {
                                     <Plus className="size-4"/>
                                 </span>
                             </summary>
-                            <div className="spesen-antwort pr-5 pb-5 pl-[3.25rem] text-[15px] leading-relaxed text-muted-foreground sm:pr-14 sm:text-sm">
+                            <div className="spesen-antwort px-5 pb-5 text-[15px] leading-relaxed text-muted-foreground sm:pr-14 sm:pl-14 sm:text-sm">
                                 {Array.isArray(faq.answer) ? (
                                     <ul className="grid gap-2">
                                         {faq.answer.map((punkt) => (
