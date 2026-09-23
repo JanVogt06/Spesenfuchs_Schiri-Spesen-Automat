@@ -946,6 +946,12 @@ class DFBScraper:
     # beschriftet ihre Daten, ganz gleich an welcher Stelle der Block steht -
     # und ganz gleich, ob die Karte gerade schon umgeschaltet hat. Welcher der
     # beiden gleich beschrifteten Bloecke welcher ist, entscheidet ihr Inhalt.
+    #
+    # Die Ueberschrift allein beweist aber nicht, dass die Daten da sind: nach
+    # jeder Auswahl stehen Ueberschrift und Spaltenkoepfe sofort wieder da,
+    # die Zeilen erst ein paar hundert Millisekunden spaeter - bis dahin zeigt
+    # jeder Block einen dfb-spinner. Deshalb meldet das Skript mit, ob die
+    # Karte noch laedt und welche Saison ihr Auswahlfeld gerade zeigt.
     _BILANZ_JS = r"""
         (karte, saison) => {
             const kopf = (t) => (t.querySelector('tr')?.textContent || '').trim();
@@ -962,9 +968,9 @@ class DFBScraper:
             const einsatzTabelle = bloecke.find(t => t.textContent.includes('Geleitet'));
             const lehrTabelle = bloecke.find(t => t.textContent.includes('Lehrabend'));
 
-            if (!einsatzTabelle && !lehrTabelle) return null;
-
             return {
+                laedt: karte.querySelector('dfb-spinner') !== null,
+                gewaehlt: (karte.querySelector('.dfb-dropdown-input-value')?.textContent || '').trim(),
                 einsaetze: einsatzTabelle ? lies(einsatzTabelle) : [],
                 lehrgaenge: lehrTabelle ? lies(lehrTabelle) : [],
             };
@@ -982,6 +988,11 @@ class DFBScraper:
         return dropdown.locator('button.dropdown-item').evaluate_all(
             "els => els.map(e => e.textContent.trim())"
         )
+
+    @staticmethod
+    def _dropdown_wert(dropdown) -> str:
+        """Der Eintrag, den ein dfb-dropdown-input gerade anzeigt."""
+        return (dropdown.locator('.dfb-dropdown-input-value').first.text_content() or "").strip()
 
     def _dropdown_waehlen(self, dropdown, wert: str):
         """
@@ -1160,6 +1171,15 @@ class DFBScraper:
         ist. Ein Warten auf "irgendein tr enthaelt den Saisonnamen" war
         wertlos: die Karte zeigt immer auch die Vorsaison, der Name stand also
         schon vor dem Umschalten auf der Seite.
+
+        Fertig ist die Karte erst, wenn sie keinen Spinner mehr zeigt, ihr
+        Auswahlfeld auf der gesuchten Saison steht UND der Block echte
+        Datenzeilen traegt. Frueher genuegte "der Block hat Zeilen" - das
+        waren waehrend des Ladens die beiden Kopfzeilen, gelesen wurden also
+        null Einsaetze, und die ganze Saison galt als unvollstaendig. Die
+        laufende Saison traf das fast immer, weil sie beim Start schon gewaehlt
+        ist und die Wiederwahl die Karte nur neu laedt: seit dem 23.09.2026
+        wurde sie bei keinem Konto mehr gespeichert.
         """
         karte = self.page.locator(self._BILANZ_KARTE).first
 
@@ -1168,25 +1188,54 @@ class DFBScraper:
             dropdown.locator('button.dropdown-item').first.wait_for(
                 state="attached", timeout=timeout_ms
             )
-            self._dropdown_waehlen(dropdown, saison)
+
+            # Steht die Karte schon auf der Saison, wird nicht neu gewaehlt:
+            # das kostete nur einen weiteren Ladevorgang.
+            if self._dropdown_wert(dropdown) != saison:
+                self._dropdown_waehlen(dropdown, saison)
 
             ende = time.monotonic() + timeout_ms / 1000
-            roh = None
+            einsaetze, lehrgaenge = [], {}
 
             while time.monotonic() < ende:
                 roh = karte.evaluate(self._BILANZ_JS, saison)
-                if roh and roh.get("einsaetze"):
-                    break
-                self.page.wait_for_timeout(400)
+                einsaetze, lehrgaenge = self._bilanz_auswerten(roh)
 
-            if not roh:
-                logger.warning(f"Bilanz fuer Saison {saison} nicht gefunden")
+                if not roh["laedt"] and roh["gewaehlt"] == saison and einsaetze:
+                    break
+
+                self.page.wait_for_timeout(300)
+            else:
+                # Eine halb geladene Karte zaehlt nicht: lieber bleibt die
+                # Saison unvollstaendig und wird beim naechsten Lauf gelesen.
+                logger.warning(
+                    f"Bilanz fuer Saison {saison} nicht rechtzeitig geladen "
+                    f"(laedt={roh['laedt']}, gewaehlt={roh['gewaehlt']!r}, "
+                    f"{len(einsaetze)} Einsatzzeilen)"
+                )
                 return {"einsaetze": [], "lehrgaenge": {}}
 
         except Exception as e:
             logger.warning(f"Bilanz fuer Saison {saison} nicht lesbar: {e}")
             return {"einsaetze": [], "lehrgaenge": {}}
 
+        logger.info(
+            f"Saison {saison}: {len(einsaetze)} Einsatzzeilen, "
+            f"{len(lehrgaenge)} Lehrgangswerte"
+        )
+        return {"einsaetze": einsaetze, "lehrgaenge": lehrgaenge}
+
+    @staticmethod
+    def _bilanz_auswerten(roh: dict):
+        """
+        Macht aus den Rohzeilen der Bilanz-Karte Einsaetze und Lehrgaenge.
+
+        Kopfzeilen fallen dabei heraus - was uebrig bleibt, sind echte
+        Datenzeilen. Eine noch ladende Karte ergibt deshalb leere Listen.
+
+        Returns:
+            Tuple (einsaetze, lehrgaenge)
+        """
         einsaetze = []
         for zeile in roh.get("einsaetze", []):
             if len(zeile) < 2:
@@ -1215,11 +1264,7 @@ class DFBScraper:
             if schluessel:
                 lehrgaenge[schluessel] = zeile[1]
 
-        logger.info(
-            f"Saison {saison}: {len(einsaetze)} Einsatzzeilen, "
-            f"{len(lehrgaenge)} Lehrgangswerte"
-        )
-        return {"einsaetze": einsaetze, "lehrgaenge": lehrgaenge}
+        return einsaetze, lehrgaenge
 
     # DFBnet liefert bei mindestens einer Saison (beobachtet: 24/25) mit "100
     # Ergebnisse pro Seite" dauerhaft eine LEERE Tabelle, waehrend 50, 20 und
