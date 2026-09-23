@@ -313,18 +313,71 @@ function Marke({hell}: { hell: boolean }) {
     );
 }
 
+/** Hoehe der Kopfzeile in px (h-14) */
+const KOPFHOEHE = 56;
+
 /**
- * Kopfzeile. Ganz oben ist sie durchsichtig. Solange noch der Nacht-Block
- * unter ihr liegt, wird sie dunkles Glas - ein heller Balken ueber dem
- * dunklen Hero braeche die Stimmung und den Kontrast. Erst darunter legt
- * sie sich auf die Flaeche der Anwendung.
+ * Ob unter der Kopfzeile gerade ein Nacht-Abschnitt liegt (alles mit
+ * data-nacht). Beobachtet wird nur der Streifen hinter der Kopfzeile: der
+ * untere Rand des Beobachters rueckt dafuer bis auf KOPFHOEHE an den oberen
+ * heran. Der Wert haengt an der Fensterhoehe und wird deshalb bei jeder
+ * Groessenaenderung neu gesetzt - am Handy auch, wenn die Adressleiste
+ * ein- oder ausfaehrt.
+ */
+function useUnterKopfNacht(): boolean {
+    const [nacht, setNacht] = useState(true);
+
+    useEffect(() => {
+        const abschnitte = Array.from(document.querySelectorAll('[data-nacht]'));
+        if (!abschnitte.length || !('IntersectionObserver' in window)) {
+            return;
+        }
+
+        const darunter = new Set<Element>();
+        let beobachter: IntersectionObserver | undefined;
+
+        const aufbauen = () => {
+            beobachter?.disconnect();
+            darunter.clear();
+            beobachter = new IntersectionObserver(
+                (eintraege) => {
+                    eintraege.forEach((eintrag) => {
+                        if (eintrag.isIntersecting) {
+                            darunter.add(eintrag.target);
+                        } else {
+                            darunter.delete(eintrag.target);
+                        }
+                    });
+                    setNacht(darunter.size > 0);
+                },
+                {rootMargin: `0px 0px ${KOPFHOEHE - window.innerHeight}px 0px`},
+            );
+            abschnitte.forEach((abschnitt) => beobachter?.observe(abschnitt));
+        };
+
+        aufbauen();
+        window.addEventListener('resize', aufbauen);
+        return () => {
+            beobachter?.disconnect();
+            window.removeEventListener('resize', aufbauen);
+        };
+    }, []);
+
+    return nacht;
+}
+
+/**
+ * Kopfzeile. Ganz oben ist sie durchsichtig. Liegt ein Nacht-Abschnitt
+ * unter ihr (Hero, Spielablauf, Abschluss), wird sie dunkles Glas - ein
+ * heller Balken ueber dem dunklen Grund braeche Stimmung und Kontrast. Ueber
+ * den hellen Abschnitten legt sie sich auf die Flaeche der Anwendung.
  *
  * Am Handy steht rechts nur "Anmelden": die Hauptaktion hat dort der Hero
  * und danach die Leiste am unteren Rand, in Reichweite des Daumens.
  */
-function Kopfzeile({angemeldet, heroRef}: { angemeldet: boolean; heroRef: RefObject<HTMLElement | null> }) {
+function Kopfzeile({angemeldet}: { angemeldet: boolean }) {
     const [gescrollt, setGescrollt] = useState(false);
-    const ueberHero = useImBild(heroRef, {rand: '-56px 0px 0px 0px'});
+    const dunkel = useUnterKopfNacht();
 
     useEffect(() => {
         const pruefen = () => setGescrollt(window.scrollY > 24);
@@ -333,7 +386,6 @@ function Kopfzeile({angemeldet, heroRef}: { angemeldet: boolean; heroRef: RefObj
         return () => window.removeEventListener('scroll', pruefen);
     }, []);
 
-    const dunkel = ueberHero;
     const flaeche = !gescrollt
         ? 'border-transparent'
         : dunkel
@@ -557,9 +609,8 @@ function Satzband() {
 }
 
 /** Der dunkle Block ganz oben: Versprechen, Beispiel, Zahlen, Spesensaetze */
-function Hero({angemeldet, heroRef, ctaRef}: {
+function Hero({angemeldet, ctaRef}: {
     angemeldet: boolean;
-    heroRef: RefObject<HTMLElement | null>;
     ctaRef: RefObject<HTMLDivElement | null>;
 }) {
     const buehne = useRef<HTMLDivElement>(null);
@@ -583,7 +634,7 @@ function Hero({angemeldet, heroRef, ctaRef}: {
 
     return (
         <section
-            ref={heroRef}
+            data-nacht
             className="spesen-nacht relative isolate flex flex-col overflow-hidden text-white lg:min-h-[100svh]"
             onMouseMove={zeigerBewegt}
             onMouseLeave={zeigerWeg}
@@ -933,7 +984,7 @@ function Spielablauf() {
     const stufe = fortschritt * SCHRITTE.length;
 
     return (
-        <section className="spesen-nacht relative isolate overflow-hidden py-16 text-white sm:py-24 lg:py-28">
+        <section data-nacht className="spesen-nacht relative isolate overflow-hidden py-16 text-white sm:py-24 lg:py-28">
             <div aria-hidden className="pointer-events-none absolute inset-0 hidden place-items-center lg:grid">
                 <Spielfeld proportional ohnePunkte className="spesen-wasserzeichen w-[min(94%,86rem)] text-white/[0.07]"/>
             </div>
@@ -1132,7 +1183,7 @@ function Abschluss({angemeldet, abschlussRef}: {
     abschlussRef: RefObject<HTMLElement | null>;
 }) {
     return (
-        <section ref={abschlussRef} className="spesen-nacht relative isolate overflow-hidden text-white">
+        <section ref={abschlussRef} data-nacht className="spesen-nacht relative isolate overflow-hidden text-white">
             <div aria-hidden className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-flutlicht/50 to-transparent"/>
             <div aria-hidden className="spesen-feld spesen-feld-auslauf pointer-events-none absolute inset-x-0 bottom-0 h-[70%]">
                 <div className="absolute inset-0">
@@ -1180,7 +1231,7 @@ function Abschluss({angemeldet, abschlussRef}: {
 
 function Fusszeile() {
     return (
-        <footer className="bg-nacht pt-2 pb-8 text-white sm:pb-10">
+        <footer data-nacht className="bg-nacht pt-2 pb-8 text-white sm:pb-10">
             <div className={`${RAHMEN} flex flex-col items-center justify-between gap-5 sm:flex-row`}>
                 <div className="flex flex-col items-center gap-1 sm:items-start">
                     <Marke hell/>
@@ -1270,7 +1321,6 @@ export function LandingPage() {
     useRevealOnScroll();
 
     const [angemeldet] = useState(isAuthenticated);
-    const hero = useRef<HTMLElement>(null);
     const heroAktion = useRef<HTMLDivElement>(null);
     const abschluss = useRef<HTMLElement>(null);
     const aktionImBild = useImBild(heroAktion);
@@ -1278,9 +1328,9 @@ export function LandingPage() {
 
     return (
         <div className="spesen-landing flex min-h-screen flex-col bg-background text-foreground">
-            <Kopfzeile angemeldet={angemeldet} heroRef={hero}/>
+            <Kopfzeile angemeldet={angemeldet}/>
             <main className="flex-1">
-                <Hero angemeldet={angemeldet} heroRef={hero} ctaRef={heroAktion}/>
+                <Hero angemeldet={angemeldet} ctaRef={heroAktion}/>
                 <Aufstellung/>
                 <Spielablauf/>
                 <Fairplay/>
