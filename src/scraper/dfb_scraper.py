@@ -579,6 +579,26 @@ class DFBScraper:
             logger.error(f"Fehler beim Öffnen des Modals: {e}")
             raise
 
+    _MODAL_SELEKTOR = '.modal.show, [role="dialog"], .dfb-modal'
+
+    def _warte_bis_modal_zu(self, timeout_ms: int = 8000):
+        """
+        Wartet, bis kein Modal mehr sichtbar ist.
+
+        Ein Locator.wait_for(state="hidden") taugt dafuer nicht: ein offenes
+        DFBnet-Modal trifft den Selektor zweimal (Dialog und Innenleben), und
+        Playwright bricht dann mit einer strict mode violation ab. Das geschah
+        bei jedem einzelnen Modal und kostete im Rueckfall jeweils eine
+        Sekunde Pause - rund 30 Sekunden pro Konto und Nacht.
+        """
+        self.page.wait_for_function(
+            "(selektor) => ![...document.querySelectorAll(selektor)]"
+            ".some(e => e.getClientRects().length > 0)",
+            arg=self._MODAL_SELEKTOR,
+            timeout=timeout_ms,
+            polling=100,
+        )
+
     def close_modal(self):
         """Schließt ein geöffnetes Modal"""
         logger.info("Schließe Modal...")
@@ -589,19 +609,13 @@ class DFBScraper:
 
             if close_button.is_visible(timeout=5000):
                 close_button.click()
-
-                # Warte bis Modal NICHT mehr sichtbar ist
-                modal = self.page.locator('.modal.show, [role="dialog"], .dfb-modal')
-                modal.wait_for(state="hidden", timeout=8000)
+                self._warte_bis_modal_zu()
 
                 logger.info("Modal geschlossen")
             else:
                 # Alternative: ESC-Taste drücken
                 self.page.keyboard.press('Escape')
-
-                # Warte bis Modal verschwunden ist
-                modal = self.page.locator('.modal.show, [role="dialog"], .dfb-modal')
-                modal.wait_for(state="hidden", timeout=8000)
+                self._warte_bis_modal_zu()
 
                 logger.info("Modal mit ESC geschlossen")
 
