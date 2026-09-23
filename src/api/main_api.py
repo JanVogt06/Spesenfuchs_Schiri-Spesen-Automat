@@ -300,7 +300,7 @@ def run_scrape_process(dfb_username: str, dfb_password: str, user_id: int, run_i
         )
 
     except Exception as e:
-        process_logger.error(f"[User {user_id}] Fehler beim Scrape: {e}")
+        process_logger.error(f"[User {user_id}] Fehler beim Scrape: {e}", exc_info=True)
         update_run(
             run_id,
             status="failed",
