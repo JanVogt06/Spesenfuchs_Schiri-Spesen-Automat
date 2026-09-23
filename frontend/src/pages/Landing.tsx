@@ -1,21 +1,38 @@
-import {type CSSProperties, useEffect, useRef, useState} from 'react';
+import {type CSSProperties, type ReactNode, type RefObject, useEffect, useLayoutEffect, useRef, useState} from 'react';
+import {Link} from 'react-router-dom';
 import {Button} from '@/components/ui/button';
-import {useNavigate, Link} from 'react-router-dom';
 import {api} from '@/lib/api';
-import {magKeineBewegung, useCountUp, useRevealOnScroll, useScrollProgress} from '@/hooks/useReveal';
+import {isAuthenticated} from '@/lib/auth';
+import {magKeineBewegung, useCountUp, useImBild, useRevealOnScroll, useScrollProgress} from '@/hooks/useReveal';
 import {
-    FileText,
-    Users,
-    Shield,
-    Zap,
-    CheckCircle2,
+    Abrechnungskarte,
+    Anfahrtschip,
+    Anfahrtskarte,
+    Dokumente,
+    Ligenauszug,
+    Nachtuhr,
+    Saisontafel,
+    Spieleliste,
+    Stammdatenauszug,
+} from '@/components/landing/Schaufenster';
+import {
     ArrowRight,
-    Download,
-    Receipt,
-    MoonStar,
-    Plus,
-    Calendar,
+    ChartColumn,
+    CheckCircle2,
+    Clock,
+    Eye,
+    FileText,
+    IdCard,
+    Lock,
     Mail,
+    MoonStar,
+    Pause,
+    Play,
+    Plus,
+    Route,
+    Scale,
+    Trash2,
+    Trophy,
     type LucideIcon,
 } from 'lucide-react';
 
@@ -35,106 +52,159 @@ const SPESENSAETZE = [
     {klasse: 'Alte Herren, Kreisebene', sr: '25,00 €', sra: '23,00 €'},
 ];
 
-interface Vorteil {
+const QUELLE = 'TFV-Spesenordnung §2 · SR / SRA · Stand 01.07.2025';
+
+/** Innenrahmen aller Abschnitte, damit die Kanten untereinander fluchten */
+const RAHMEN = 'mx-auto w-full max-w-[90rem] px-4 sm:px-6 lg:px-10';
+
+interface Funktion {
     icon: LucideIcon;
     title: string;
     description: string;
-    /** Kachel ueber zwei Spalten, mit waagerechtem Aufbau */
-    breit?: boolean;
-    /** Dunkle Kachel, die den Nacht-Block von oben aufgreift */
-    nacht?: boolean;
-    /** Uhr auf der Kachel - nur dort, wo es um den naechtlichen Lauf geht */
-    uhr?: boolean;
+    /** Der kleine Beleg ueber dem Text - ein Ausschnitt aus der Anwendung */
+    bild: ReactNode;
 }
 
-const FEATURES: Vorteil[] = [
+/** Die hellen Kacheln der Aufstellung. Die zwei dunklen stehen darunter einzeln. */
+const FUNKTIONEN: Funktion[] = [
     {
-        icon: MoonStar,
-        breit: true,
-        nacht: true,
-        uhr: true,
-        title: 'Läuft, während du schläfst',
-        description: 'Jede Nacht um 3 Uhr werden deine Ansetzungen automatisch aus DFBnet geladen und abgerechnet.',
+        icon: Route,
+        title: 'Fahrtkosten mit Karte',
+        description: 'Kilometer eintragen, den Rest rechnet Spesenfuchs mit 0,30 € je km. ' +
+            'Die Karte zeigt die Anschriften des Gespanns und die Spielstätte.',
+        bild: <Anfahrtskarte className="h-full w-auto max-w-full"/>,
+    },
+    {
+        icon: Trophy,
+        title: 'Pokal richtig eingestuft',
+        description: 'Bei Pokal- und Freundschaftsspielen zählt die Klasse der Vereine – nachgeschlagen ' +
+            'in den Tabellen von Thüringenliga und Landesklasse. Unsicher? Dann bleibt das Feld leer.',
+        bild: <Ligenauszug/>,
     },
     {
         icon: FileText,
         title: 'Word & PDF',
-        description: 'Jede Abrechnung als bearbeitbares DOCX und fertiges PDF, einzeln oder alle als ZIP.',
+        description: 'Jede Abrechnung als bearbeitbares DOCX und fertiges PDF, einzeln oder alle zusammen als ZIP.',
+        bild: <Dokumente/>,
     },
     {
-        icon: Zap,
-        title: 'TFV-Spesenordnung eingebaut',
-        description: 'Spesensätze für SR und Assistenten werden automatisch nach Spielklasse berechnet.',
-    },
-    {
-        icon: Calendar,
-        title: 'Alle Spiele im Blick',
-        description: 'Teams, Anstoß, Spielstätte und Schiedsrichter-Team übersichtlich an einem Ort.',
-    },
-    {
-        icon: Shield,
-        title: 'Verschlüsselt gespeichert',
-        description: 'Deine DFBnet-Zugangsdaten werden mit Fernet-Verschlüsselung gesichert, Passwörter gehasht.',
-    },
-    {
-        icon: Users,
-        breit: true,
-        nacht: true,
-        title: 'Für jeden Schiedsrichter',
-        description: 'Eigener Account und eigene Daten, vom Kreisliga-Neuling bis zum Oberliga-Routinier.',
+        icon: IdCard,
+        title: 'Stammdaten & QMax',
+        description: 'Deine DFBnet-Stammdaten samt Qualifikations-Maximum auf einen Blick, ' +
+            'die persönlichen Angaben verschlüsselt gespeichert.',
+        bild: <Stammdatenauszug/>,
     },
 ];
 
 const SCHRITTE = [
     {
+        phase: 'Aufwärmen',
         title: 'Registrieren',
-        description: 'Account anlegen und DFBnet-Zugangsdaten einmalig hinterlegen.',
+        chip: 'einmalig',
+        description: 'Account anlegen und deine DFBnet-Zugangsdaten ein einziges Mal hinterlegen.',
     },
     {
-        title: 'Anpfiff',
-        description: 'Das System liest deine Ansetzungen automatisch aus DFBnet aus, jede Nacht oder auf Knopfdruck.',
+        phase: 'Anpfiff',
+        title: 'Ansetzungen abrufen',
+        chip: 'jede Nacht · 03:00',
+        description: 'Spesenfuchs holt deine Ansetzungen aus DFBnet – nachts von allein oder sofort auf Knopfdruck.',
     },
     {
-        title: 'Abrechnung',
-        description: 'Für jedes Spiel entsteht eine fertige Spesenabrechnung mit korrekten Sätzen.',
+        phase: 'Halbzeit',
+        title: 'Kilometer eintragen',
+        chip: 'je Spiel',
+        description: 'Satz, Gespann und Spielstätte stehen schon drin. Du trägst die Kilometer ein, die Karte hilft.',
     },
     {
-        title: 'Abpfiff',
-        description: 'Word oder PDF herunterladen, unterschreiben, einreichen. Fertig.',
+        phase: 'Abpfiff',
+        title: 'Herunterladen & einreichen',
+        chip: 'Word · PDF · ZIP',
+        description: 'Abrechnung als Word oder PDF laden, unterschreiben, einreichen. Fertig.',
     },
 ];
 
-const FAQS = [
+const FAIRPLAY = [
     {
-        question: 'Ist der Service wirklich kostenlos?',
-        answer: 'Ja, Spesenfuchs ist zu 100% kostenlos für alle Schiedsrichter in Thüringen. ' +
-            'Es gibt keine versteckten Kosten oder Premium-Features.',
+        icon: Eye,
+        title: 'Nur lesend',
+        description: 'Spesenfuchs liest deine Daten aus DFBnet und schreibt nichts dorthin zurück.',
     },
     {
-        question: 'Wie sicher sind meine DFBnet-Zugangsdaten?',
-        answer: 'Deine Zugangsdaten werden mit Fernet-Verschlüsselung (symmetrische Verschlüsselung) sicher gespeichert ' +
-            'und sind nur für dich zugänglich. Dein Account-Passwort wird zusätzlich mit PBKDF2-HMAC gehashed. ' +
-            'Die Daten werden ausschließlich für die Generierung deiner Spesenberichte verwendet.',
+        icon: Lock,
+        title: 'Verschlüsselt',
+        description: 'Zugangsdaten und persönliche Stammdaten liegen verschlüsselt, Passwörter nur als Hash. Keine Weitergabe an Dritte.',
     },
     {
-        question: 'Welche Daten werden aus DFBnet ausgelesen?',
-        answer: 'Das System liest automatisch alle relevanten Spielinformationen aus: Datum und Uhrzeit, Teams, Spielklasse, ' +
-            'Spielort mit Adresse und Platztyp, sowie alle Schiedsrichter-Kontaktdaten (Name, Telefon, E-Mail, Adresse). ' +
-            'Diese Daten werden strukturiert in die Dokumente übertragen. Zusätzlich werden deine eigenen Stammdaten ' +
-            'aus DFBnet mitgelesen – Anschrift, Ausweis, Verein, Status und dein Qualifikations-Maximum – und im ' +
-            'Reiter „Stammdaten" angezeigt. Dein Passfoto wird nicht abgerufen. Außerdem werden deine geleiteten Spiele ' +
-            'aller Saisons mit Ergebnis, Kartenstatistik und Gespann geladen, dazu Einsatzbilanz und Lehrabende.',
+        icon: Scale,
+        title: 'Lieber leer als falsch',
+        description: 'Lässt sich ein Satz nicht sicher bestimmen, bleibt das Feld frei – statt eines Betrags, der nur plausibel aussieht.',
     },
     {
-        question: 'Wie lange dauert die Generierung?',
-        answer: 'Ein manueller Abruf dauert je nach Anzahl der Spiele 1-6 Minuten. ' +
-            'Da jede Nacht um 3 Uhr automatisch ein Lauf für alle Nutzer startet, sind deine Abrechnungen ' +
-            'in der Regel schon fertig, bevor du sie brauchst.',
+        icon: Trash2,
+        title: 'Löschen per Mail',
+        description: 'Eine kurze Mail genügt, dann werden dein Konto und alle zugehörigen Daten gelöscht.',
+    },
+];
+
+/** Eine Antwort ist Fliesstext oder, wo sie aufzaehlt, eine kurze Liste */
+const FAQS: { question: string; answer: string | string[] }[] = [
+    {
+        question: 'Ist Spesenfuchs wirklich kostenlos?',
+        answer: 'Ja. Spesenfuchs kostet nichts – für alle Schiedsrichter in Thüringen, ohne versteckte Kosten ' +
+            'und ohne Bezahlfunktionen.',
+    },
+    {
+        question: 'Wer kann meine DFBnet-Zugangsdaten sehen?',
+        answer: 'Dein DFBnet-Passwort liegt verschlüsselt auf dem Server und wird nur entschlüsselt, um deine Daten ' +
+            'aus DFBnet abzurufen – nachts oder wenn du den Abruf selbst startest. In DFBnet wird dabei nichts ' +
+            'verändert. Dein Spesenfuchs-Passwort wird nur als Hash gespeichert, übertragen wird ausschließlich ' +
+            'über HTTPS, und nichts wird an Dritte weitergegeben.',
+    },
+    {
+        question: 'Welche Daten liest Spesenfuchs aus DFBnet?',
+        answer: [
+            'Für die Abrechnung: Datum, Anstoß, Paarung, Spielklasse und Spielstätte sowie Name und Anschrift der angesetzten Unparteiischen.',
+            'Nur zur Anzeige: Telefon und E-Mail des Gespanns – sie stehen in keinem Dokument.',
+            'Reiter „Stammdaten“: deine eigenen DFBnet-Stammdaten samt Qualifikations-Maximum, die persönlichen Angaben verschlüsselt.',
+            'Reiter „Saison“: deine geleiteten Spiele mit Ergebnis, Karten und Gespann, dazu Einsatzbilanz, Lehrabende und Leistungsprüfungen.',
+            'Dein Passfoto wird nicht abgerufen.',
+        ],
+    },
+    {
+        question: 'Wie werden Pokal- und Freundschaftsspiele abgerechnet?',
+        answer: 'Nach der TFV-Spesenordnung zählt beim Pokal die höchstklassige beteiligte Mannschaft, beim ' +
+            'Freundschaftsspiel der Gastgeber. Im Herrenbereich schlägt Spesenfuchs die Vereine dafür in den ' +
+            'Tabellen von Thüringenliga und Landesklasse nach (Reiter „Ligen“, von FUSSBALL.DE). Lässt sich ein ' +
+            'Verein nicht sicher zuordnen, bleibt der Satz leer statt geraten.',
+    },
+    {
+        question: 'Warum steht bei einem Spiel kein Betrag?',
+        answer: 'Bei überregionalen Spielen wie der Oberliga und bei Spielen anderer Landesverbände gelten nicht ' +
+            'die Sätze der TFV-Spesenordnung – dort trägt Spesenfuchs bewusst nichts ein. Dasselbe gilt, wenn sich ' +
+            'bei einem Pokal- oder Freundschaftsspiel ein Verein nicht sicher zuordnen lässt. Den Betrag kannst du ' +
+            'dann selbst im Word-Dokument ergänzen.',
+    },
+    {
+        question: 'Muss ich die Fahrtkosten selbst eintragen?',
+        answer: 'Ja, die Kilometer oder die Kosten für öffentliche Verkehrsmittel trägst du je Person im Rechner ' +
+            'ein; Kilometer werden mit 0,30 € abgerechnet. Die Karte zeigt dir dazu die Anschriften des Gespanns ' +
+            'und die Spielstätte.',
+    },
+    {
+        question: 'Wann sind meine Abrechnungen da?',
+        answer: 'Jede Nacht um 3 Uhr startet ein Abruf für alle Nutzer – deine Abrechnungen sind also meist ' +
+            'fertig, bevor du sie brauchst. Einen Abruf auf Knopfdruck kannst du jederzeit selbst starten, er ' +
+            'dauert je nach Anzahl der Spiele 1 bis 6 Minuten.',
     },
     {
         question: 'Kann ich die Dokumente nachträglich bearbeiten?',
-        answer: 'Ja! Die generierten Word-Dokumente kannst du nach dem Download beliebig mit Microsoft Word oder anderen ' +
-            'kompatiblen Programmen bearbeiten und an deine Bedürfnisse anpassen.',
+        answer: 'Ja. Die Word-Dokumente kannst du nach dem Download mit Microsoft Word oder einem kompatiblen ' +
+            'Programm beliebig anpassen.',
+    },
+    {
+        question: 'Wie lösche ich meinen Account?',
+        answer: 'Schreib eine Mail an spesen-generator@jan-vogt.dev – dann werden dein Konto und alle ' +
+            'zugehörigen Daten gelöscht. Einzelheiten stehen in der Datenschutzerklärung.',
     },
 ];
 
@@ -146,9 +216,14 @@ function verzoegerung(millisekunden: number): CSSProperties {
 /**
  * Spielfeld-Markierungen in Originalmassen (105 x 68 Meter). Die Strichstaerke
  * skaliert bewusst mit: in der gekippten Ebene werden die nahen Linien dadurch
- * breiter als die fernen, so wie auf einem echten Platz.
+ * breiter als die fernen, so wie auf einem echten Platz. Als Wasserzeichen
+ * stoeren die gefuellten Punkte - sie sehen dort wie Flecken aus.
  */
-function Spielfeld({className, proportional}: { className?: string; proportional?: boolean }) {
+function Spielfeld({className, proportional, ohnePunkte}: {
+    className?: string;
+    proportional?: boolean;
+    ohnePunkte?: boolean;
+}) {
     return (
         <svg
             viewBox="0 0 105 68"
@@ -162,17 +237,22 @@ function Spielfeld({className, proportional}: { className?: string; proportional
             <rect x="0.2" y="0.2" width="104.6" height="67.6"/>
             <line x1="52.5" y1="0.2" x2="52.5" y2="67.8"/>
             <circle cx="52.5" cy="34" r="9.15"/>
-            <circle cx="52.5" cy="34" r="0.5" fill="currentColor" stroke="none"/>
-            {/* Strafraum, Torraum, Elfmeterpunkt und Torraumbogen, links */}
+            {/* Strafraum, Torraum und Torraumbogen, links */}
             <rect x="0.2" y="13.84" width="16.5" height="40.32"/>
             <rect x="0.2" y="24.84" width="5.5" height="18.32"/>
-            <circle cx="11" cy="34" r="0.5" fill="currentColor" stroke="none"/>
             <path d="M16.7 26.69 A 9.15 9.15 0 0 1 16.7 41.31"/>
             {/* dieselben Markierungen gespiegelt, rechts */}
             <rect x="88.3" y="13.84" width="16.5" height="40.32"/>
             <rect x="99.3" y="24.84" width="5.5" height="18.32"/>
-            <circle cx="94" cy="34" r="0.5" fill="currentColor" stroke="none"/>
             <path d="M88.3 41.31 A 9.15 9.15 0 0 1 88.3 26.69"/>
+            {/* Anstoss- und Elfmeterpunkte */}
+            {!ohnePunkte && (
+                <g fill="currentColor" stroke="none">
+                    <circle cx="52.5" cy="34" r="0.5"/>
+                    <circle cx="11" cy="34" r="0.5"/>
+                    <circle cx="94" cy="34" r="0.5"/>
+                </g>
+            )}
             {/* Eckviertel */}
             <path d="M1.2 0.2 A 1 1 0 0 1 0.2 1.2"/>
             <path d="M0.2 66.8 A 1 1 0 0 1 1.2 67.8"/>
@@ -182,14 +262,60 @@ function Spielfeld({className, proportional}: { className?: string; proportional
     );
 }
 
+/** Das Zeichen: eine Schiedsrichterpfeife, passend zu Anpfiff und Abpfiff */
+function Pfeife({className}: { className?: string }) {
+    return (
+        <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+            className={className}
+        >
+            <path d="M9 8h12v4h-6.34A6 6 0 1 1 9 8z"/>
+            <circle cx="9" cy="14" r="1.6"/>
+            <path d="M3.5 6.5 5.6 8.6"/>
+        </svg>
+    );
+}
+
+/** Zeichen und Wortmarke, oben und unten gleich */
+function Marke({hell}: { hell: boolean }) {
+    return (
+        <span className="flex items-center gap-2.5">
+            <span
+                className={`grid size-8 place-items-center rounded-lg transition-colors ${
+                    hell ? 'bg-flutlicht/15 text-flutlicht' : 'bg-primary text-primary-foreground'
+                }`}
+            >
+                <Pfeife className="size-[1.1rem]"/>
+            </span>
+            <span
+                className={`text-[15px] font-semibold tracking-tight whitespace-nowrap transition-colors ${
+                    hell ? 'text-white' : 'text-foreground'
+                }`}
+            >
+                Spesen<span className={hell ? 'text-flutlicht' : 'text-primary'}>fuchs</span>
+            </span>
+        </span>
+    );
+}
+
 /**
- * Kopfzeile. Sie liegt ueber dem dunklen Hero und ist dort durchsichtig mit
- * hellem Text; erst nach den ersten Pixeln Scrollen legt sie sich auf die
- * Flaeche der Anwendung.
+ * Kopfzeile. Ganz oben ist sie durchsichtig. Solange noch der Nacht-Block
+ * unter ihr liegt, wird sie dunkles Glas - ein heller Balken ueber dem
+ * dunklen Hero braeche die Stimmung und den Kontrast. Erst darunter legt
+ * sie sich auf die Flaeche der Anwendung.
+ *
+ * Am Handy steht rechts nur "Anmelden": die Hauptaktion hat dort der Hero
+ * und danach die Leiste am unteren Rand, in Reichweite des Daumens.
  */
-function Kopfzeile() {
-    const navigate = useNavigate();
+function Kopfzeile({angemeldet, heroRef}: { angemeldet: boolean; heroRef: RefObject<HTMLElement | null> }) {
     const [gescrollt, setGescrollt] = useState(false);
+    const ueberHero = useImBild(heroRef, {rand: '-56px 0px 0px 0px'});
 
     useEffect(() => {
         const pruefen = () => setGescrollt(window.scrollY > 24);
@@ -198,143 +324,253 @@ function Kopfzeile() {
         return () => window.removeEventListener('scroll', pruefen);
     }, []);
 
+    const dunkel = ueberHero;
+    const flaeche = !gescrollt
+        ? 'border-transparent'
+        : dunkel
+            ? 'border-white/10 bg-[oklch(0.17_0.028_158/0.72)] backdrop-blur-md'
+            : 'border-border bg-background/80 backdrop-blur-md';
+
     return (
-        <header
-            className={`fixed inset-x-0 top-0 z-50 transition-colors duration-300 ${
-                gescrollt ? 'border-b bg-background/80 backdrop-blur-md' : 'border-b border-transparent'
-            }`}
-        >
-            <div className="mx-auto flex h-14 max-w-[96rem] items-center justify-between px-4 sm:px-6">
-                <div className="flex items-center gap-2.5">
-                    <span
-                        className={`grid size-7 place-items-center rounded-lg transition-colors ${
-                            gescrollt ? 'bg-primary text-primary-foreground' : 'bg-flutlicht/15 text-flutlicht'
-                        }`}
-                    >
-                        <Receipt className="size-4"/>
-                    </span>
-                    <span
-                        className={`text-sm font-semibold tracking-tight whitespace-nowrap transition-colors ${
-                            gescrollt ? 'text-foreground' : 'text-white'
-                        }`}
-                    >
-                        Spesenfuchs
-                    </span>
-                </div>
-                <div className="flex items-center gap-2">
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => navigate('/login')}
-                        className={gescrollt ? 'text-muted-foreground' : 'text-white/75 hover:bg-white/10 hover:text-white'}
-                    >
-                        Anmelden
-                    </Button>
-                    <Button
-                        size="sm"
-                        onClick={() => navigate('/register')}
-                        className={gescrollt ? '' : 'bg-flutlicht text-nacht hover:bg-flutlicht/90'}
-                    >
-                        Kostenlos starten
-                    </Button>
-                </div>
+        <header className={`fixed inset-x-0 top-0 z-50 border-b transition-colors duration-300 ${flaeche}`}>
+            <div className={`${RAHMEN} flex h-14 items-center justify-between`}>
+                <Link to="/" aria-label="Spesenfuchs, zur Startseite" className="-m-1 rounded-lg p-1">
+                    <Marke hell={dunkel}/>
+                </Link>
+                <nav className="flex items-center gap-1 sm:gap-2">
+                    {angemeldet ? (
+                        <Button
+                            asChild
+                            size="sm"
+                            className={`h-10 px-4 sm:h-9 ${dunkel ? 'bg-flutlicht text-nacht hover:bg-flutlicht/90' : ''}`}
+                        >
+                            <Link to="/dashboard">
+                                Zum Dashboard
+                                <ArrowRight/>
+                            </Link>
+                        </Button>
+                    ) : (
+                        <>
+                            <Button
+                                asChild
+                                variant="ghost"
+                                size="sm"
+                                className={`h-11 px-3 text-sm sm:h-9 ${
+                                    dunkel ? 'text-white/80 hover:bg-white/10 hover:text-white' : 'text-foreground/75'
+                                }`}
+                            >
+                                <Link to="/login">Anmelden</Link>
+                            </Button>
+                            <Button
+                                asChild
+                                size="sm"
+                                className={`hidden h-9 px-4 sm:inline-flex ${
+                                    dunkel ? 'bg-flutlicht text-nacht hover:bg-flutlicht/90' : ''
+                                }`}
+                            >
+                                <Link to="/register">Kostenlos starten</Link>
+                            </Button>
+                        </>
+                    )}
+                </nav>
             </div>
         </header>
     );
 }
 
-/** Die Beispiel-Abrechnung, die im Hero schwebt */
-function Beispielkarte() {
-    return (
-        <>
-            {/* angeschnittene Karte dahinter, damit ein Stapel entsteht */}
-            <div className="absolute inset-x-6 -top-5 rotate-[3deg] rounded-xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
-                <p className="text-sm font-medium text-white/70">SG Blau-Gelb – FC Beispieltal</p>
-                <p className="mt-1 text-xs text-white/40">So · 23.11. · 11:00 Uhr</p>
-            </div>
+/**
+ * Die Buehne rechts im Hero, ab md: hinten das Fenster mit den Ansetzungen,
+ * vorne die fertige Abrechnung, daneben die Karte zur Anfahrt. Die Ebenen
+ * verschieben sich leicht gegeneinander, wenn der Mauszeiger sich bewegt -
+ * gesteuert ueber --zx/--zy am Rahmen, damit React dafuer nicht neu rendert.
+ */
+function Buehne({rahmen}: { rahmen: RefObject<HTMLDivElement | null> }) {
+    const ebene = (tiefe: number): CSSProperties => ({
+        transform: `translate3d(calc(var(--zx, 0) * ${tiefe}px), calc(var(--zy, 0) * ${tiefe * 0.8}px), 0)`,
+    });
 
-            <div className="relative overflow-hidden rounded-xl border border-white/15 bg-[oklch(0.22_0.03_158/0.85)] p-5 shadow-2xl shadow-black/50 backdrop-blur-md">
-                <div className="relative flex items-start justify-between gap-3">
-                    <div>
-                        <p className="text-sm font-semibold">SV Grün-Weiß – FC Kreisstadt</p>
-                        <p className="mt-1 flex items-center gap-1.5 text-xs text-white/50">
-                            <Calendar className="size-3.5"/>
-                            Sa · 22.11. · 13:00 Uhr
+    return (
+        <div
+            ref={rahmen}
+            className="relative mx-auto h-[31rem] w-full max-w-[40rem] select-none [perspective:1400px]"
+        >
+            <div
+                className="absolute inset-0 transition-transform duration-500 ease-out"
+                style={{transform: 'rotateX(calc(var(--zy, 0) * -5deg)) rotateY(calc(var(--zx, 0) * 7deg))'}}
+            >
+                <div className="absolute top-0 right-0 w-[84%] transition-transform duration-500 ease-out" style={ebene(-14)}>
+                    <Spieleliste/>
+                </div>
+
+                <div className="absolute right-0 bottom-3 z-10 w-[34%] transition-transform duration-500 ease-out" style={ebene(22)}>
+                    <div className="spesen-schweben" style={{animationDelay: '-3s'}}>
+                        <Anfahrtschip/>
+                    </div>
+                </div>
+
+                <div className="absolute bottom-0 left-0 z-20 w-[72%] transition-transform duration-500 ease-out" style={ebene(10)}>
+                    <div className="spesen-schweben">
+                        <Abrechnungskarte/>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/**
+ * Die Kennzahlen als Anzeigetafel am Fuss des Hero. Die Zahl der erfassten
+ * Spiele erscheint nur, wenn es eine gibt - ein Strich oder eine Null saehe
+ * nach kaputt aus. Gezaehlt wird erst, wenn die Tafel im Bild ist.
+ */
+function Anzeigetafel() {
+    const tafel = useRef<HTMLDivElement>(null);
+    const [spiele, setSpiele] = useState<number | 'laedt' | 'fehlt'>('laedt');
+    const gesehen = useImBild(tafel, {einmal: true, anfang: false});
+    const gezaehlt = useCountUp(gesehen && typeof spiele === 'number' ? spiele : null);
+
+    useEffect(() => {
+        api.get('/api/stats/public')
+            .then((response) => {
+                const anzahl = Number(response.data?.matches_total);
+                setSpiele(Number.isFinite(anzahl) && anzahl > 0 ? anzahl : 'fehlt');
+            })
+            .catch(() => setSpiele('fehlt'));
+    }, []);
+
+    const felder: { wert: ReactNode; kurz: string; lang: string }[] = [
+        {wert: '03:00', kurz: 'Abruf jede Nacht', lang: 'Uhr – automatischer Abruf, jede Nacht'},
+        {wert: '0 €', kurz: 'für alle SR', lang: 'kostenlos für alle SR in Thüringen'},
+    ];
+    if (spiele !== 'fehlt') {
+        felder.push({
+            wert: spiele === 'laedt'
+                ? <span className="inline-block h-[0.8em] w-[2.5em] rounded-md bg-white/10 align-middle"/>
+                : gezaehlt.toLocaleString('de-DE'),
+            kurz: 'Spiele erfasst',
+            lang: 'Spiele bisher erfasst',
+        });
+    }
+
+    return (
+        <div ref={tafel} className="relative border-t border-white/10 bg-[oklch(0.145_0.026_158/0.88)]">
+            <div className={`${RAHMEN} grid ${felder.length === 3 ? 'grid-cols-3' : 'grid-cols-2'} divide-x divide-white/10`}>
+                {felder.map((feld) => (
+                    <div key={feld.kurz} className="px-1 py-4 text-center sm:py-7">
+                        <p className="spesen-leuchtziffer text-2xl font-semibold tracking-tight text-flutlicht tabular-nums sm:text-4xl lg:text-5xl">
+                            {feld.wert}
+                        </p>
+                        <p className="mt-1 text-xs text-white/60 sm:text-sm">
+                            <span className="sm:hidden">{feld.kurz}</span>
+                            <span className="hidden sm:inline">{feld.lang}</span>
                         </p>
                     </div>
-                    <span className="flex shrink-0 items-center gap-1.5 text-xs text-white/60">
-                        <span className="relative grid size-2 place-items-center">
-                            <span className="spesen-puls absolute size-2 rounded-full bg-flutlicht"/>
-                            <span className="size-2 rounded-full bg-flutlicht"/>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function Satzchip({satz}: { satz: (typeof SPESENSAETZE)[number] }) {
+    return (
+        <span className="flex shrink-0 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[13px] whitespace-nowrap text-white/60 sm:py-1 sm:text-xs">
+            <span className="font-medium text-white/90">{satz.klasse}</span>
+            <span className="text-flutlicht tabular-nums">{satz.sr}</span>
+            <span className="text-white/30">/</span>
+            <span className="tabular-nums">{satz.sra}</span>
+        </span>
+    );
+}
+
+/**
+ * Die Saetze der Spesenordnung. Am Handy eine Reihe zum Wischen - ein
+ * Laufband liesse sich dort weder anhalten noch in Ruhe lesen. Ab sm laeuft
+ * es als Band mit fester Quellenangabe links und einem Knopf zum Anhalten.
+ * Die zweite Kopie des Bandes gibt es nur fuers Auge, Screenreader lesen die
+ * Liste einmal. Ohne Bewegung bricht das Band um, statt abgeschnitten
+ * stehen zu bleiben (siehe index.css).
+ */
+function Satzband() {
+    const [angehalten, setAngehalten] = useState(false);
+
+    return (
+        <div className="relative border-t border-white/10 bg-[oklch(0.145_0.026_158/0.88)]">
+            {/* Handy */}
+            <div className="py-3 sm:hidden">
+                <p className="px-4 text-[11px] font-medium tracking-wide text-white/60">{QUELLE}</p>
+                <div className="mt-2 flex snap-x snap-mandatory scroll-px-4 gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    {SPESENSAETZE.map((satz) => (
+                        <span key={satz.klasse} className="snap-start">
+                            <Satzchip satz={satz}/>
                         </span>
-                        Fertig
-                    </span>
-                </div>
-
-                <div className="relative mt-4 grid gap-1.5 rounded-lg border border-dashed border-white/15 p-3 text-sm">
-                    <div className="grid grid-cols-[90px_1fr] gap-2">
-                        <span className="text-white/50">SR</span>
-                        <span className="font-mono font-medium text-flutlicht">50,00 €</span>
-                    </div>
-                    <div className="grid grid-cols-[90px_1fr] gap-2">
-                        <span className="text-white/50">SRA</span>
-                        <span className="font-mono font-medium text-flutlicht">40,00 €</span>
-                    </div>
-                </div>
-
-                <div className="relative mt-4 flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-2.5 py-1 text-xs font-medium text-white/80">
-                        <Download className="size-3.5"/>
-                        DOCX
-                    </span>
-                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-2.5 py-1 text-xs font-medium text-white/80">
-                        <Download className="size-3.5"/>
-                        PDF
-                    </span>
-                    <span className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-flutlicht/15 px-2.5 py-1 text-xs font-medium text-flutlicht">
-                        <MoonStar className="size-3.5"/>
-                        Heute 03:00
-                    </span>
+                    ))}
                 </div>
             </div>
-        </>
+
+            {/* ab sm */}
+            <div className="hidden items-stretch sm:flex">
+                <p className="flex shrink-0 items-center border-r border-white/10 px-6 text-xs font-medium text-white/60 lg:px-10">
+                    {QUELLE}
+                </p>
+                <div className="relative min-w-0 flex-1 overflow-hidden py-3">
+                    <div className="spesen-laufband-rand pointer-events-none absolute inset-y-0 left-0 z-10 w-16 bg-gradient-to-r from-[oklch(0.145_0.026_158)] to-transparent"/>
+                    <div className="spesen-laufband-rand pointer-events-none absolute inset-y-0 right-0 z-10 w-16 bg-gradient-to-l from-[oklch(0.145_0.026_158)] to-transparent"/>
+                    <div className={`spesen-laufband flex w-max ${angehalten ? 'is-angehalten' : ''}`}>
+                        {[0, 1].map((durchlauf) => (
+                            <div
+                                key={durchlauf}
+                                aria-hidden={durchlauf === 1 || undefined}
+                                className="spesen-laufband-gruppe flex shrink-0 gap-3 pr-3"
+                            >
+                                {SPESENSAETZE.map((satz) => <Satzchip key={satz.klasse} satz={satz}/>)}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+                <button
+                    type="button"
+                    onClick={() => setAngehalten((wert) => !wert)}
+                    aria-label={angehalten ? 'Laufband weiterlaufen lassen' : 'Laufband anhalten'}
+                    className="grid w-12 shrink-0 place-items-center border-l border-white/10 text-white/60 transition-colors hover:bg-white/5 hover:text-white motion-reduce:hidden"
+                >
+                    {angehalten ? <Play className="size-4"/> : <Pause className="size-4"/>}
+                </button>
+            </div>
+        </div>
     );
 }
 
 /** Der dunkle Block ganz oben: Versprechen, Beispiel, Zahlen, Spesensaetze */
-function Hero() {
-    const navigate = useNavigate();
-    const [docCount, setDocCount] = useState<number | null>(null);
-    const [zeiger, setZeiger] = useState({x: 0, y: 0});
-    const gezaehlt = useCountUp(docCount);
+function Hero({angemeldet, heroRef, ctaRef}: {
+    angemeldet: boolean;
+    heroRef: RefObject<HTMLElement | null>;
+    ctaRef: RefObject<HTMLDivElement | null>;
+}) {
+    const buehne = useRef<HTMLDivElement>(null);
 
-    // Live-Anzahl der erfassten Spiele laden
-    useEffect(() => {
-        api.get('/api/stats/public')
-            .then((response) => setDocCount(response.data.matches_total))
-            .catch(() => {
-                // Fallback bleibt bei der statischen Anzeige
-            });
-    }, []);
-
-    // Die Karte dreht sich ein Stueck zum Mauszeiger. Auf Touchgeraeten
-    // kommt kein mousemove an, dort bleibt sie schlicht gerade stehen.
+    // Die Buehne neigt sich ein Stueck zum Mauszeiger. Auf Touchgeraeten
+    // kommt kein mousemove an, dort bleibt sie schlicht stehen.
     const zeigerBewegt = (ereignis: React.MouseEvent<HTMLElement>) => {
-        if (magKeineBewegung()) {
+        const element = buehne.current;
+        if (!element || magKeineBewegung()) {
             return;
         }
         const kasten = ereignis.currentTarget.getBoundingClientRect();
-        setZeiger({
-            x: (ereignis.clientX - kasten.left) / kasten.width - 0.5,
-            y: (ereignis.clientY - kasten.top) / kasten.height - 0.5,
-        });
+        element.style.setProperty('--zx', ((ereignis.clientX - kasten.left) / kasten.width - 0.5).toFixed(3));
+        element.style.setProperty('--zy', ((ereignis.clientY - kasten.top) / kasten.height - 0.5).toFixed(3));
+    };
+
+    const zeigerWeg = () => {
+        buehne.current?.style.setProperty('--zx', '0');
+        buehne.current?.style.setProperty('--zy', '0');
     };
 
     return (
         <section
-            className="spesen-nacht relative isolate overflow-hidden text-white"
+            ref={heroRef}
+            className="spesen-nacht relative isolate flex flex-col overflow-hidden text-white lg:min-h-[100svh]"
             onMouseMove={zeigerBewegt}
-            onMouseLeave={() => setZeiger({x: 0, y: 0})}
+            onMouseLeave={zeigerWeg}
         >
             {/* Spielfeld, in die Tiefe gekippt */}
             <div aria-hidden className="spesen-feld pointer-events-none absolute inset-x-0 bottom-0 h-[65%]">
@@ -348,20 +584,21 @@ function Hero() {
             <div aria-hidden className="spesen-strahl spesen-flutlicht pointer-events-none absolute inset-0"/>
             <div aria-hidden className="spesen-koerner pointer-events-none absolute inset-0"/>
 
-            <div className="relative mx-auto grid max-w-[96rem] items-center gap-14 px-4 pt-28 pb-16 sm:px-6 sm:pt-36 lg:grid-cols-[1.05fr_0.95fr] lg:pb-24">
+            <div className={`${RAHMEN} relative grid flex-1 items-center gap-12 pt-24 pb-12 sm:pt-32 md:gap-14 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.02fr)] lg:content-center lg:gap-10 lg:pt-24 lg:pb-14 xl:gap-16`}>
                 <div className="text-center lg:text-left">
                     <p
-                        className="spesen-aufsteigen mb-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-medium text-white/75 backdrop-blur"
+                        className="spesen-aufsteigen mb-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-medium text-white/80 backdrop-blur"
                         style={{animationDelay: '60ms'}}
                     >
                         <span className="relative grid size-1.5 place-items-center">
                             <span className="spesen-puls absolute size-1.5 rounded-full bg-flutlicht"/>
                             <span className="size-1.5 rounded-full bg-flutlicht"/>
                         </span>
-                        Für Schiedsrichter des Thüringer Fußball-Verbandes
+                        <span className="sm:hidden">Für Schiedsrichter im TFV</span>
+                        <span className="hidden sm:inline">Für Schiedsrichter des Thüringer Fußball-Verbandes</span>
                     </p>
 
-                    <h1 className="text-4xl font-semibold tracking-tight sm:text-6xl lg:text-7xl">
+                    <h1 className="text-[clamp(2.4rem,1rem+3.9vw,5.75rem)] leading-[1.02] font-semibold tracking-[-0.035em]">
                         {/* Jede Zeile faehrt aus ihrer eigenen Zeile herauf, deshalb
                             der Ausschnitt je Zeile statt einer Animation auf der
                             ganzen Ueberschrift. */}
@@ -372,186 +609,156 @@ function Hero() {
                         </span>
                         <span className="block overflow-hidden pb-2 -mb-2">
                             <span className="spesen-zeile block" style={{animationDelay: '240ms'}}>
-                                <span className="text-flutlicht">Papierkram</span>.
+                                <span className="spesen-leuchtschrift text-flutlicht">Papierkram</span>.
                             </span>
                         </span>
                     </h1>
 
                     <p
-                        className="spesen-aufsteigen mx-auto mt-6 max-w-xl text-base text-white/60 sm:text-lg lg:mx-0"
+                        className="spesen-aufsteigen mx-auto mt-5 max-w-xl text-[17px] leading-relaxed text-white/70 sm:mt-6 sm:text-lg lg:mx-0"
                         style={{animationDelay: '380ms'}}
                     >
-                        Deine Spesenabrechnungen entstehen jede Nacht automatisch aus deinen
-                        DFBnet-Ansetzungen. Fertig als Word und PDF, bevor du überhaupt daran denkst.
+                        Deine Spesenabrechnungen entstehen jede Nacht aus deinen DFBnet-Ansetzungen.
+                        Satz, Gespann und Spielstätte stehen schon drin – du trägst nur noch die Kilometer ein.
                     </p>
 
                     <div
-                        className="spesen-aufsteigen mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center lg:justify-start"
+                        ref={ctaRef}
+                        className="spesen-aufsteigen mt-7 flex flex-col items-center gap-3 sm:mt-8 sm:flex-row sm:justify-center lg:justify-start"
                         style={{animationDelay: '460ms'}}
                     >
                         <Button
+                            asChild
                             size="lg"
-                            onClick={() => navigate('/register')}
-                            className="w-full bg-flutlicht text-nacht shadow-lg shadow-flutlicht/20 hover:bg-flutlicht/90 sm:w-auto"
+                            className="h-12 w-full bg-flutlicht px-6 text-base text-nacht shadow-lg shadow-flutlicht/25 hover:bg-flutlicht/90 sm:h-11 sm:w-auto sm:text-[15px]"
                         >
-                            Kostenlos starten
-                            <ArrowRight className="size-4"/>
+                            <Link to={angemeldet ? '/dashboard' : '/register'}>
+                                {angemeldet ? 'Zum Dashboard' : 'Kostenlos starten'}
+                                <ArrowRight className="size-4"/>
+                            </Link>
                         </Button>
-                        <Button
-                            size="lg"
-                            variant="secondary"
-                            onClick={() => navigate('/login')}
-                            className="w-full border border-white/20 bg-white/10 text-white hover:bg-white/20 sm:w-auto"
-                        >
-                            Anmelden
-                        </Button>
+                        {!angemeldet && (
+                            <>
+                                <Button
+                                    asChild
+                                    size="lg"
+                                    variant="secondary"
+                                    className="hidden h-11 border border-white/20 bg-white/10 px-6 text-[15px] text-white hover:bg-white/20 sm:inline-flex"
+                                >
+                                    <Link to="/login">Anmelden</Link>
+                                </Button>
+                                <Link
+                                    to="/login"
+                                    className="inline-flex min-h-11 items-center px-3 text-sm text-white/70 underline-offset-4 hover:text-white hover:underline sm:hidden"
+                                >
+                                    Schon dabei?&nbsp;<span className="font-medium text-white">Anmelden</span>
+                                </Link>
+                            </>
+                        )}
                     </div>
 
-                    <div
-                        className="spesen-aufsteigen mt-8 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm text-white/55 lg:justify-start"
+                    <ul
+                        className="spesen-aufsteigen mt-5 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-sm text-white/65 sm:mt-8 sm:gap-x-5 lg:justify-start"
                         style={{animationDelay: '540ms'}}
                     >
-                        {['100% kostenlos', 'Keine Installation', 'Verschlüsselte Daten'].map((eintrag) => (
-                            <span key={eintrag} className="flex items-center gap-1.5">
+                        {['Kostenlos', 'Ohne Installation', 'Verschlüsselt'].map((eintrag) => (
+                            <li key={eintrag} className="flex items-center gap-1.5">
                                 <CheckCircle2 className="size-4 text-flutlicht"/>
                                 {eintrag}
-                            </span>
+                            </li>
                         ))}
-                    </div>
+                    </ul>
                 </div>
 
-                <div
-                    aria-hidden
-                    className="spesen-aufsteigen relative mx-auto w-full max-w-sm select-none"
-                    style={{animationDelay: '520ms'}}
-                >
-                    <div className="spesen-schweben relative">
-                        <div
-                            className="transition-transform duration-300 ease-out"
-                            style={{
-                                transform: `perspective(1000px) rotateX(${-zeiger.y * 6}deg) rotateY(${zeiger.x * 9}deg)`,
-                            }}
-                        >
-                            <Beispielkarte/>
+                <div className="spesen-aufsteigen relative w-full" style={{animationDelay: '520ms'}}>
+                    {/* Handy: nur die Abrechnung, die Buehne waere dort zu klein */}
+                    <div className="mx-auto w-full max-w-md md:hidden">
+                        <div className="spesen-schweben">
+                            <Abrechnungskarte/>
                         </div>
+                    </div>
+                    <div className="hidden md:block">
+                        <Buehne rahmen={buehne}/>
                     </div>
                 </div>
             </div>
 
-            {/* Zahlenband */}
-            <div className="relative border-t border-white/10">
-                <div className="mx-auto grid max-w-[96rem] divide-y divide-white/10 px-4 sm:grid-cols-3 sm:divide-x sm:divide-y-0 sm:px-6">
-                    {[
-                        {
-                            wert: docCount !== null ? gezaehlt.toLocaleString('de-DE') : '–',
-                            label: 'Spiele erfasst',
-                        },
-                        {wert: '03:00', label: 'Uhr startet der automatische Lauf, jede Nacht'},
-                        {wert: '0 €', label: 'Kostenlos für alle SR in Thüringen'},
-                    ].map((zahl) => (
-                        <div key={zahl.label} className="px-2 py-8 text-center">
-                            <p className="font-mono text-3xl font-semibold tracking-tight text-flutlicht sm:text-4xl">
-                                {zahl.wert}
-                            </p>
-                            <p className="mt-1 text-sm text-white/45">{zahl.label}</p>
-                        </div>
-                    ))}
-                </div>
-            </div>
-
-            {/* Laufband der Spesensaetze */}
-            <div className="relative overflow-hidden border-t border-white/10 py-3">
-                <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-16 bg-gradient-to-r from-nacht to-transparent sm:w-24"/>
-                <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-16 bg-gradient-to-l from-nacht to-transparent sm:w-24"/>
-                <div className="spesen-laufband flex w-max">
-                    {[0, 1].map((durchlauf) => (
-                        <div key={durchlauf} className="flex shrink-0 gap-3 pr-3">
-                            <span className="flex items-center rounded-full border border-dashed border-white/15 px-3 py-1 text-xs whitespace-nowrap text-white/40">
-                                TFV-Spesenordnung §2, Stand 01.07.2025
-                            </span>
-                            {SPESENSAETZE.map((satz) => (
-                                <span
-                                    key={satz.klasse}
-                                    className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs whitespace-nowrap text-white/55"
-                                >
-                                    <span className="font-medium text-white/85">{satz.klasse}</span>
-                                    <span className="font-mono text-flutlicht">{satz.sr}</span>
-                                    <span className="text-white/25">/</span>
-                                    <span className="font-mono">{satz.sra}</span>
-                                </span>
-                            ))}
-                        </div>
-                    ))}
-                </div>
-            </div>
+            <Anzeigetafel/>
+            <Satzband/>
+            {/* Leuchtende Seitenlinie als Grenze zum hellen Teil */}
+            <div aria-hidden className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-flutlicht/50 to-transparent"/>
         </section>
     );
 }
 
-/**
- * Uhr auf drei Uhr nachts - die Zeit, zu der der Lauf fuer alle Nutzer
- * startet. Sie steht auf der dunklen Kachel und macht aus der Zusage im
- * Text ein Bild.
- */
-function Nachtuhr() {
+/** Rahmen einer dunklen Kachel, mit dem Rasen des Hero als Grund */
+function NachtFlaeche({children, className = ''}: { children: ReactNode; className?: string }) {
     return (
-        <div className="relative flex shrink-0 flex-col items-center gap-2">
-            <svg viewBox="0 0 100 100" className="size-24 sm:size-28" fill="none" aria-hidden>
-                <circle cx="50" cy="50" r="46" strokeWidth="1" className="stroke-white/15"/>
-                <circle
-                    cx="50"
-                    cy="50"
-                    r="38"
-                    strokeWidth="1.5"
-                    strokeDasharray="1 7"
-                    strokeLinecap="round"
-                    className="stroke-flutlicht/40"
-                />
-                {/* Zeiger auf 03:00 */}
-                <line x1="50" y1="50" x2="50" y2="24" strokeWidth="3" strokeLinecap="round" className="stroke-white/70"/>
-                <line x1="50" y1="50" x2="74" y2="50" strokeWidth="3" strokeLinecap="round" className="stroke-flutlicht"/>
-                <circle cx="50" cy="50" r="3" className="fill-flutlicht stroke-none"/>
-            </svg>
-            <span className="font-mono text-xs tracking-wide text-white/50">03:00 Uhr</span>
-        </div>
-    );
-}
-
-/**
- * Die dunklen Kacheln im hellen Raster. Es sind zwei, diagonal gegenueber:
- * eine allein waere ein Ausreisser, zwei ergeben einen Rhythmus.
- */
-function NachtKachel({feature}: { feature: Vorteil }) {
-    return (
-        <div className="spesen-nacht relative isolate flex h-full flex-col gap-5 overflow-hidden rounded-2xl border border-white/10 p-6 text-white sm:flex-row sm:items-center sm:gap-6">
+        <div className={`spesen-nacht relative isolate h-full overflow-hidden rounded-2xl border border-white/10 p-5 text-white sm:p-6 ${className}`}>
             <div aria-hidden className="spesen-feld pointer-events-none absolute inset-x-0 bottom-0 h-3/4">
                 <div className="absolute inset-0">
                     <div className="spesen-rasen absolute inset-0"/>
                 </div>
             </div>
-
-            <span className="relative grid size-10 shrink-0 place-items-center rounded-xl bg-flutlicht/15 text-flutlicht sm:size-14">
-                <feature.icon className="size-5 sm:size-6"/>
-            </span>
-
-            <div className="relative">
-                <h3 className="font-medium">{feature.title}</h3>
-                <p className={`mt-1.5 text-sm leading-relaxed text-white/55 ${feature.uhr ? 'max-w-sm' : ''}`}>
-                    {feature.description}
-                </p>
-            </div>
-
-            {feature.uhr && (
-                <div className="relative sm:ml-auto">
-                    <Nachtuhr/>
-                </div>
-            )}
+            {children}
         </div>
     );
 }
 
-/** Eine helle Feature-Kachel, deren Lichtpunkt dem Mauszeiger folgt */
-function VorteilKarte({feature}: { feature: Vorteil }) {
+function Kachelkopf({icon: Icon, title, hell}: { icon: LucideIcon; title: string; hell?: boolean }) {
+    return (
+        <div className="flex items-center gap-3">
+            <span
+                className={`grid size-9 shrink-0 place-items-center rounded-xl ${
+                    hell ? 'bg-flutlicht/15 text-flutlicht' : 'bg-primary/10 text-primary'
+                }`}
+            >
+                <Icon className="size-[1.1rem]"/>
+            </span>
+            <h3 className="font-medium">{title}</h3>
+        </div>
+    );
+}
+
+/** Die Nacht-Kachel mit der Uhr: der Lauf um 3 Uhr */
+function LaufKachel() {
+    return (
+        <NachtFlaeche className="flex items-center gap-5 sm:gap-8">
+            <div className="relative min-w-0 flex-1">
+                <Kachelkopf icon={MoonStar} title="Läuft, während du schläfst" hell/>
+                <p className="mt-3 max-w-md text-sm leading-relaxed text-white/65">
+                    Jede Nacht um 3 Uhr holt Spesenfuchs deine neuen Ansetzungen aus DFBnet und legt die
+                    Abrechnungen an. Eilig? Dann startest du den Abruf selbst.
+                </p>
+            </div>
+            <div className="relative flex shrink-0 flex-col items-center gap-2">
+                <Nachtuhr className="size-20 sm:size-28"/>
+                <span className="text-[11px] tracking-wide text-white/55 tabular-nums">03:00 Uhr</span>
+            </div>
+        </NachtFlaeche>
+    );
+}
+
+/** Die Nacht-Kachel mit der Saison */
+function SaisonKachel() {
+    return (
+        <NachtFlaeche className="grid gap-5 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] md:items-center md:gap-8">
+            <div className="relative">
+                <Kachelkopf icon={ChartColumn} title="Deine Saison in Zahlen" hell/>
+                <p className="mt-3 text-sm leading-relaxed text-white/65">
+                    Alle geleiteten Spiele je Saison mit Ergebnis, Karten und Gespann – dazu deine
+                    Einsatzbilanz als SR und SRA, Lehrabende und Leistungsprüfung.
+                </p>
+            </div>
+            <div className="relative">
+                <Saisontafel/>
+            </div>
+        </NachtFlaeche>
+    );
+}
+
+/** Eine helle Kachel mit Beleg oben und Text darunter */
+function Funktionskachel({funktion}: { funktion: Funktion }) {
     const zeigerBewegt = (ereignis: React.MouseEvent<HTMLDivElement>) => {
         const kasten = ereignis.currentTarget.getBoundingClientRect();
         ereignis.currentTarget.style.setProperty('--mx', `${ereignis.clientX - kasten.left}px`);
@@ -561,62 +768,95 @@ function VorteilKarte({feature}: { feature: Vorteil }) {
     return (
         <div
             onMouseMove={zeigerBewegt}
-            className={`spesen-glanz group relative isolate h-full overflow-hidden rounded-2xl border bg-card p-6 transition duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5 ${
-                // Die breite Kachel stellt Zeichen und Text nebeneinander,
-                // sonst bliebe die halbe Flaeche leer.
-                feature.breit ? 'sm:flex sm:items-center sm:gap-6' : ''
-            }`}
+            className="spesen-glanz spesen-kachel group relative isolate flex h-full flex-col overflow-hidden rounded-2xl border bg-card p-4 transition duration-300 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5 motion-safe:hover:-translate-y-1 sm:p-5"
         >
-            <span
-                className={`relative grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary transition-transform duration-300 group-hover:scale-110 ${
-                    feature.breit ? 'mb-4 sm:mb-0 sm:size-14' : 'mb-4'
-                }`}
-            >
-                <feature.icon className={feature.breit ? 'size-5 sm:size-6' : 'size-5'}/>
-            </span>
-            <div className="relative">
-                <h3 className="font-medium">{feature.title}</h3>
-                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-                    {feature.description}
+            <div className="relative flex h-40 items-center justify-center overflow-hidden rounded-xl border bg-muted/40 p-3 dark:bg-white/[0.025]">
+                {funktion.bild}
+            </div>
+            <div className="relative mt-4 px-1">
+                <Kachelkopf icon={funktion.icon} title={funktion.title}/>
+                <p className="mt-2.5 text-sm leading-relaxed text-muted-foreground">
+                    {funktion.description}
                 </p>
             </div>
         </div>
     );
 }
 
-function Vorteile() {
+/**
+ * Die Funktionen als Aufstellung. Ab sm ein Raster in 2 + 1 + 1 und
+ * 1 + 1 + 2, dunkel oben links und unten rechts. Am Handy stehen die zwei
+ * dunklen Kacheln breit, die vier hellen dazwischen in einer Reihe zum
+ * Wischen - sechs gestapelte Kaesten waeren fast zwei Bildschirme Scrollen.
+ * Ab sm loest sich die Reihe per display: contents ins Raster auf.
+ */
+function Aufstellung() {
+    const reihe = useRef<HTMLDivElement>(null);
+    const [aktiv, setAktiv] = useState(0);
+
+    const gewischt = () => {
+        const element = reihe.current;
+        if (!element) {
+            return;
+        }
+        const weg = element.scrollWidth - element.clientWidth;
+        setAktiv(weg > 0 ? Math.round((element.scrollLeft / weg) * (FUNKTIONEN.length - 1)) : 0);
+    };
+
     return (
-        <section className="spesen-band relative isolate overflow-hidden border-b py-20 sm:py-28">
+        <section className="spesen-band relative isolate overflow-hidden py-16 sm:py-24 lg:py-28">
             <div aria-hidden className="spesen-uebergang pointer-events-none absolute inset-x-0 top-0 h-64"/>
-            <div className="relative mx-auto max-w-[96rem] px-4 sm:px-6">
-                <div data-reveal className="mb-12 max-w-xl">
-                    <p className="mb-2 text-xs font-medium tracking-wide text-primary uppercase">Features</p>
-                    <h2 className="text-2xl font-semibold tracking-tight text-balance sm:text-4xl">
-                        Vom Anstoß bis zur Auszahlung, ohne Umwege
-                    </h2>
+            <div className={`${RAHMEN} relative`}>
+                <div data-reveal className="mb-10 grid gap-4 sm:mb-12 lg:grid-cols-2 lg:items-end lg:gap-16">
+                    <div>
+                        <p className="mb-2 text-xs font-medium tracking-wide text-primary uppercase">Aufstellung</p>
+                        <h2 className="text-[1.75rem] leading-tight font-semibold tracking-tight text-balance sm:text-4xl">
+                            Mehr als eine Abrechnung
+                        </h2>
+                    </div>
+                    <p className="max-w-xl text-[15px] leading-relaxed text-muted-foreground sm:text-base lg:justify-self-end">
+                        Rund um jede Ansetzung liegt alles an einem Ort: Anfahrt, Einstufung, Dokumente, deine
+                        Stammdaten und die ganze Saison – aus deinen DFBnet-Daten, ohne Abtippen.
+                    </p>
                 </div>
 
-                {/*
-                    Zwei Kacheln laufen ueber zwei Spalten. Damit gehen beide
-                    Reihen glatt auf - ab sm 2 + 1 + 1 und 1 + 1 + 2, ab lg
-                    dieselbe Folge in vier Spalten - und das Raster wirkt
-                    gesetzt statt gleichfoermig.
-                */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    {FEATURES.map((feature, index) => (
-                        // Das Einblenden liegt auf dem Rahmen, damit es der
-                        // Kachel ihr transform beim Darueberfahren nicht nimmt.
-                        <div
-                            key={feature.title}
-                            data-reveal
-                            style={verzoegerung(index * 70)}
-                            className={feature.breit ? 'sm:col-span-2' : ''}
-                        >
-                            {feature.nacht
-                                ? <NachtKachel feature={feature}/>
-                                : <VorteilKarte feature={feature}/>}
-                        </div>
-                    ))}
+                    <div data-reveal className="sm:col-span-2">
+                        <LaufKachel/>
+                    </div>
+
+                    <div
+                        ref={reihe}
+                        onScroll={gewischt}
+                        data-reveal
+                        className="spesen-wisch -mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:contents [&::-webkit-scrollbar]:hidden"
+                    >
+                        {FUNKTIONEN.map((funktion, index) => (
+                            <div
+                                key={funktion.title}
+                                data-reveal
+                                style={verzoegerung(70 + index * 70)}
+                                className="w-[84%] shrink-0 snap-start sm:w-auto"
+                            >
+                                <Funktionskachel funktion={funktion}/>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div aria-hidden className="-mt-1 flex justify-center gap-1.5 sm:hidden">
+                        {FUNKTIONEN.map((funktion, index) => (
+                            <span
+                                key={funktion.title}
+                                className={`h-1.5 rounded-full transition-all duration-300 ${
+                                    index === aktiv ? 'w-5 bg-primary' : 'w-1.5 bg-foreground/20'
+                                }`}
+                            />
+                        ))}
+                    </div>
+
+                    <div data-reveal style={verzoegerung(140)} className="sm:col-span-2">
+                        <SaisonKachel/>
+                    </div>
                 </div>
             </div>
         </section>
@@ -626,7 +866,9 @@ function Vorteile() {
 /**
  * Die vier Schritte auf einer Bahn, die beim Scrollen mitlaeuft: untereinander
  * senkrecht, ab lg waagerecht zwischen den Ziffern. Am Kopf der Fuellung
- * laeuft ein Punkt mit, damit zu sehen ist, wo die Bahn gerade steht.
+ * laeuft ein Ball mit, damit zu sehen ist, wo die Bahn gerade steht. Der
+ * Abschnitt ist ein Nacht-Band: hell, dunkel, hell, dunkel statt dreier
+ * heller Bloecke hintereinander.
  */
 function Spielablauf() {
     const bereich = useRef<HTMLDivElement>(null);
@@ -634,29 +876,30 @@ function Spielablauf() {
     const stufe = fortschritt * SCHRITTE.length;
 
     return (
-        <section className="relative isolate overflow-hidden py-20 sm:py-28">
-            <div aria-hidden className="spesen-punkte pointer-events-none absolute inset-0 opacity-60"/>
-            <div className="relative mx-auto max-w-[96rem] px-4 sm:px-6">
-                <div data-reveal className="mb-12 max-w-xl">
-                    <p className="mb-2 text-xs font-medium tracking-wide text-primary uppercase">Spielablauf</p>
-                    <h2 className="text-2xl font-semibold tracking-tight text-balance sm:text-4xl">
-                        Von der Registrierung bis zum Abpfiff
+        <section className="spesen-nacht relative isolate overflow-hidden py-16 text-white sm:py-24 lg:py-28">
+            <div aria-hidden className="pointer-events-none absolute inset-0 hidden place-items-center lg:grid">
+                <Spielfeld proportional ohnePunkte className="spesen-wasserzeichen w-[min(94%,86rem)] text-white/[0.07]"/>
+            </div>
+            <div aria-hidden className="spesen-koerner pointer-events-none absolute inset-0"/>
+
+            <div className={`${RAHMEN} relative`}>
+                <div data-reveal className="mb-10 max-w-xl sm:mb-14">
+                    <p className="mb-2 text-xs font-medium tracking-wide text-flutlicht uppercase">Spielablauf</p>
+                    <h2 className="text-[1.75rem] leading-tight font-semibold tracking-tight text-balance sm:text-4xl">
+                        In vier Schritten zur Abrechnung
                     </h2>
                 </div>
 
-                <div ref={bereich} className="relative grid gap-10 lg:grid-cols-4 lg:gap-8">
+                <div ref={bereich} className="relative grid gap-9 lg:grid-cols-4 lg:gap-8">
                     {/* Senkrechte Bahn, solange die Schritte untereinander stehen */}
-                    <div
-                        aria-hidden
-                        className="absolute top-5 bottom-5 left-[1.375rem] w-px bg-border lg:hidden"
-                    >
+                    <div aria-hidden className="absolute top-5 bottom-5 left-[1.375rem] w-px bg-white/12 lg:hidden">
                         <div
-                            className="absolute inset-x-0 top-0 bg-primary"
+                            className="absolute inset-x-0 top-0 bg-flutlicht shadow-[0_0_12px] shadow-flutlicht/60"
                             style={{height: `${fortschritt * 100}%`}}
                         />
                         {fortschritt > 0 && fortschritt < 1 && (
                             <span
-                                className="absolute left-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary ring-4 ring-primary/15"
+                                className="spesen-ball absolute left-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white"
                                 style={{top: `${fortschritt * 100}%`}}
                             />
                         )}
@@ -673,35 +916,42 @@ function Spielablauf() {
                                 style={verzoegerung(index * 90)}
                                 className="relative pl-16 lg:pl-0"
                             >
-                                <div className="absolute top-0 left-0 lg:static lg:mb-4 lg:flex lg:items-center lg:gap-3">
+                                <div className="absolute top-0 left-0 lg:static lg:mb-5 lg:flex lg:items-center lg:gap-3">
                                     <span
-                                        className={`grid size-11 shrink-0 place-items-center rounded-full font-mono text-sm font-semibold transition-all duration-500 ${
+                                        className={`grid size-11 shrink-0 place-items-center rounded-full border font-mono text-sm font-semibold transition-all duration-500 ${
                                             erreicht
-                                                ? 'bg-primary text-primary-foreground ring-4 ring-primary/15'
-                                                : 'bg-muted text-muted-foreground ring-4 ring-transparent'
+                                                ? 'border-flutlicht bg-flutlicht text-nacht shadow-[0_0_24px] shadow-flutlicht/40'
+                                                : 'border-white/15 bg-white/5 text-white/60'
                                         }`}
                                     >
                                         {String(index + 1).padStart(2, '0')}
                                     </span>
                                     {index < SCHRITTE.length - 1 && (
-                                        <span aria-hidden className="relative hidden h-px flex-1 bg-border lg:block">
+                                        <span aria-hidden className="relative hidden h-px flex-1 bg-white/12 lg:block">
                                             <span
-                                                className="absolute inset-y-0 left-0 bg-primary"
+                                                className="absolute inset-y-0 left-0 bg-flutlicht shadow-[0_0_12px] shadow-flutlicht/60"
                                                 style={{width: `${fuellung * 100}%`}}
                                             />
                                             {fuellung > 0 && fuellung < 1 && (
                                                 <span
-                                                    className="absolute top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary ring-4 ring-primary/15"
+                                                    className="spesen-ball absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white"
                                                     style={{left: `${fuellung * 100}%`}}
                                                 />
                                             )}
                                         </span>
                                     )}
                                 </div>
-                                <h3 className="font-medium">{schritt.title}</h3>
-                                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                                <p className="font-mono text-[11px] tracking-widest text-flutlicht/80 uppercase">
+                                    {schritt.phase}
+                                </p>
+                                <h3 className="mt-1 text-lg font-medium">{schritt.title}</h3>
+                                <p className="mt-1.5 text-sm leading-relaxed text-white/65">
                                     {schritt.description}
                                 </p>
+                                <span className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-white/15 px-2.5 py-1 text-xs text-white/70">
+                                    <Clock className="size-3.5 text-flutlicht"/>
+                                    {schritt.chip}
+                                </span>
                             </div>
                         );
                     })}
@@ -711,32 +961,85 @@ function Spielablauf() {
     );
 }
 
+/** Was mit den Daten passiert - die groesste Huerde vor der Registrierung */
+function Fairplay() {
+    return (
+        <section className="relative isolate overflow-hidden py-16 sm:py-24">
+            <div aria-hidden className="spesen-uebergang pointer-events-none absolute inset-x-0 top-0 h-64"/>
+            <div className={`${RAHMEN} relative grid gap-10 lg:grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)] lg:gap-16`}>
+                <div data-reveal>
+                    <p className="mb-2 text-xs font-medium tracking-wide text-primary uppercase">Fairplay</p>
+                    <h2 className="text-[1.75rem] leading-tight font-semibold tracking-tight text-balance sm:text-4xl">
+                        Fair zu deinen Daten
+                    </h2>
+                    <p className="mt-4 max-w-md text-[15px] leading-relaxed text-muted-foreground sm:text-base">
+                        Du gibst Spesenfuchs deinen DFBnet-Zugang. Dafür bekommst du klare Zusagen.
+                    </p>
+                    <Link
+                        to="/datenschutz"
+                        className="mt-4 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-primary underline-offset-4 hover:underline"
+                    >
+                        Zur Datenschutzerklärung
+                        <ArrowRight className="size-4"/>
+                    </Link>
+                </div>
+
+                <ul className="grid gap-3 sm:grid-cols-2 sm:gap-4">
+                    {FAIRPLAY.map((eintrag, index) => (
+                        <li
+                            key={eintrag.title}
+                            data-reveal
+                            style={verzoegerung(index * 70)}
+                            className="flex gap-4 rounded-2xl border bg-card p-4 sm:p-5"
+                        >
+                            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                                <eintrag.icon className="size-5"/>
+                            </span>
+                            <div>
+                                <h3 className="font-medium">{eintrag.title}</h3>
+                                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{eintrag.description}</p>
+                            </div>
+                        </li>
+                    ))}
+                </ul>
+            </div>
+        </section>
+    );
+}
+
 function Fragen() {
     return (
-        <section className="spesen-band relative isolate overflow-hidden border-y py-20 sm:py-28">
-            {/* Spielfeld als Wasserzeichen, sehr blass */}
-            <div aria-hidden className="pointer-events-none absolute inset-0">
+        // overflow-clip statt overflow-hidden: schneidet das Wasserzeichen
+        // genauso ab, macht den Abschnitt aber nicht zum Scroll-Container -
+        // sonst griffe das sticky der linken Spalte nicht.
+        <section className="spesen-band relative isolate overflow-clip border-y py-16 sm:py-24 lg:py-28">
+            {/* Spielfeld als Wasserzeichen, sehr blass und erst ab lg - schmal
+                blieben davon nur einzelne Striche, die wie verrutschte Linien
+                aussehen. */}
+            <div aria-hidden className="pointer-events-none absolute inset-0 hidden place-items-center lg:grid">
                 <Spielfeld
                     proportional
-                    className="absolute top-1/2 left-1/2 w-[115%] max-w-none -translate-x-1/2 -translate-y-1/2 text-foreground/[0.055]"
+                    ohnePunkte
+                    className="spesen-wasserzeichen w-[min(92%,80rem)] text-foreground/[0.06]"
                 />
             </div>
 
-            <div className="relative mx-auto grid max-w-[96rem] gap-10 px-4 sm:px-6 lg:grid-cols-[0.75fr_1.25fr] lg:gap-16">
+            <div className={`${RAHMEN} relative grid gap-10 lg:grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)] lg:gap-16`}>
                 <div data-reveal className="lg:sticky lg:top-24 lg:self-start">
                     <p className="mb-2 text-xs font-medium tracking-wide text-primary uppercase">Häufige Fragen</p>
-                    <h2 className="text-2xl font-semibold tracking-tight text-balance sm:text-4xl">
+                    <h2 className="text-[1.75rem] leading-tight font-semibold tracking-tight text-balance sm:text-4xl">
                         Fragen & Antworten
                     </h2>
-                    <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-                        Etwas offen geblieben? Schreib mir einfach, ich antworte selbst.
+                    <p className="mt-4 max-w-md text-[15px] leading-relaxed text-foreground/70 sm:text-base">
+                        Etwas offen geblieben oder einen Fehler gefunden? Schreib mir einfach, ich antworte
+                        selbst. Angemeldet geht es auch über den Reiter „Fehler melden“.
                     </p>
                     <a
                         href="mailto:spesen-generator@jan-vogt.dev"
-                        className="mt-5 inline-flex items-center gap-2 rounded-xl border bg-card px-4 py-2.5 text-sm font-medium transition-colors hover:border-primary/30 hover:text-primary"
+                        className="mt-5 inline-flex max-w-full items-center gap-2 rounded-xl border bg-card px-4 py-3 text-sm font-medium transition-colors hover:border-primary/30 hover:text-primary"
                     >
-                        <Mail className="size-4 text-primary"/>
-                        spesen-generator@jan-vogt.dev
+                        <Mail className="size-4 shrink-0 text-primary"/>
+                        <span className="truncate">spesen-generator@jan-vogt.dev</span>
                     </a>
                 </div>
 
@@ -744,18 +1047,28 @@ function Fragen() {
                 <div data-reveal className="divide-y overflow-hidden rounded-2xl border bg-card">
                     {FAQS.map((faq, index) => (
                         <details key={faq.question} className="group">
-                            <summary className="flex cursor-pointer list-none items-center gap-4 px-5 py-5 [&::-webkit-details-marker]:hidden">
-                                <span className="font-mono text-xs text-muted-foreground transition-colors group-open:text-primary">
+                            <summary className="flex min-h-16 cursor-pointer list-none items-center gap-4 px-5 py-4 [&::-webkit-details-marker]:hidden">
+                                <span className="w-5 shrink-0 font-mono text-xs text-muted-foreground transition-colors group-open:text-primary">
                                     {String(index + 1).padStart(2, '0')}
                                 </span>
-                                <span className="flex-1 text-sm font-medium">{faq.question}</span>
+                                <span className="flex-1 text-[15px] font-medium sm:text-sm">{faq.question}</span>
                                 <span className="grid size-8 shrink-0 place-items-center rounded-full border text-muted-foreground transition-all duration-300 group-hover:border-primary/40 group-hover:text-primary group-open:rotate-45 group-open:border-primary group-open:bg-primary group-open:text-primary-foreground">
                                     <Plus className="size-4"/>
                                 </span>
                             </summary>
-                            <p className="spesen-antwort pr-14 pb-5 pl-14 text-sm leading-relaxed text-muted-foreground">
-                                {faq.answer}
-                            </p>
+                            <div className="spesen-antwort pr-5 pb-5 pl-[3.25rem] text-[15px] leading-relaxed text-muted-foreground sm:pr-14 sm:text-sm">
+                                {Array.isArray(faq.answer) ? (
+                                    <ul className="grid gap-2">
+                                        {faq.answer.map((punkt) => (
+                                            <li key={punkt} className="relative pl-4 before:absolute before:top-[0.6em] before:left-0 before:size-1.5 before:rounded-full before:bg-primary/60">
+                                                {punkt}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : (
+                                    <p>{faq.answer}</p>
+                                )}
+                            </div>
                         </details>
                     ))}
                 </div>
@@ -764,96 +1077,169 @@ function Fragen() {
     );
 }
 
-/** Abschluss und Fusszeile, wieder im Nacht-Block wie ganz oben */
-function Abschluss() {
-    const navigate = useNavigate();
-
+/** Abschluss, wieder im Nacht-Block wie ganz oben */
+function Abschluss({angemeldet, abschlussRef}: {
+    angemeldet: boolean;
+    abschlussRef: RefObject<HTMLElement | null>;
+}) {
     return (
-        <>
-            <section className="spesen-nacht relative isolate overflow-hidden text-white">
-                <div aria-hidden className="spesen-feld pointer-events-none absolute inset-x-0 bottom-0 h-[70%]">
-                    <div className="absolute inset-0">
-                        <Spielfeld className="absolute inset-x-[6%] inset-y-[8%] h-[84%] w-[88%] text-white/15"/>
-                    </div>
+        <section ref={abschlussRef} className="spesen-nacht relative isolate overflow-hidden text-white">
+            <div aria-hidden className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-flutlicht/50 to-transparent"/>
+            <div aria-hidden className="spesen-feld spesen-feld-auslauf pointer-events-none absolute inset-x-0 bottom-0 h-[70%]">
+                <div className="absolute inset-0">
+                    <Spielfeld className="absolute inset-x-[6%] inset-y-[8%] h-[84%] w-[88%] text-white/15"/>
                 </div>
+            </div>
 
-                {/* Ringe wie ein Pfiff, der sich ueber den Platz ausbreitet */}
-                <div aria-hidden className="pointer-events-none absolute inset-0 grid place-items-center">
-                    {[0, 2.3, 4.6].map((verzug) => (
-                        <div
-                            key={verzug}
-                            className="spesen-ring absolute size-[34rem] rounded-full border border-flutlicht/20"
-                            style={{animationDelay: `${verzug}s`}}
-                        />
-                    ))}
-                </div>
-                <div aria-hidden className="spesen-koerner pointer-events-none absolute inset-0"/>
+            {/* Ringe wie ein Pfiff, der sich ueber den Platz ausbreitet */}
+            <div aria-hidden className="pointer-events-none absolute inset-0 grid place-items-center">
+                {[0, 2.3, 4.6].map((verzug) => (
+                    <div
+                        key={verzug}
+                        className="spesen-ring absolute size-[34rem] rounded-full border border-flutlicht/20"
+                        style={{animationDelay: `${verzug}s`}}
+                    />
+                ))}
+            </div>
+            <div aria-hidden className="spesen-koerner pointer-events-none absolute inset-0"/>
 
-                <div data-reveal className="relative mx-auto max-w-2xl px-4 py-24 text-center sm:px-6 sm:py-32">
-                    <h2 className="text-3xl font-semibold tracking-tight text-balance sm:text-5xl">
-                        Bereit für den Abpfiff?
-                    </h2>
-                    <p className="mx-auto mt-4 max-w-md text-sm text-white/60 sm:text-base">
-                        Registrieren, Zugangsdaten hinterlegen und ab morgen früh liegen deine
-                        Abrechnungen fertig bereit.
-                    </p>
-                    <Button
-                        size="lg"
-                        onClick={() => navigate('/register')}
-                        className="mt-8 bg-flutlicht text-nacht shadow-lg shadow-flutlicht/20 hover:bg-flutlicht/90"
-                    >
-                        Jetzt kostenlos starten
+            <div data-reveal className="relative mx-auto max-w-2xl px-4 py-20 text-center sm:px-6 sm:py-32">
+                <span className="mx-auto mb-6 grid size-14 place-items-center rounded-2xl bg-flutlicht/15 text-flutlicht shadow-[0_0_40px] shadow-flutlicht/20">
+                    <Pfeife className="size-7"/>
+                </span>
+                <h2 className="text-[2rem] leading-tight font-semibold tracking-tight text-balance sm:text-5xl">
+                    Bereit für den Abpfiff?
+                </h2>
+                <p className="mx-auto mt-4 max-w-md text-[15px] leading-relaxed text-white/70 sm:text-base">
+                    Registrieren, Zugangsdaten hinterlegen und den ersten Abruf per Knopfdruck starten –
+                    danach läuft er jede Nacht von allein.
+                </p>
+                <Button
+                    asChild
+                    size="lg"
+                    className="mt-8 h-12 w-full bg-flutlicht px-7 text-base text-nacht shadow-lg shadow-flutlicht/25 hover:bg-flutlicht/90 sm:w-auto"
+                >
+                    <Link to={angemeldet ? '/dashboard' : '/register'}>
+                        {angemeldet ? 'Zum Dashboard' : 'Jetzt kostenlos starten'}
                         <ArrowRight className="size-4"/>
-                    </Button>
-                </div>
-            </section>
-
-            <footer className="bg-nacht py-10 text-white">
-                <div className="mx-auto max-w-[96rem] px-4 sm:px-6">
-                    <div className="flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-8 sm:flex-row">
-                        <div className="flex items-center gap-2.5">
-                            <span className="grid size-7 place-items-center rounded-lg bg-flutlicht/15 text-flutlicht">
-                                <Receipt className="size-4"/>
-                            </span>
-                            <div className="leading-tight">
-                                <span className="block text-sm font-semibold tracking-tight">Spesenfuchs</span>
-                                <span className="text-xs text-white/45">
-                                    Für Schiedsrichter des Thüringer Fußball-Verbandes
-                                </span>
-                            </div>
-                        </div>
-                        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm text-white/50">
-                            <span>© 2025 · Jan Vogt</span>
-                            <a
-                                href="mailto:spesen-generator@jan-vogt.dev"
-                                className="transition-colors hover:text-white"
-                            >
-                                Kontakt
-                            </a>
-                            <Link to="/datenschutz" className="transition-colors hover:text-white">
-                                Datenschutz
-                            </Link>
-                        </div>
-                    </div>
-                </div>
-            </footer>
-        </>
+                    </Link>
+                </Button>
+            </div>
+        </section>
     );
 }
 
+function Fusszeile() {
+    return (
+        <footer className="bg-nacht pt-2 pb-8 text-white sm:pb-10">
+            <div className={`${RAHMEN} flex flex-col items-center justify-between gap-5 sm:flex-row`}>
+                <div className="flex flex-col items-center gap-1 sm:items-start">
+                    <Marke hell/>
+                    <span className="text-xs text-white/60">Für Schiedsrichter des Thüringer Fußball-Verbandes</span>
+                </div>
+                <div className="flex flex-wrap items-center justify-center gap-x-2 text-sm text-white/60">
+                    <span className="px-2">© {new Date().getFullYear()} · Jan Vogt</span>
+                    <a
+                        href="mailto:spesen-generator@jan-vogt.dev"
+                        className="inline-flex min-h-11 items-center px-2 transition-colors hover:text-white"
+                    >
+                        Kontakt
+                    </a>
+                    <Link to="/datenschutz" className="inline-flex min-h-11 items-center px-2 transition-colors hover:text-white">
+                        Datenschutz
+                    </Link>
+                </div>
+            </div>
+        </footer>
+    );
+}
+
+/**
+ * Die Anpfiff-Leiste am unteren Rand, nur am Handy. Sie erscheint, sobald
+ * die Hauptaktion des Hero aus dem Bild ist, und geht wieder, wenn der
+ * Abschluss mit seiner eigenen Aktion auftaucht. Ohne Bewegung erscheint
+ * sie ohne Hereingleiten.
+ */
+function Anpfiffleiste({angemeldet, sichtbar}: { angemeldet: boolean; sichtbar: boolean }) {
+    return (
+        <div
+            inert={!sichtbar}
+            className={`fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[oklch(0.17_0.028_158/0.9)] px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md transition-[translate,opacity] duration-300 ease-out motion-reduce:transition-none sm:hidden ${
+                sichtbar ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-full opacity-0'
+            }`}
+        >
+            <Button
+                asChild
+                size="lg"
+                className="h-12 w-full bg-flutlicht text-base text-nacht shadow-lg shadow-flutlicht/20 hover:bg-flutlicht/90"
+            >
+                <Link to={angemeldet ? '/dashboard' : '/register'}>
+                    {angemeldet ? 'Zum Dashboard' : 'Kostenlos starten'}
+                    <ArrowRight className="size-4"/>
+                </Link>
+            </Button>
+        </div>
+    );
+}
+
+/*
+ * Die Landingpage bekommt ein paar Eigenheiten am html-Element, solange sie
+ * offen ist: 16px Grundschrift auch am Handy (die Anwendung nutzt dort 14px,
+ * fuer eine Seite, die einladen soll, ist das zu klein), der Nacht-Ton als
+ * Grund hinter der Seite (sonst blitzt beim Ueberscrollen auf iOS Weiss ueber
+ * dem dunklen Hero auf) und die passende Farbe fuer die Browserleiste.
+ */
+const THEMEFARBE = '#05130b';
+
+function useStartseitenRahmen() {
+    useLayoutEffect(() => {
+        const wurzel = document.documentElement;
+        wurzel.classList.add('spesen-startseite');
+
+        let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+        const vorher = meta?.content ?? null;
+        if (!meta) {
+            meta = document.createElement('meta');
+            meta.name = 'theme-color';
+            document.head.appendChild(meta);
+        }
+        meta.content = THEMEFARBE;
+
+        return () => {
+            wurzel.classList.remove('spesen-startseite');
+            if (vorher === null) {
+                meta.remove();
+            } else {
+                meta.content = vorher;
+            }
+        };
+    }, []);
+}
+
 export function LandingPage() {
+    useStartseitenRahmen();
     useRevealOnScroll();
 
+    const [angemeldet] = useState(isAuthenticated);
+    const hero = useRef<HTMLElement>(null);
+    const heroAktion = useRef<HTMLDivElement>(null);
+    const abschluss = useRef<HTMLElement>(null);
+    const aktionImBild = useImBild(heroAktion);
+    const abschlussImBild = useImBild(abschluss, {anfang: false});
+
     return (
-        <div className="flex min-h-screen flex-col bg-background text-foreground">
-            <Kopfzeile/>
+        <div className="spesen-landing flex min-h-screen flex-col bg-background text-foreground">
+            <Kopfzeile angemeldet={angemeldet} heroRef={hero}/>
             <main className="flex-1">
-                <Hero/>
-                <Vorteile/>
+                <Hero angemeldet={angemeldet} heroRef={hero} ctaRef={heroAktion}/>
+                <Aufstellung/>
                 <Spielablauf/>
+                <Fairplay/>
                 <Fragen/>
+                <Abschluss angemeldet={angemeldet} abschlussRef={abschluss}/>
             </main>
-            <Abschluss/>
+            <Fusszeile/>
+            <Anpfiffleiste angemeldet={angemeldet} sichtbar={!aktionImBild && !abschlussImBild}/>
         </div>
     );
 }
