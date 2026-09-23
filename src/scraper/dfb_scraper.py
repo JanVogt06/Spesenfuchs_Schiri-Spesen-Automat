@@ -498,13 +498,39 @@ class DFBScraper:
             logger.error(f"Fehler beim Extrahieren der QMax-Werte: {e}")
             return {}
 
+    # Fertig ist die Ansetzungsliste, sobald ein Spiel darin steht - oder
+    # sobald sie ohne Spinner eine Weile leer geblieben ist. Die Nachfrist
+    # faengt den Moment ab, bevor die Karte ihren Spinner ueberhaupt zeigt.
+    _LISTE_GELADEN_JS = r"""
+        () => {
+            const karte = document.querySelector('sria-matches-matches-card');
+            if (!karte) return false;
+            if (karte.querySelector('sria-matches-match-list-item')) return true;
+            if (karte.querySelector('dfb-spinner')) {
+                window.__spesenfuchsLeerSeit = null;
+                return false;
+            }
+            window.__spesenfuchsLeerSeit = window.__spesenfuchsLeerSeit || Date.now();
+            return Date.now() - window.__spesenfuchsLeerSeit > 3000;
+        }
+    """
+
     def get_all_matches(self):
-        """Sammelt alle Spiele von der Seite"""
+        """
+        Zaehlt die Ansetzungen auf "Meine Spiele".
+
+        Gewartet wird, bis die Liste geladen ist, nicht eine feste Zeit. Mit
+        den frueheren 2 Sekunden hing die Liste nach dem Login oft noch am
+        Spinner: viele Nachtlaeufe meldeten "Keine Spiele gefunden", obwohl
+        Ansetzungen da waren (am 18.09.2026 bei 31 von 35 Konten).
+        """
         logger.info("Sammle alle Spiele...")
 
         try:
-            # Kurz warten bis Seite geladen ist
-            self.page.wait_for_timeout(2000)
+            try:
+                self.page.wait_for_function(self._LISTE_GELADEN_JS, timeout=45000, polling=250)
+            except Exception as e:
+                logger.warning(f"Ansetzungsliste nicht rechtzeitig geladen: {e}")
 
             # Finde alle Spiel-Container (jeder Container = 1 Spiel)
             match_containers = self.page.locator('sria-matches-match-list-item').all()
