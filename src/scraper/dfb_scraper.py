@@ -508,7 +508,7 @@ class DFBScraper:
             const karte = document.querySelector('sria-matches-matches-card');
             if (!karte) return false;
             if (karte.querySelector('sria-matches-match-list-item')) return true;
-            if (karte.querySelector('dfb-spinner')) {
+            if ([...karte.querySelectorAll('dfb-spinner')].some(s => s.getClientRects().length > 0)) {
                 window.__spesenfuchsLeerSeit = null;
                 return false;
             }
@@ -978,9 +978,12 @@ class DFBScraper:
     # der vorigen Auswahl - dann gibt es noch keine Zahl. Eine Saison ohne
     # Spiele zeigt gar keine Trefferzahl, nur "Keine Spiele vorhanden"; ohne
     # diesen Fall wartete jeder Lauf dreimal bis zum Timeout und verwarf sie.
+    # Es zaehlt nur ein SICHTBARER Spinner (hier und in den anderen Karten):
+    # heute entfernt DFBnet ihn nach dem Laden, bliebe er aber ausgeblendet
+    # stehen, wartete sonst jede Saison bis zum Timeout.
     _TREFFER_JS = r"""
         (karte) => {
-            if (karte.querySelector('dfb-spinner')) return null;
+            if ([...karte.querySelectorAll('dfb-spinner')].some(s => s.getClientRects().length > 0)) return null;
             const m = karte.textContent.match(/\((\d+)\s*Treffer\)/);
             if (m) return Number(m[1]);
             return karte.textContent.includes('Keine Spiele vorhanden') ? 0 : null;
@@ -1018,8 +1021,8 @@ class DFBScraper:
             const lehrTabelle = bloecke.find(t => t.textContent.includes('Lehrabend'));
 
             return {
-                laedt: karte.querySelector('dfb-spinner') !== null,
-                gewaehlt: (karte.querySelector('.dfb-dropdown-input-value')?.textContent || '').trim(),
+                laedt: [...karte.querySelectorAll('dfb-spinner')].some(s => s.getClientRects().length > 0),
+                gewaehlt: (karte.querySelector('dfb-dropdown-input .dfb-dropdown-input-value')?.textContent || '').trim(),
                 einsaetze: einsatzTabelle ? lies(einsatzTabelle) : [],
                 lehrgaenge: lehrTabelle ? lies(lehrTabelle) : [],
             };
