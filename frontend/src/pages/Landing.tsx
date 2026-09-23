@@ -894,11 +894,38 @@ function Aufstellung() {
 }
 
 /**
+ * Ein Stueck der Bahn zwischen zwei Ziffern, senkrecht oder waagerecht. Am
+ * Kopf der Fuellung laeuft ein Ball mit, damit zu sehen ist, wo die Bahn
+ * gerade steht.
+ */
+function Bahnstueck({fuellung, senkrecht, className}: { fuellung: number; senkrecht?: boolean; className: string }) {
+    return (
+        <span aria-hidden className={`absolute bg-white/12 ${className}`}>
+            <span
+                className={`absolute bg-flutlicht shadow-[0_0_12px] shadow-flutlicht/60 ${
+                    senkrecht ? 'inset-x-0 top-0' : 'inset-y-0 left-0'
+                }`}
+                style={senkrecht ? {height: `${fuellung * 100}%`} : {width: `${fuellung * 100}%`}}
+            />
+            {fuellung > 0 && fuellung < 1 && (
+                <span
+                    className={`spesen-ball absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white ${
+                        senkrecht ? 'left-1/2' : 'top-1/2'
+                    }`}
+                    style={senkrecht ? {top: `${fuellung * 100}%`} : {left: `${fuellung * 100}%`}}
+                />
+            )}
+        </span>
+    );
+}
+
+/**
  * Die vier Schritte auf einer Bahn, die beim Scrollen mitlaeuft: untereinander
- * senkrecht, ab lg waagerecht zwischen den Ziffern. Am Kopf der Fuellung
- * laeuft ein Ball mit, damit zu sehen ist, wo die Bahn gerade steht. Der
- * Abschnitt ist ein Nacht-Band: hell, dunkel, hell, dunkel statt dreier
- * heller Bloecke hintereinander.
+ * senkrecht, ab lg waagerecht zwischen den Ziffern. Jeder Schritt zeichnet
+ * sein Stueck bis zur naechsten Ziffer selbst - so endet die Bahn genau an
+ * der letzten statt irgendwo unter deren Text. Der Abschnitt ist ein
+ * Nacht-Band: hell, dunkel, hell, dunkel statt dreier heller Bloecke
+ * hintereinander.
  */
 function Spielablauf() {
     const bereich = useRef<HTMLDivElement>(null);
@@ -921,23 +948,13 @@ function Spielablauf() {
                 </div>
 
                 <div ref={bereich} className="relative grid gap-9 lg:grid-cols-4 lg:gap-8">
-                    {/* Senkrechte Bahn, solange die Schritte untereinander stehen */}
-                    <div aria-hidden className="absolute top-5 bottom-5 left-[1.375rem] w-px bg-white/12 lg:hidden">
-                        <div
-                            className="absolute inset-x-0 top-0 bg-flutlicht shadow-[0_0_12px] shadow-flutlicht/60"
-                            style={{height: `${fortschritt * 100}%`}}
-                        />
-                        {fortschritt > 0 && fortschritt < 1 && (
-                            <span
-                                className="spesen-ball absolute left-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white"
-                                style={{top: `${fortschritt * 100}%`}}
-                            />
-                        )}
-                    </div>
-
                     {SCHRITTE.map((schritt, index) => {
-                        const erreicht = stufe > index + 0.35;
+                        // Die Ziffer leuchtet auf, wenn der Ball des Stuecks davor
+                        // bei ihr ankommt (das Stueck fuellt sich von index - 0.5
+                        // bis index + 0.5).
+                        const erreicht = stufe > index + 0.45;
                         const fuellung = Math.min(1, Math.max(0, stufe - (index + 0.5)));
+                        const letzter = index === SCHRITTE.length - 1;
 
                         return (
                             <div
@@ -946,28 +963,30 @@ function Spielablauf() {
                                 style={verzoegerung(index * 90)}
                                 className="relative pl-16 lg:pl-0"
                             >
+                                {/* Senkrecht, solange die Schritte untereinander stehen:
+                                    von der Ziffer bis zur naechsten, ueber den Abstand
+                                    gap-9 hinweg. */}
+                                {!letzter && (
+                                    <Bahnstueck
+                                        senkrecht
+                                        fuellung={fuellung}
+                                        className="top-11 -bottom-9 left-[1.375rem] w-px lg:hidden"
+                                    />
+                                )}
                                 <div className="absolute top-0 left-0 lg:static lg:mb-5 lg:flex lg:items-center lg:gap-3">
+                                    {/* Deckend, damit Bahn und Ball hinter der Ziffer verschwinden */}
                                     <span
-                                        className={`grid size-11 shrink-0 place-items-center rounded-full border font-mono text-sm font-semibold transition-all duration-500 ${
+                                        className={`relative grid size-11 shrink-0 place-items-center rounded-full border font-mono text-sm font-semibold transition-all duration-500 ${
                                             erreicht
                                                 ? 'border-flutlicht bg-flutlicht text-nacht shadow-[0_0_24px] shadow-flutlicht/40'
-                                                : 'border-white/15 bg-white/5 text-white/60'
+                                                : 'border-white/15 bg-[oklch(0.21_0.026_158)] text-white/60'
                                         }`}
                                     >
                                         {String(index + 1).padStart(2, '0')}
                                     </span>
-                                    {index < SCHRITTE.length - 1 && (
-                                        <span aria-hidden className="relative hidden h-px flex-1 bg-white/12 lg:block">
-                                            <span
-                                                className="absolute inset-y-0 left-0 bg-flutlicht shadow-[0_0_12px] shadow-flutlicht/60"
-                                                style={{width: `${fuellung * 100}%`}}
-                                            />
-                                            {fuellung > 0 && fuellung < 1 && (
-                                                <span
-                                                    className="spesen-ball absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white"
-                                                    style={{left: `${fuellung * 100}%`}}
-                                                />
-                                            )}
+                                    {!letzter && (
+                                        <span className="relative hidden h-px flex-1 lg:block">
+                                            <Bahnstueck fuellung={fuellung} className="inset-0"/>
                                         </span>
                                     )}
                                 </div>
