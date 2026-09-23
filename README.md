@@ -87,6 +87,7 @@ neben der Compose-Datei — es übersteht Neustarts und Updates:
 | --- | --- |
 | `data/.env` | `JWT_SECRET_KEY` und `ENCRYPTION_KEY` |
 | `data/app.db` | Nutzer, eigene Stammdaten, Spiele, Unparteiische, Fahrtkosten, geleitete Spiele je Saison, aufgelöste Adressen der Karte, Ligatabellen, Abruf-Protokoll, Login- und Download-Log |
+| `data/logs/spesenfuchs.log` | Protokoll der Anwendung und der nächtlichen Abrufe, rotiert bei 5 MB (vier ältere Dateien bleiben liegen) |
 
 Erzeugte Dokumente werden nicht gespeichert: sie entstehen bei jedem Download
 neu aus den Daten in `app.db`. Ein Backup der Datenbank ist damit ein
@@ -109,7 +110,7 @@ docker compose start
 ```
 
 Einzelne Pfade lassen sich per Umgebungsvariable verlegen (`DATA_DIR`,
-`ENV_FILE`, `DATABASE_PATH`, `OUTPUT_DIR`); nötig ist das im Normalfall nicht.
+`ENV_FILE`, `DATABASE_PATH`, `OUTPUT_DIR`, `LOG_FILE`); nötig ist das im Normalfall nicht.
 `OUTPUT_DIR` zeigt nur noch auf die alten Session-Ordner und wird ausschließlich
 für die einmalige Übernahme beim Versionssprung gebraucht.
 
