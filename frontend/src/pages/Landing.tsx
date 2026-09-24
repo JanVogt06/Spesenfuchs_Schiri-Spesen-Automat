@@ -1,4 +1,14 @@
-import {type CSSProperties, type ReactNode, type RefObject, useEffect, useLayoutEffect, useRef, useState} from 'react';
+import {
+    type CSSProperties,
+    type ReactNode,
+    type RefObject,
+    createContext,
+    useContext,
+    useEffect,
+    useLayoutEffect,
+    useRef,
+    useState,
+} from 'react';
 import {Link} from 'react-router-dom';
 import {Button} from '@/components/ui/button';
 import {api} from '@/lib/api';
@@ -569,15 +579,25 @@ function Satzchip({satz}: { satz: (typeof SPESENSAETZE)[number] }) {
 }
 
 /**
+ * Ob der Besucher die Bewegung der Seite angehalten hat. Laufband-Knopf und
+ * Fusszeile schalten denselben Zustand, die Klasse spesen-still am
+ * Wurzelelement haelt damit jede Endlos-Animation an (siehe index.css) -
+ * nicht nur das Laufband. Wer "Bewegung reduzieren" eingestellt hat, sieht
+ * ohnehin nichts laufen und bekommt die Schalter gar nicht erst.
+ */
+const BewegungKontext = createContext({still: false, umschalten: () => {}});
+
+/**
  * Die Saetze der Spesenordnung. Am Handy eine Reihe zum Wischen - ein
  * Laufband liesse sich dort weder anhalten noch in Ruhe lesen. Ab sm laeuft
- * es als Band mit fester Quellenangabe links und einem Knopf zum Anhalten.
+ * es als Band mit fester Quellenangabe links und einem Knopf, der alle
+ * Bewegung der Seite anhaelt.
  * Die zweite Kopie des Bandes gibt es nur fuers Auge, Screenreader lesen die
  * Liste einmal. Ohne Bewegung bricht das Band um, statt abgeschnitten
  * stehen zu bleiben (siehe index.css).
  */
 function Satzband() {
-    const [angehalten, setAngehalten] = useState(false);
+    const {still, umschalten} = useContext(BewegungKontext);
 
     return (
         <div className="relative border-t border-white/10 bg-[oklch(0.145_0.026_158/0.88)]">
@@ -601,7 +621,7 @@ function Satzband() {
                 <div className="relative min-w-0 flex-1 overflow-hidden py-3">
                     <div className="spesen-laufband-rand pointer-events-none absolute inset-y-0 left-0 z-10 w-16 bg-gradient-to-r from-[oklch(0.145_0.026_158)] to-transparent"/>
                     <div className="spesen-laufband-rand pointer-events-none absolute inset-y-0 right-0 z-10 w-16 bg-gradient-to-l from-[oklch(0.145_0.026_158)] to-transparent"/>
-                    <div className={`spesen-laufband flex w-max ${angehalten ? 'is-angehalten' : ''}`}>
+                    <div className="spesen-laufband flex w-max">
                         {[0, 1].map((durchlauf) => (
                             <ul
                                 key={durchlauf}
@@ -619,11 +639,11 @@ function Satzband() {
                 </div>
                 <button
                     type="button"
-                    onClick={() => setAngehalten((wert) => !wert)}
-                    aria-label={angehalten ? 'Laufband weiterlaufen lassen' : 'Laufband anhalten'}
+                    onClick={umschalten}
+                    aria-label={still ? 'Bewegung fortsetzen' : 'Bewegung anhalten'}
                     className="grid w-12 shrink-0 place-items-center border-l border-white/10 text-white/60 transition-colors hover:bg-white/5 hover:text-white motion-reduce:hidden"
                 >
-                    {angehalten ? <Play className="size-4"/> : <Pause className="size-4"/>}
+                    {still ? <Play className="size-4"/> : <Pause className="size-4"/>}
                 </button>
             </div>
         </div>
@@ -1252,6 +1272,8 @@ function Abschluss({angemeldet, abschlussRef}: {
 }
 
 function Fusszeile() {
+    const {still, umschalten} = useContext(BewegungKontext);
+
     return (
         <footer data-nacht className="bg-nacht pt-2 pb-8 text-white sm:pb-10">
             <div className={`${RAHMEN} flex flex-col items-center justify-between gap-5 sm:flex-row`}>
@@ -1270,6 +1292,14 @@ function Fusszeile() {
                     <Link to="/datenschutz" className="inline-flex min-h-11 items-center px-2 transition-colors hover:text-white">
                         Datenschutz
                     </Link>
+                    <button
+                        type="button"
+                        onClick={umschalten}
+                        className="inline-flex min-h-11 items-center gap-1.5 px-2 transition-colors hover:text-white motion-reduce:hidden"
+                    >
+                        {still ? <Play className="size-3.5"/> : <Pause className="size-3.5"/>}
+                        {still ? 'Bewegung fortsetzen' : 'Bewegung anhalten'}
+                    </button>
                 </div>
             </div>
         </footer>
@@ -1362,20 +1392,23 @@ export function LandingPage() {
     const abschluss = useRef<HTMLElement>(null);
     const aktionImBild = useImBild(heroAktion);
     const abschlussImBild = useImBild(abschluss, {anfang: false});
+    const [still, setStill] = useState(false);
 
     return (
-        <div className="spesen-landing flex min-h-screen flex-col bg-background text-foreground">
-            <Kopfzeile angemeldet={angemeldet}/>
-            <main className="flex-1">
-                <Hero angemeldet={angemeldet} ctaRef={heroAktion}/>
-                <Aufstellung/>
-                <Spielablauf/>
-                <Fairplay/>
-                <Fragen/>
-                <Abschluss angemeldet={angemeldet} abschlussRef={abschluss}/>
-            </main>
-            <Fusszeile/>
-            <Anpfiffleiste angemeldet={angemeldet} sichtbar={!aktionImBild && !abschlussImBild}/>
-        </div>
+        <BewegungKontext.Provider value={{still, umschalten: () => setStill((wert) => !wert)}}>
+            <div className={`spesen-landing flex min-h-screen flex-col bg-background text-foreground ${still ? 'spesen-still' : ''}`}>
+                <Kopfzeile angemeldet={angemeldet}/>
+                <main className="flex-1">
+                    <Hero angemeldet={angemeldet} ctaRef={heroAktion}/>
+                    <Aufstellung/>
+                    <Spielablauf/>
+                    <Fairplay/>
+                    <Fragen/>
+                    <Abschluss angemeldet={angemeldet} abschlussRef={abschluss}/>
+                </main>
+                <Fusszeile/>
+                <Anpfiffleiste angemeldet={angemeldet} sichtbar={!aktionImBild && !abschlussImBild}/>
+            </div>
+        </BewegungKontext.Provider>
     );
 }

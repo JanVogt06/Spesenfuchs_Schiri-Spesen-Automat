@@ -287,8 +287,16 @@
   animation: spesen-laufband 48s linear infinite;
 }
 
-.spesen-laufband:hover,
-.spesen-laufband.is-angehalten {
+.spesen-laufband:hover {
+  animation-play-state: paused;
+}
+
+/*
+  "Bewegung anhalten" (Laufband-Knopf und Fusszeile) haelt jede Endlos-
+  Bewegung der Seite an, nicht nur das Laufband. Einmalige Einblendungen
+  laufen weiter - angehalten blieben sie halb sichtbar stehen.
+*/
+.spesen-still :is(.spesen-rasen, .spesen-flutlicht, .spesen-schweben, .spesen-laufband, .spesen-ring, .spesen-puls) {
   animation-play-state: paused;
 }
 
