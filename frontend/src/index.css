@@ -411,7 +411,8 @@
   am Handy ihre 14px.
 */
 html.spesen-startseite {
-  font-size: 16px;
+  /* 100 % statt 16px: eine im Browser groesser gestellte Schrift gilt weiter */
+  font-size: 100%;
   background-color: var(--nacht);
   /* Beim Tabben landet das Ziel nicht unter der festen Kopfzeile */
   scroll-padding-top: 4.5rem;
