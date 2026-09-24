@@ -1,4 +1,5 @@
-import {BrowserRouter, Routes, Route, Navigate} from 'react-router-dom';
+import {useEffect} from 'react';
+import {BrowserRouter, Routes, Route, Navigate, useLocation} from 'react-router-dom';
 import {LoginPage} from './pages/Login';
 import {RegisterPage} from './pages/Register';
 import {LandingPage} from './pages/Landing';
@@ -19,9 +20,25 @@ function ProtectedRoute({children}: { children: React.ReactNode }) {
     return <>{children}</>;
 }
 
+/**
+ * Springt beim Seitenwechsel nach oben. Der BrowserRouter behaelt sonst die
+ * Scrollposition, und ein Link von weit unten auf der Landingpage oeffnete
+ * die Datenschutzerklaerung an ihrem Ende.
+ */
+function NachObenBeiSeitenwechsel() {
+    const {pathname} = useLocation();
+
+    useEffect(() => {
+        window.scrollTo(0, 0);
+    }, [pathname]);
+
+    return null;
+}
+
 function App() {
     return (
         <BrowserRouter>
+            <NachObenBeiSeitenwechsel/>
             <Routes>
                 {/* Public Routes */}
                 <Route path="/" element={<LandingPage/>}/>
