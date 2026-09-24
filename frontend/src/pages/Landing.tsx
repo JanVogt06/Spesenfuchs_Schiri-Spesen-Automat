@@ -90,8 +90,8 @@ const FUNKTIONEN: Funktion[] = [
     {
         icon: Trophy,
         title: 'Pokal richtig eingestuft',
-        description: 'Bei Pokal- und Freundschaftsspielen zählt die Klasse der Vereine – nachgeschlagen ' +
-            'in den Tabellen von Thüringenliga und Landesklasse. Unsicher? Dann bleibt das Feld leer.',
+        description: 'Im Herrenbereich zählt bei Pokal- und Freundschaftsspielen die Klasse der Vereine – ' +
+            'nachgeschlagen in den Tabellen von Thüringenliga und Landesklasse. Unsicher? Dann bleibt das Feld leer.',
         bild: <Ligenauszug/>,
     },
     {
@@ -145,7 +145,8 @@ const FAIRPLAY = [
     {
         icon: Lock,
         title: 'Verschlüsselt',
-        description: 'Zugangsdaten und persönliche Stammdaten liegen verschlüsselt, Passwörter nur als Hash. Keine Weitergabe an Dritte.',
+        description: 'Zugangsdaten und persönliche Stammdaten liegen verschlüsselt, Passwörter nur als Hash. ' +
+            'Nach außen geht nur, was die Karte braucht: eine Anschrift ohne Namen an OpenStreetMap.',
     },
     {
         icon: Scale,
@@ -174,7 +175,7 @@ const FAQS: { question: string; answer: ReactNode | string[] }[] = [
         answer: 'Dein DFBnet-Passwort liegt verschlüsselt auf dem Server und wird nur entschlüsselt, um deine Daten ' +
             'aus DFBnet abzurufen – nachts oder wenn du den Abruf selbst startest. In DFBnet wird dabei nichts ' +
             'verändert. Dein Spesenfuchs-Passwort wird nur als Hash gespeichert, übertragen wird ausschließlich ' +
-            'über HTTPS, und nichts wird an Dritte weitergegeben.',
+            'über HTTPS. Deine Zugangsdaten gehen an niemanden außer DFBnet.',
     },
     {
         question: 'Welche Daten liest Spesenfuchs aus DFBnet?',
@@ -191,14 +192,16 @@ const FAQS: { question: string; answer: ReactNode | string[] }[] = [
         answer: 'Nach der TFV-Spesenordnung zählt beim Pokal die höchstklassige beteiligte Mannschaft, beim ' +
             'Freundschaftsspiel der Gastgeber. Im Herrenbereich schlägt Spesenfuchs die Vereine dafür in den ' +
             'Tabellen von Thüringenliga und Landesklasse nach (Reiter „Ligen“, von FUSSBALL.DE). Lässt sich ein ' +
-            'Verein nicht sicher zuordnen, bleibt der Satz leer statt geraten.',
+            'Verein nicht sicher zuordnen, bleibt der Satz leer statt geraten. Für Juniorinnen und Alte Herren ' +
+            'auf Kreisebene gibt es ohnehin nur einen Satz.',
     },
     {
         question: 'Warum steht bei einem Spiel kein Betrag?',
         answer: 'Bei überregionalen Spielen wie der Oberliga und bei Spielen anderer Landesverbände gelten nicht ' +
             'die Sätze der TFV-Spesenordnung – dort trägt Spesenfuchs bewusst nichts ein. Dasselbe gilt, wenn sich ' +
-            'bei einem Pokal- oder Freundschaftsspiel ein Verein nicht sicher zuordnen lässt. Den Betrag kannst du ' +
-            'dann selbst im Word-Dokument ergänzen.',
+            'bei einem Pokal- oder Freundschaftsspiel ein Verein nicht sicher zuordnen lässt, im Kreispokal der ' +
+            'Herren (die Ansetzung verrät nicht, ob Kreisoberliga oder Kreisliga) und bei Pokal- und ' +
+            'Freundschaftsspielen von Frauen und Junioren. Den Betrag kannst du dann selbst im Word-Dokument ergänzen.',
     },
     {
         question: 'Muss ich die Fahrtkosten selbst eintragen?',
