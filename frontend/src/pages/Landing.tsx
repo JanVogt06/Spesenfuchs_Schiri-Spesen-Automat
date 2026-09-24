@@ -421,9 +421,19 @@ function Kopfzeile({angemeldet}: { angemeldet: boolean }) {
             : 'border-border bg-background/80 backdrop-blur-md';
 
     return (
-        <header className={`fixed inset-x-0 top-0 z-50 border-b transition-colors duration-300 ${flaeche}`}>
+        <header className={`fixed inset-x-0 top-0 z-50 border-b transition-colors duration-300 ${flaeche} ${dunkel ? 'spesen-dunkel' : ''}`}>
             <div className={`${RAHMEN} flex h-14 items-center justify-between`}>
-                <Link to="/" aria-label="Spesenfuchs, zur Startseite" className="-m-1 rounded-lg p-1">
+                {/* Die Kopfzeile steht nur hier; ein Link auf dieselbe Seite taete
+                    nichts, also fuehrt er nach oben */}
+                <Link
+                    to="/"
+                    aria-label="Spesenfuchs, zur Startseite"
+                    className="-m-1 rounded-lg p-1"
+                    onClick={(ereignis) => {
+                        ereignis.preventDefault();
+                        window.scrollTo({top: 0, behavior: magKeineBewegung() ? 'auto' : 'smooth'});
+                    }}
+                >
                     <Marke hell={dunkel}/>
                 </Link>
                 <nav className="flex items-center gap-1 sm:gap-2">
@@ -604,7 +614,13 @@ function Satzband() {
             {/* Handy */}
             <div className="py-3 sm:hidden">
                 <p className="px-4 text-[11px] font-medium tracking-wide text-white/60">{QUELLE}</p>
-                <ul className="mt-2 flex snap-x snap-mandatory scroll-px-4 gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {/* tabIndex: Safari macht einen Scroller nicht von selbst fokussierbar,
+                    per Tastatur kaeme dort niemand an die hinteren Saetze */}
+                <ul
+                    tabIndex={0}
+                    aria-label="Spesensätze"
+                    className="spesen-wisch mt-2 flex snap-x snap-mandatory scroll-px-4 gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                >
                     {SPESENSAETZE.map((satz) => (
                         <li key={satz.klasse} className="snap-start">
                             <Satzchip satz={satz}/>
@@ -912,9 +928,21 @@ function Funktionskachel({funktion}: { funktion: Funktion }) {
  * Wischen - sechs gestapelte Kaesten waeren fast zwei Bildschirme Scrollen.
  * Ab sm loest sich die Reihe per display: contents ins Raster auf.
  */
+const NUR_HANDY = '(max-width: 639px)';
+
 function Aufstellung() {
     const reihe = useRef<HTMLDivElement>(null);
     const [aktiv, setAktiv] = useState(0);
+
+    // Ein Scroller ist die Reihe nur am Handy. Nur dann bekommt sie einen
+    // eigenen Tabstopp - Safari macht Scroller nicht von selbst fokussierbar.
+    const [wischbar, setWischbar] = useState(() => window.matchMedia(NUR_HANDY).matches);
+    useEffect(() => {
+        const abfrage = window.matchMedia(NUR_HANDY);
+        const pruefen = () => setWischbar(abfrage.matches);
+        abfrage.addEventListener('change', pruefen);
+        return () => abfrage.removeEventListener('change', pruefen);
+    }, []);
 
     const gewischt = () => {
         const element = reihe.current;
@@ -952,6 +980,9 @@ function Aufstellung() {
                         ref={reihe}
                         onScroll={gewischt}
                         data-reveal
+                        tabIndex={wischbar ? 0 : undefined}
+                        role={wischbar ? 'region' : undefined}
+                        aria-label={wischbar ? 'Funktionen' : undefined}
                         className="spesen-wisch -mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:contents [&::-webkit-scrollbar]:hidden"
                     >
                         {FUNKTIONEN.map((funktion, index) => (
@@ -1318,7 +1349,7 @@ function Anpfiffleiste({angemeldet, sichtbar}: { angemeldet: boolean; sichtbar: 
     return (
         <div
             inert={!sichtbar}
-            className={`fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[oklch(0.17_0.028_158/0.9)] px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md transition-[translate,opacity] duration-300 ease-out motion-reduce:transition-none sm:hidden ${
+            className={`spesen-dunkel fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[oklch(0.17_0.028_158/0.9)] px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md transition-[translate,opacity] duration-300 ease-out motion-reduce:transition-none sm:hidden ${
                 sichtbar ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-full opacity-0'
             }`}
         >

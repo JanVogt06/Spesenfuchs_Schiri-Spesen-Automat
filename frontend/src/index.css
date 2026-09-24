@@ -413,6 +413,35 @@
 html.spesen-startseite {
   font-size: 16px;
   background-color: var(--nacht);
+  /* Beim Tabben landet das Ziel nicht unter der festen Kopfzeile */
+  scroll-padding-top: 4.5rem;
+}
+
+/* ... und am Handy nicht unter der Anpfiff-Leiste */
+@media (width < 40rem) {
+  html.spesen-startseite {
+    scroll-padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  }
+}
+
+/*
+  Tastaturfokus auf der Landingpage: der Ring der Anwendung (ring/50) kommt
+  auf diesen Flaechen nicht auf 3:1. Auf hellem Grund in der Primaerfarbe,
+  auf den Nacht-Flaechen im Flutlicht-Gruen. Die FAQ-Zeilen liegen in einer
+  Liste mit overflow-hidden, dort sitzt der Ring deshalb innen.
+*/
+.spesen-landing :focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.spesen-landing :is(.spesen-nacht, [data-nacht], .spesen-dunkel) :focus-visible {
+  outline-color: var(--flutlicht);
+}
+
+.spesen-landing summary:focus-visible,
+.spesen-landing .spesen-wisch:focus-visible {
+  outline-offset: -2px;
 }
 
 /*
