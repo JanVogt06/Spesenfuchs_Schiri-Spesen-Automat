@@ -1021,7 +1021,7 @@ function Bahnstueck({fuellung, senkrecht, className}: { fuellung: number; senkre
  * hintereinander.
  */
 function Spielablauf() {
-    const bereich = useRef<HTMLDivElement>(null);
+    const bereich = useRef<HTMLOListElement>(null);
     const fortschritt = useScrollProgress(bereich);
     const stufe = fortschritt * SCHRITTE.length;
 
@@ -1040,7 +1040,7 @@ function Spielablauf() {
                     </h2>
                 </div>
 
-                <div ref={bereich} className="relative grid gap-9 lg:grid-cols-4 lg:gap-8">
+                <ol ref={bereich} className="relative grid gap-9 lg:grid-cols-4 lg:gap-8">
                     {SCHRITTE.map((schritt, index) => {
                         // Die Ziffer leuchtet auf, wenn der Ball des Stuecks davor
                         // bei ihr ankommt (das Stueck fuellt sich von index - 0.5
@@ -1050,7 +1050,7 @@ function Spielablauf() {
                         const letzter = index === SCHRITTE.length - 1;
 
                         return (
-                            <div
+                            <li
                                 key={schritt.title}
                                 data-reveal
                                 style={verzoegerung(index * 90)}
@@ -1067,8 +1067,10 @@ function Spielablauf() {
                                     />
                                 )}
                                 <div className="absolute top-0 left-0 lg:static lg:mb-5 lg:flex lg:items-center lg:gap-3">
-                                    {/* Deckend, damit Bahn und Ball hinter der Ziffer verschwinden */}
+                                    {/* Deckend, damit Bahn und Ball hinter der Ziffer verschwinden.
+                                        Die Nummer traegt die Liste, die Ziffer ist nur fuers Auge. */}
                                     <span
+                                        aria-hidden
                                         className={`relative grid size-11 shrink-0 place-items-center rounded-full border font-mono text-sm font-semibold transition-all duration-500 ${
                                             erreicht
                                                 ? 'border-flutlicht bg-flutlicht text-nacht shadow-[0_0_24px] shadow-flutlicht/40'
@@ -1094,10 +1096,10 @@ function Spielablauf() {
                                     <Clock className="size-3.5 text-flutlicht"/>
                                     {schritt.chip}
                                 </span>
-                            </div>
+                            </li>
                         );
                     })}
-                </div>
+                </ol>
             </div>
         </section>
     );
@@ -1190,7 +1192,7 @@ function Fragen() {
                     {FAQS.map((faq, index) => (
                         <details key={faq.question} className="group">
                             <summary className="flex min-h-16 cursor-pointer list-none items-center gap-4 px-5 py-4 [&::-webkit-details-marker]:hidden">
-                                <span className="w-5 shrink-0 font-mono text-xs text-muted-foreground transition-colors group-open:text-primary">
+                                <span aria-hidden className="w-5 shrink-0 font-mono text-xs text-muted-foreground transition-colors group-open:text-primary">
                                     {String(index + 1).padStart(2, '0')}
                                 </span>
                                 <span className="flex-1 text-[15px] font-medium sm:text-sm">{faq.question}</span>
