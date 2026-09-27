@@ -1,0 +1,24 @@
+/*
+  Instagram-Slides: eine Flaeche von 540 x 720 CSS-Pixeln (3:4), exportiert
+  mit doppelter Pixeldichte als 1080 x 1440. Bewegung gibt es im Standbild
+  nicht - alles steht so, wie es ohne Animation aussieht.
+*/
+html {
+  font-size: 16px;
+  background: var(--nacht);
+}
+
+body {
+  margin: 0;
+}
+
+.ig-slide *,
+.ig-slide *::before,
+.ig-slide *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+.ig-slide .spesen-flutlicht {
+  opacity: 0.7;
+}
