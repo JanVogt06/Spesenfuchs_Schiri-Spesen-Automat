@@ -256,7 +256,7 @@ function verzoegerung(millisekunden: number): CSSProperties {
  * breiter als die fernen, so wie auf einem echten Platz. Als Wasserzeichen
  * stoeren die gefuellten Punkte - sie sehen dort wie Flecken aus.
  */
-function Spielfeld({className, proportional, ohnePunkte}: {
+export function Spielfeld({className, proportional, ohnePunkte}: {
     className?: string;
     proportional?: boolean;
     ohnePunkte?: boolean;
@@ -320,7 +320,7 @@ function Pfeife({className}: { className?: string }) {
 }
 
 /** Zeichen und Wortmarke, oben und unten gleich */
-function Marke({hell}: { hell: boolean }) {
+export function Marke({hell}: { hell: boolean }) {
     return (
         <span className="flex items-center gap-2.5">
             <span
