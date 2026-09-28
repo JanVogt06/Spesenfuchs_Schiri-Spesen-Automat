@@ -45,14 +45,19 @@ interface KennzahlProps {
 function Kennzahl({icon: Icon, label, wert, zusatz}: KennzahlProps) {
     return (
         <Card className="gap-0 py-0">
-            <CardContent className="flex items-start gap-3 p-4">
-                <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+            {/* Am Handy stehen zwei nebeneinander - dort rueckt das Icon klein
+                vor die Beschriftung, damit der Wert die volle Breite hat */}
+            <CardContent className="flex items-start gap-3 p-3 sm:p-4">
+                <span className="hidden size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary sm:grid">
                     <Icon className="size-4"/>
                 </span>
                 <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground">{label}</p>
-                    <p className="truncate text-xl font-semibold tabular-nums">{wert}</p>
-                    {zusatz && <p className="truncate text-xs text-muted-foreground">{zusatz}</p>}
+                    <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Icon className="size-3.5 shrink-0 text-primary sm:hidden"/>
+                        <span className="truncate">{label}</span>
+                    </p>
+                    <p className="mt-0.5 truncate text-xl font-semibold tabular-nums">{wert}</p>
+                    {zusatz && <p className="line-clamp-2 text-xs text-muted-foreground">{zusatz}</p>}
                 </div>
             </CardContent>
         </Card>
@@ -175,7 +180,7 @@ export function DashboardPage() {
                 </div>
             ) : (
                 <div className="space-y-4">
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
                         <Kennzahl
                             icon={Trophy}
                             label={saison ? `Spiele in ${saison.saison}` : 'Geleitete Spiele'}
