@@ -444,6 +444,18 @@ export function MatchCard({
         );
     };
 
+    /** Telefon und E-Mail der Kollegen zum Antippen - am Handy ruft das direkt an */
+    const renderKontakt = (key: string, value: string) => {
+        const linkClass = 'break-words text-primary underline-offset-2 hover:underline';
+        if (key === 'telefon') {
+            return <a href={`tel:${value.replace(/[^\d+]/g, '')}`} className={linkClass}>{value}</a>;
+        }
+        if (key === 'email') {
+            return <a href={`mailto:${value}`} className={linkClass}>{value}</a>;
+        }
+        return <span className="break-words">{value}</span>;
+    };
+
     const renderSchiedsrichter = () => {
         if (!match.schiedsrichter || match.schiedsrichter.length === 0) {
             return null;
@@ -463,7 +475,7 @@ export function MatchCard({
                                 .map(([key, value]) => (
                                     <div key={key} className={fieldRowClass}>
                                         <span className="break-words text-muted-foreground">{formatFieldName(key)}</span>
-                                        <span className="break-words">{value}</span>
+                                        {renderKontakt(key, String(value))}
                                     </div>
                                 ))}
                         </div>
