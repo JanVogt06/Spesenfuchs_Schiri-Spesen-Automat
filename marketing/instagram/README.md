@@ -8,10 +8,16 @@ Fünf Slides im Format 3:4 (1080 × 1440), in dieser Reihenfolge hochladen:
 4. `04-funktionen.png` – Mehr als nur Spesen
 5. `05-aufruf.png` – Adresse und Link in Bio
 
+Dieselben fünf Slides gibt es als Story in 9:16 (1080 × 1920) unter `story/`.
+Oben und unten bleibt dort Platz für die Leisten von Instagram. Auf der letzten
+Story ist unter der Adresse eine Lücke frei: Dort den **Link-Sticker** mit
+`https://spesenfuchs.jan-vogt.dev` platzieren (Sticker-Symbol → Link).
+
 Die Slides sind keine Grafiken, sondern gebaut aus den Bausteinen der
 Landingpage mit deren Beispieldaten: `frontend/src/instagram/Slides.tsx`,
 aufrufbar im Dev-Server unter `http://localhost:5173/instagram.html`
-(`?s=1` bis `?s=5` für eine einzelne Slide). Sie gehören nicht zum Build.
+(`?s=1` bis `?s=5` für eine einzelne Slide, `&f=story` für die Story). Sie
+gehören nicht zum Build.
 
 Neu exportieren, während `npm run dev` in `frontend` läuft:
 

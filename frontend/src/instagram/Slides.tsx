@@ -1,5 +1,5 @@
 import type {ReactNode} from 'react';
-import {ArrowRight, Check, CheckCircle2, Lock, Route, ShieldCheck, Trophy, FileText, ChartColumn, Link2} from 'lucide-react';
+import {ArrowDown, ArrowRight, Check, CheckCircle2, Lock, Route, ShieldCheck, Trophy, FileText, ChartColumn, Link2} from 'lucide-react';
 import {Marke, Spielfeld} from '@/pages/Landing';
 import {
     Abrechnungskarte,
@@ -16,10 +16,16 @@ import {
  * 3:4, gebaut aus denselben Bausteinen wie die Landingpage, mit deren
  * ausgedachten Beispieldaten. ?s=1 bis ?s=5 zeigt eine einzelne Slide fuer
  * den Export, ohne Parameter stehen alle untereinander.
+ *
+ * Mit ?f=story entstehen dieselben Slides als Story im Format 9:16. Oben und
+ * unten bleibt dort Platz fuer die Leisten von Instagram (Fortschritt, Profil,
+ * Antwortfeld); Wisch-Hinweis und Punkte entfallen, die Story hat ihre eigenen.
+ * Auf der letzten Slide bleibt eine Luecke fuer den Link-Sticker.
  */
 
 const ANZAHL = 5;
 const ADRESSE = 'spesenfuchs.jan-vogt.dev';
+const STORY = new URLSearchParams(window.location.search).get('f') === 'story';
 
 function Fortschritt({nummer}: { nummer: number }) {
     return (
@@ -37,7 +43,7 @@ function Fortschritt({nummer}: { nummer: number }) {
 /** Rahmen jeder Slide: Nacht-Grund, Flutlicht, Korn, Marke oben, Fortschritt unten */
 function Folie({nummer, feld, children}: { nummer: number; feld?: boolean; children: ReactNode }) {
     return (
-        <section className="ig-slide spesen-nacht spesen-landing relative isolate flex h-[720px] w-[540px] flex-col overflow-hidden text-white">
+        <section className={`ig-slide spesen-nacht spesen-landing relative isolate flex w-[540px] flex-col overflow-hidden text-white ${STORY ? 'h-[960px]' : 'h-[720px]'}`}>
             {feld && (
                 <div className="spesen-feld pointer-events-none absolute inset-x-0 bottom-0 h-[55%]">
                     <div className="absolute inset-0">
@@ -49,14 +55,16 @@ function Folie({nummer, feld, children}: { nummer: number; feld?: boolean; child
             <div className="spesen-strahl spesen-flutlicht pointer-events-none absolute inset-0"/>
             <div className="spesen-koerner pointer-events-none absolute inset-0"/>
 
-            <header className="relative flex items-center justify-between px-10 pt-9">
+            <header className={`relative flex items-center justify-between px-10 ${STORY ? 'pt-[118px]' : 'pt-9'}`}>
                 <span className="[zoom:1.15]"><Marke hell/></span>
                 <span className="text-[13px] font-medium text-white/45 tabular-nums">{nummer} / {ANZAHL}</span>
             </header>
 
-            <div className="relative flex min-h-0 flex-1 flex-col px-10 pt-7">{children}</div>
+            <div className={`relative flex min-h-0 flex-1 flex-col px-10 pt-7 ${STORY ? 'justify-center pb-[130px]' : ''}`}>
+                {children}
+            </div>
 
-            <footer className="relative flex items-center justify-between px-10 pt-5 pb-9">
+            {!STORY && <footer className="relative flex items-center justify-between px-10 pt-5 pb-9">
                 <Fortschritt nummer={nummer}/>
                 {nummer < ANZAHL ? (
                     <span className="flex items-center gap-1.5 text-[13px] font-medium text-white/55">
@@ -69,7 +77,7 @@ function Folie({nummer, feld, children}: { nummer: number; feld?: boolean; child
                         Link in Bio
                     </span>
                 )}
-            </footer>
+            </footer>}
         </section>
     );
 }
@@ -106,7 +114,7 @@ function Ankuendigung() {
             </p>
 
             {/* Die Abrechnung liegt unter der ersten Ansetzung - sie ist deren Beleg */}
-            <div className="relative mt-5 flex-1 [zoom:0.75]">
+            <div className={`relative flex-1 ${STORY ? 'mt-8 [zoom:0.88]' : 'mt-5 [zoom:0.75]'}`}>
                 <div className="absolute top-0 right-[-2rem] w-[86%]">
                     <Spieleliste/>
                 </div>
@@ -141,7 +149,7 @@ function Problem() {
                 {AUFGABEN.map((aufgabe) => (
                     <li
                         key={aufgabe.text}
-                        className="flex items-center justify-between gap-3 border-b border-white/[0.07] px-4 py-3 last:border-b-0"
+                        className={`flex items-center justify-between gap-3 border-b border-white/[0.07] px-4 last:border-b-0 ${STORY ? 'py-4' : 'py-3'}`}
                     >
                         {aufgabe.selbst ? (
                             <span className="text-[15px] font-medium text-white">{aufgabe.text}</span>
@@ -187,7 +195,7 @@ function Ablauf() {
                 <Nachtuhr className="mt-1 size-20 shrink-0"/>
             </div>
 
-            <ol className="relative mt-6 grid gap-3">
+            <ol className={`relative mt-6 grid ${STORY ? 'gap-5' : 'gap-3'}`}>
                 <span className="absolute top-5 bottom-8 left-[19px] w-px bg-gradient-to-b from-flutlicht/70 via-flutlicht/30 to-flutlicht/10"/>
                 {SCHRITTE.map((schritt, index) => (
                     <li key={schritt.titel} className="relative grid grid-cols-[40px_1fr] gap-4">
@@ -198,7 +206,7 @@ function Ablauf() {
                         >
                             {index + 1}
                         </span>
-                        <div className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5">
+                        <div className={`rounded-xl border border-white/10 bg-white/[0.04] px-4 ${STORY ? 'py-3.5' : 'py-2.5'}`}>
                             <div className="flex items-center justify-between gap-2">
                                 <span className="text-[11px] font-medium tracking-wider text-white/45 uppercase">{schritt.phase}</span>
                                 <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-white/75">{schritt.chip}</span>
@@ -221,7 +229,7 @@ function Kachel({icon: Icon, titel, text, children}: {
 }) {
     return (
         <div className="flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04]">
-            <div className="flex h-[132px] items-center justify-center bg-black/20 p-3">{children}</div>
+            <div className={`flex items-center justify-center bg-black/20 p-3 ${STORY ? 'h-[156px]' : 'h-[132px]'}`}>{children}</div>
             <div className="border-t border-white/10 px-3.5 py-2.5">
                 <p className="flex items-center gap-1.5 text-[14px] font-semibold">
                     <Icon className="size-4 text-flutlicht"/>
@@ -248,7 +256,7 @@ function Funktionen() {
                     <div className="w-full [zoom:0.84]"><Ligenauszug/></div>
                 </Kachel>
                 <Kachel icon={ChartColumn} titel="Deine Saison" text="Einsätze, Karten, Lehrabende und Gespanne.">
-                    <div className="w-full [zoom:0.64]"><Saisontafel/></div>
+                    <div className={`w-full ${STORY ? '[zoom:0.72]' : '[zoom:0.64]'}`}><Saisontafel/></div>
                 </Kachel>
                 <Kachel icon={FileText} titel="Word & PDF" text="Einzeln laden oder alle zusammen als ZIP.">
                     <div className="[zoom:0.9]"><Dokumente/></div>
@@ -269,7 +277,7 @@ function Aufruf() {
                 Registrieren, DFBnet verbinden – die nächste Abrechnung schreibt sich von selbst.
             </p>
 
-            <div className="mt-9 overflow-hidden rounded-2xl border border-white/15 bg-[oklch(0.215_0.03_158)] shadow-2xl shadow-black/60">
+            <div className={`overflow-hidden rounded-2xl ${STORY ? 'mt-8' : 'mt-9'} border border-white/15 bg-[oklch(0.215_0.03_158)] shadow-2xl shadow-black/60`}>
                 <div className="flex items-center gap-3 border-b border-white/10 px-4 py-2.5">
                     <span className="flex gap-1.5">
                         <span className="size-2.5 rounded-full bg-white/15"/>
@@ -284,11 +292,14 @@ function Aufruf() {
                 <div className="px-5 py-6 text-center">
                     <p className="spesen-leuchtziffer text-[29px] font-semibold tracking-tight text-flutlicht">{ADRESSE}</p>
                     <p className="mt-2 flex items-center justify-center gap-1.5 text-[14px] text-white/60">
-                        <Link2 className="size-4"/>
-                        oder direkt über den Link in der Bio
+                        {STORY ? <ArrowDown className="size-4"/> : <Link2 className="size-4"/>}
+                        {STORY ? 'oder direkt unten auf den Link tippen' : 'oder direkt über den Link in der Bio'}
                     </p>
                 </div>
             </div>
+
+            {/* Frei fuer den Link-Sticker, der erst in Instagram dazukommt */}
+            {STORY && <div className="h-[88px] shrink-0"/>}
 
             <ul className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[14px] text-white/70">
                 {['Ohne Installation', 'Verschlüsselt', 'Für Handy & PC'].map((eintrag) => (
@@ -299,7 +310,7 @@ function Aufruf() {
                 ))}
             </ul>
 
-            <p className="mt-auto flex items-center justify-center gap-1.5 text-[13px] text-white/50">
+            <p className={`flex items-center justify-center gap-1.5 text-[13px] text-white/50 ${STORY ? 'mt-10' : 'mt-auto'}`}>
                 <ShieldCheck className="size-4"/>
                 Für Schiedsrichter des Thüringer Fußball-Verbandes
             </p>
