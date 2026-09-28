@@ -2,11 +2,17 @@
 <html lang="de">
   <head>
     <meta charset="UTF-8" />
-    <!-- Die Icons liegen unter src/assets, damit Vite sie nach /assets baut:
-         das Backend liefert ausser /assets und /appicon.png jede Adresse als
-         index.html aus. -->
+    <!-- Favicon und Touch-Icon liegen unter src/assets, damit Vite sie mit
+         Hash nach /assets baut und sie dauerhaft gecacht werden duerfen. -->
     <link rel="icon" type="image/png" sizes="64x64" href="./src/assets/favicon-64.png" />
     <link rel="apple-touch-icon" href="./src/assets/apple-touch-icon.png" />
+    <!-- Manifest, App-Icons und Service Worker liegen in public/ und damit
+         direkt in dist/: das Backend reicht Dateien dort unveraendert durch,
+         jede andere Adresse bekommt die index.html. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#171717" media="(prefers-color-scheme: dark)" />
+    <meta name="apple-mobile-web-app-title" content="Spesenfuchs" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Spesenfuchs — Schiri-Spesen-Automat</title>
     <meta name="description" content="Spesenabrechnungen für Schiedsrichter im Thüringer Fußball-Verband: jede Nacht aus deinen DFBnet-Ansetzungen, nach TFV-Spesenordnung, als Word und PDF. Kostenlos." />
