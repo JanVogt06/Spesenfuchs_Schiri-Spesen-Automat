@@ -6,6 +6,7 @@ import {Separator} from '@/components/ui/separator';
 import {Badge} from '@/components/ui/badge';
 import {AppShell} from '@/components/layout/AppShell';
 import {GenerateButton} from '@/components/matches/GenerateButton';
+import {InstallBanner} from '@/components/pwa/InstallHinweis';
 import {useScrapeRun} from '@/hooks/useScrapeRun';
 import {getAllMatches, type MatchData} from '@/lib/matches';
 import {getSaisons, getSaison, type SaisonDetails} from '@/lib/saison';
@@ -133,6 +134,8 @@ export function DashboardPage() {
 
     return (
         <AppShell actions={<GenerateButton isGenerating={isStarting || isRunning} onClick={startGeneration}/>}>
+            <InstallBanner/>
+
             {displayError && (
                 <div className="mb-6 flex items-start gap-2 rounded-lg bg-destructive/10 px-4 py-3 ring-1 ring-destructive/20">
                     <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive"/>

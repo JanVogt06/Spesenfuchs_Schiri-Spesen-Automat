@@ -2,6 +2,7 @@ import {AppShell} from '@/components/layout/AppShell';
 import {DFBCredentialsForm} from '@/components/auth/DFBCredentialsForm';
 import {ChangePasswordForm} from '@/components/auth/ChangePasswordForm';
 import {ThemeCard} from '@/components/settings/ThemeCard';
+import {InstallCard} from '@/components/pwa/InstallHinweis';
 
 export function SettingsPage() {
     return (
@@ -16,6 +17,9 @@ export function SettingsPage() {
 
                 {/* Theme / Dark Mode */}
                 <ThemeCard/>
+
+                {/* Installation als App */}
+                <InstallCard/>
             </div>
         </AppShell>
     );
