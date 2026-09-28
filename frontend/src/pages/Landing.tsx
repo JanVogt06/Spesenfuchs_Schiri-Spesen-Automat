@@ -1387,14 +1387,20 @@ function useStartseitenRahmen() {
         const wurzel = document.documentElement;
         wurzel.classList.add('spesen-startseite');
 
-        let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
-        const vorher = meta?.content ?? null;
-        if (!meta) {
-            meta = document.createElement('meta');
-            meta.name = 'theme-color';
-            document.head.appendChild(meta);
+        // index.html bringt je eine Farbe fuer hell und dunkel mit (media);
+        // die Startseite ist in beiden Faellen dunkel, also werden alle umgefaerbt
+        const metas = [...document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')];
+        const vorher = metas.map((meta) => meta.content);
+        let eigene: HTMLMetaElement | null = null;
+        if (metas.length === 0) {
+            eigene = document.createElement('meta');
+            eigene.name = 'theme-color';
+            document.head.appendChild(eigene);
         }
-        meta.content = THEMEFARBE;
+        metas.forEach((meta) => {
+            meta.content = THEMEFARBE;
+        });
+        if (eigene) eigene.content = THEMEFARBE;
 
         const viewport = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
         const viewportVorher = viewport?.content;
@@ -1407,11 +1413,10 @@ function useStartseitenRahmen() {
             if (viewport && viewportVorher !== undefined) {
                 viewport.content = viewportVorher;
             }
-            if (vorher === null) {
-                meta.remove();
-            } else {
-                meta.content = vorher;
-            }
+            metas.forEach((meta, i) => {
+                meta.content = vorher[i];
+            });
+            eigene?.remove();
         };
     }, []);
 }
