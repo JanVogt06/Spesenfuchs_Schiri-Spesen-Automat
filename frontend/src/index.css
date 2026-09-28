@@ -406,6 +406,33 @@
 }
 
 /*
+  Dasselbe fuer die Anwendung (AppShell), mit ihren schmaleren Raendern. Unten
+  haelt .app-unten den Inhalt am Handy frei von der schwebenden Tab-Leiste und
+  dem Home-Balken darunter.
+*/
+.app-rahmen {
+  --app-rand: 1rem;
+  padding-left: max(var(--app-rand), env(safe-area-inset-left));
+  padding-right: max(var(--app-rand), env(safe-area-inset-right));
+}
+
+@media (min-width: 640px) {
+  .app-rahmen {
+    --app-rand: 1.5rem;
+  }
+}
+
+.app-unten {
+  padding-bottom: calc(6rem + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 1024px) {
+  .app-unten {
+    padding-bottom: 2rem;
+  }
+}
+
+/*
   Grundschrift und Grund hinter der Seite, solange die Landingpage offen ist
   (siehe useStartseitenRahmen in Landing.tsx). Die Anwendung selbst behaelt
   am Handy ihre 14px.
