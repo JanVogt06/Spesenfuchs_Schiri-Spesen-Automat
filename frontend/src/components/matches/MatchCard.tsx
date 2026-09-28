@@ -372,7 +372,7 @@ export function MatchCard({
                                         onChange={(e) => { hatEigeneEingaben.current = true; setExpenseInputs(prev => ({...prev, [kmKey]: e.target.value})); }}
                                         placeholder="z.B. 42"
                                         inputMode="decimal"
-                                        className="h-8 text-sm"
+                                        className="h-10 text-sm sm:h-8"
                                     />
                                     {kmCost !== null && (
                                         <p className="mt-1 font-mono text-xs text-muted-foreground">
@@ -385,7 +385,7 @@ export function MatchCard({
                                     onChange={(e) => { hatEigeneEingaben.current = true; setExpenseInputs(prev => ({...prev, [oevmKey]: e.target.value})); }}
                                     placeholder="z.B. 7,50"
                                     inputMode="decimal"
-                                    className="h-8 text-sm"
+                                    className="h-10 text-sm sm:h-8"
                                 />
                             </div>
                         );
