@@ -42,25 +42,32 @@ export function SaisonBilanz({einsaetze, lehrgaenge}: SaisonBilanzProps) {
                                 <thead>
                                     <tr className="border-b text-xs tracking-wide text-muted-foreground uppercase">
                                         <th className="px-4 py-2 text-left font-medium sm:px-6">Rolle</th>
-                                        <th className="px-3 py-2 text-right font-medium">Geleitet</th>
-                                        <th className="px-3 py-2 text-right font-medium">Zurückgegeben</th>
-                                        <th className="px-4 py-2 text-right font-medium sm:px-6">Nicht angetreten</th>
+                                        <th className="px-2 py-2 text-right font-medium sm:px-3">Geleitet</th>
+                                        <th className="px-2 py-2 text-right font-medium sm:px-3">
+                                            {/* Am Handy passen die vollen Spaltennamen nicht nebeneinander */}
+                                            <abbr title="Zurückgegeben" className="no-underline sm:hidden">Zurück</abbr>
+                                            <span className="hidden sm:inline">Zurückgegeben</span>
+                                        </th>
+                                        <th className="px-4 py-2 text-right font-medium sm:px-6">
+                                            <abbr title="Nicht angetreten" className="no-underline sm:hidden">Nicht ang.</abbr>
+                                            <span className="hidden sm:inline">Nicht angetreten</span>
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {zeilen.map((zeile) => (
                                         <tr key={zeile.rolle} className="border-b last:border-0">
                                             <td className="px-4 py-2 sm:px-6">{zeile.rolle}</td>
-                                            <td className="px-3 py-2 text-right font-mono">{wert(zeile.geleitet)}</td>
-                                            <td className="px-3 py-2 text-right font-mono">{wert(zeile.zurueckgegeben)}</td>
+                                            <td className="px-2 py-2 text-right font-mono sm:px-3">{wert(zeile.geleitet)}</td>
+                                            <td className="px-2 py-2 text-right font-mono sm:px-3">{wert(zeile.zurueckgegeben)}</td>
                                             <td className="px-4 py-2 text-right font-mono sm:px-6">{wert(zeile.nicht_angetreten)}</td>
                                         </tr>
                                     ))}
                                     {summe && (
                                         <tr className="bg-muted/40 font-medium">
                                             <td className="px-4 py-2 sm:px-6">Summe</td>
-                                            <td className="px-3 py-2 text-right font-mono">{wert(summe.geleitet)}</td>
-                                            <td className="px-3 py-2 text-right font-mono">{wert(summe.zurueckgegeben)}</td>
+                                            <td className="px-2 py-2 text-right font-mono sm:px-3">{wert(summe.geleitet)}</td>
+                                            <td className="px-2 py-2 text-right font-mono sm:px-3">{wert(summe.zurueckgegeben)}</td>
                                             <td className="px-4 py-2 text-right font-mono sm:px-6">{wert(summe.nicht_angetreten)}</td>
                                         </tr>
                                     )}
