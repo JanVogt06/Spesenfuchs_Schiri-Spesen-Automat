@@ -634,3 +634,17 @@ details[open] > .spesen-antwort {
     display: none;
   }
 }
+
+/*
+  Safari am iPhone zoomt in die Seite, sobald ein Eingabefeld mit weniger als
+  16px Schrift den Fokus bekommt - bei jedem Kilometer-Eintrag. Die Anwendung
+  setzt am Handy 14px als Grundschrift, text-sm liegt noch darunter. Ausserhalb
+  jeder @layer, damit die Regel auch die Tailwind-Klassen am Feld schlaegt.
+*/
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: max(16px, 1em);
+  }
+}
