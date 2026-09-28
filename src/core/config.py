@@ -41,7 +41,7 @@ _GENERATED_SECRETS = {
 # werden - was dreimal vergessen wurde, sodass v1.8.1 sich selbst als 1.7.0
 # ausgab: im Health-Endpunkt, im Betreff der Fehlerberichte und im User-Agent
 # gegenueber fussball.de und Nominatim.
-APP_VERSION = os.getenv("APP_VERSION") or "1.9.4"
+APP_VERSION = os.getenv("APP_VERSION") or "1.9.5"
 
 
 def get_data_dir() -> Path:
