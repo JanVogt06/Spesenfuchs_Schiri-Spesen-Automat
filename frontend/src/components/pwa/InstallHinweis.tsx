@@ -33,9 +33,37 @@ function IosSchritte() {
     );
 }
 
+/**
+ * Derselbe Knopf auf jedem Geraet. Wo der Browser einen Installationsdialog
+ * hat, oeffnet er ihn; auf dem iPhone klappt er stattdessen die Handgriffe auf,
+ * damit die Anleitung erst auf Wunsch erscheint.
+ */
+function InstallKnopf({klein}: {klein?: boolean}) {
+    const {kannInstallieren, installieren} = useInstallation();
+    const [schritteOffen, setSchritteOffen] = useState(false);
+
+    return (
+        <>
+            <Button
+                size={klein ? 'sm' : 'default'}
+                onClick={kannInstallieren ? installieren : () => setSchritteOffen((offen) => !offen)}
+                aria-expanded={kannInstallieren ? undefined : schritteOffen}
+            >
+                <Download className="size-4"/>
+                App installieren
+            </Button>
+            {!kannInstallieren && schritteOffen && (
+                <div className="mt-3">
+                    <IosSchritte/>
+                </div>
+            )}
+        </>
+    );
+}
+
 /** Karte in den Einstellungen - erklaert den Weg auf jedem Geraet */
 export function InstallCard() {
-    const {installiert, kannInstallieren, ios, installieren} = useInstallation();
+    const {installiert, kannInstallieren, ios} = useInstallation();
 
     return (
         <Card className="w-full">
@@ -54,13 +82,8 @@ export function InstallCard() {
                         <CheckCircle2 className="size-4 shrink-0 text-primary"/>
                         Spesenfuchs ist auf diesem Gerät installiert.
                     </p>
-                ) : kannInstallieren ? (
-                    <Button onClick={installieren}>
-                        <Download className="size-4"/>
-                        App installieren
-                    </Button>
-                ) : ios ? (
-                    <IosSchritte/>
+                ) : kannInstallieren || ios ? (
+                    <InstallKnopf/>
                 ) : (
                     <p className="text-sm text-muted-foreground">
                         Dein Browser bietet die Installation gerade nicht an. In Chrome und Edge findest du
@@ -90,7 +113,7 @@ function istAusgeblendet(): boolean {
  * Weg dauerhaft.
  */
 export function InstallBanner() {
-    const {installiert, kannInstallieren, ios, installieren} = useInstallation();
+    const {installiert, kannInstallieren, ios} = useInstallation();
     const [ausgeblendet, setAusgeblendet] = useState(istAusgeblendet);
     const touch = window.matchMedia('(pointer: coarse)').matches;
 
@@ -110,21 +133,12 @@ export function InstallBanner() {
             <Smartphone className="mt-0.5 size-4 shrink-0 text-primary"/>
             <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium">Spesenfuchs als App</p>
-                {kannInstallieren ? (
-                    <>
-                        <p className="mt-0.5 text-sm text-muted-foreground">
-                            Mit eigenem Symbol auf dem Homescreen, ohne Browserleiste.
-                        </p>
-                        <Button size="sm" className="mt-2" onClick={installieren}>
-                            <Download className="size-4"/>
-                            App installieren
-                        </Button>
-                    </>
-                ) : (
-                    <div className="mt-1.5">
-                        <IosSchritte/>
-                    </div>
-                )}
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                    Mit eigenem Symbol auf dem Homescreen, ohne Browserleiste.
+                </p>
+                <div className="mt-2">
+                    <InstallKnopf klein/>
+                </div>
             </div>
             <Button
                 variant="ghost"

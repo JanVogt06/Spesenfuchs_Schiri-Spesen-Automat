@@ -128,8 +128,8 @@ in einem ZIP stecken dürfen.
 Die Oberfläche lässt sich als App auf den Homescreen legen (PWA). Auf Android
 und in Chrome oder Edge am Rechner steht dafür auf dem Dashboard und in den
 *Einstellungen* ein Knopf „App installieren“. Auf dem iPhone lässt Apple keinen
-solchen Knopf zu, dort zeigt die Seite die Handgriffe in Safari (*Teilen* →
-*Zum Home-Bildschirm*).
+Installationsdialog zu; derselbe Knopf klappt dort die Handgriffe in Safari auf
+(*Teilen* → *Zum Home-Bildschirm*).
 
 Voraussetzung ist **HTTPS**: über `http://192.168.x.x:8001` bietet kein Browser
 die Installation an, über einen Reverse-Proxy oder Cloudflare Tunnel mit
