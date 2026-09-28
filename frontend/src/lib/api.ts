@@ -21,6 +21,12 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
     (response) => response,
     (error) => {
+        // Ohne Antwort war der Server nicht erreichbar, meist fehlt das Netz.
+        // axios meldet das nur als englisches "Network Error".
+        if (!error.response && error.code !== 'ERR_CANCELED') {
+            error.message = 'Keine Verbindung zum Server. Prüfe deine Internetverbindung.';
+        }
+
         // Nur bei 401 UND wenn es NICHT der Login-Endpoint ist
         if (error.response?.status === 401) {
             const isLoginRequest = error.config?.url?.includes('/api/auth/login');
