@@ -123,6 +123,26 @@ begrenzt, wie viele LibreOffice-Prozesse gleichzeitig laufen dürfen — jeder
 belegt 150–300 MB. `MAX_BULK_DOWNLOAD` (Standard 50) begrenzt, wie viele Spiele
 in einem ZIP stecken dürfen.
 
+## Als App installieren
+
+Die Oberfläche lässt sich als App auf den Homescreen legen (PWA). Auf Android
+und in Chrome oder Edge am Rechner steht dafür auf dem Dashboard und in den
+*Einstellungen* ein Knopf „App installieren“. Auf dem iPhone lässt Apple keinen
+solchen Knopf zu, dort zeigt die Seite die Handgriffe in Safari (*Teilen* →
+*Zum Home-Bildschirm*).
+
+Voraussetzung ist **HTTPS**: über `http://192.168.x.x:8001` bietet kein Browser
+die Installation an, über einen Reverse-Proxy oder Cloudflare Tunnel mit
+Zertifikat schon. Nur `localhost` ist davon ausgenommen.
+
+Der Service Worker (`frontend/public/sw.js`) hält nur die Hülle der Oberfläche
+vor, damit die App auch ohne Netz startet. Antworten der API landen nie in
+seinem Cache — sie enthalten Anschriften und Telefonnummern. Seitenaufrufe gehen
+immer zuerst ans Netz, ein Update erreicht die installierte App also beim
+nächsten Öffnen von selbst. `sw.js` und das Manifest liefert das Backend mit
+`Cache-Control: no-cache` aus, damit auch ein CDN davor keinen alten Worker
+festhält.
+
 ## Karte
 
 Die Karte bei den Fahrtkosten braucht Koordinaten, DFBnet liefert aber nur
