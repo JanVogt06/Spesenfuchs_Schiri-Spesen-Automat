@@ -961,6 +961,25 @@ async def root():
         raise HTTPException(status_code=404, detail="Frontend not found")
 
 
+def _wurzel_datei(full_path: str) -> Optional[FileResponse]:
+    """
+    Eine Datei direkt in FRONTEND_DIR, sonst None. Unterverzeichnisse und
+    Pfade, die aus dem Verzeichnis herausfuehren, zaehlen nicht.
+    """
+    wurzel = FRONTEND_DIR.resolve()
+    kandidat = (wurzel / full_path).resolve()
+    if kandidat.parent != wurzel or not kandidat.is_file() or kandidat.name == "index.html":
+        return None
+
+    media_type = "application/manifest+json" if kandidat.suffix == ".webmanifest" else None
+    headers = {}
+    if kandidat.name in ("sw.js", "manifest.webmanifest"):
+        # Ohne das haelt Cloudflare oder der Browser einen alten Worker fest,
+        # und ein Update erreicht die installierte App nicht mehr.
+        headers["Cache-Control"] = "no-cache"
+    return FileResponse(str(kandidat), media_type=media_type, headers=headers)
+
+
 @app.get("/{full_path:path}")
 async def serve_frontend(full_path: str):
     """
@@ -974,6 +993,13 @@ async def serve_frontend(full_path: str):
     # Wenn Frontend nicht verfügbar, 404
     if not FRONTEND_DIR.exists():
         raise HTTPException(status_code=404, detail="Frontend not available")
+
+    # Dateien aus frontend/public landen direkt im dist-Wurzelverzeichnis.
+    # Manifest und Service Worker muessen dort liegen: der Worker kontrolliert
+    # nur Adressen unterhalb seines eigenen Pfads.
+    datei = _wurzel_datei(full_path)
+    if datei is not None:
+        return datei
 
     # index.html ausliefern (für React Router)
     index_path = FRONTEND_DIR / "index.html"
