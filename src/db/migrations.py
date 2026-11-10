@@ -885,6 +885,60 @@ def _migration_016_ligen(conn: sqlite3.Connection) -> None:
     """)
 
 
+def _migration_017_beobachtungen(conn: sqlite3.Connection) -> None:
+    """
+    Die eigenen Beobachtungen aus Schiri-Beobachtung und Schiri-Portal.
+
+    quelle trennt die beiden Module: "herren" (Landesverband) und "portal"
+    (DFB-Nachwuchs). Beide haben je Saison einen eigenen Schnitt und duerfen
+    nie zusammengerechnet werden.
+
+    Je Spiel wird nur die EIGENE Note gespeichert, zusammen mit der Rolle, in
+    der sie vergeben wurde. Die Noten der Kollegen gehen niemanden etwas an,
+    der nicht selbst Nutzer ist.
+
+    beobachtung_saisons merkt sich, welche Saisons vollstaendig gelesen
+    wurden - auch die leeren. Sonst liesse sich "ohne Beobachtung" nicht von
+    "noch nie gelesen" unterscheiden, und jede leere Saison wuerde jede Nacht
+    erneut abgefragt.
+    """
+    _run_script(conn, """
+        CREATE TABLE beobachtungen (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            quelle TEXT NOT NULL,
+            saison TEXT NOT NULL,
+            datum TEXT NOT NULL,
+            uhrzeit TEXT NOT NULL DEFAULT '',
+            spieltag TEXT NOT NULL DEFAULT '',
+            staffel TEXT NOT NULL DEFAULT '',
+            heim TEXT NOT NULL DEFAULT '',
+            gast TEXT NOT NULL DEFAULT '',
+            ergebnis TEXT NOT NULL DEFAULT '',
+            rolle TEXT NOT NULL,
+            note REAL NOT NULL,
+            note_text TEXT NOT NULL DEFAULT '',
+            beobachter TEXT NOT NULL DEFAULT '',
+            freigegeben_am TEXT NOT NULL DEFAULT '',
+            scraped_at TEXT NOT NULL,
+            UNIQUE (user_id, quelle, saison, datum, uhrzeit, heim, gast, rolle),
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        );
+
+        CREATE INDEX idx_beobachtungen_user ON beobachtungen (user_id, saison, quelle);
+
+        CREATE TABLE beobachtung_saisons (
+            user_id INTEGER NOT NULL,
+            quelle TEXT NOT NULL,
+            saison TEXT NOT NULL,
+            anzahl INTEGER NOT NULL DEFAULT 0,
+            scraped_at TEXT NOT NULL,
+            PRIMARY KEY (user_id, quelle, saison),
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        );
+    """)
+
+
 # (Version, Beschreibung, Funktion) - aufsteigend, Luecken sind nicht erlaubt.
 MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "baseline schema", _migration_001_baseline),
@@ -903,6 +957,7 @@ MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (14, "clear league rates frozen on cup and friendly matches", _migration_014_pokal_freundschaft_saetze),
     (15, "drop tfv rates from other associations matches", _migration_015_fremde_verbaende),
     (16, "thuringian league tables for cup and friendly rates", _migration_016_ligen),
+    (17, "own observation grades per season", _migration_017_beobachtungen),
 ]
 
 
