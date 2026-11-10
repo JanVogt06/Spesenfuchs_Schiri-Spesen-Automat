@@ -14,10 +14,14 @@ from scraper.dfb_scraper import DFBScraper
 from generator.docx_generator import KM_SATZ_EURO
 from generator.spesen_calculator import calculate_spesen
 from db.matches import upsert_match, mark_missing_matches, build_match_key
-from db.stammdaten import upsert_stammdaten
+from db.stammdaten import upsert_stammdaten, get_stammdaten
+from db.beobachtungen import (
+    replace_beobachtungs_saison, count_beobachtungen, get_fertige_beobachtungs_saisons,
+)
 from db.season import replace_saison, get_komplette_saisons, count_saison_spiele
 from utils.logger import setup_logger
 from utils.match_utils import extract_iso_date_from_anpfiff, parse_saison_datum
+from utils.saison_utils import saison_start_jahr, saison_fuer_datum, parse_deutsches_datum
 
 logger = setup_logger("main")
 
@@ -177,6 +181,63 @@ def persist_saisons(user_id: int, saisons: dict) -> int:
     return ersetzt
 
 
+def waehle_beobachtungs_saisons(angebotene: List[str], schiedsrichter_seit: str, fertig: set) -> List[str]:
+    """
+    Die Saisons, deren Beobachtungen gelesen werden muessen.
+
+    Ab der Saison, in der man Schiedsrichter wurde - davor kann es keine
+    Beobachtung geben. Ist das Datum noch unbekannt (erster Abruf, die
+    Stammdaten werden erst spaeter im Lauf gelesen), werden alle angebotenen
+    Saisons gelesen; das passiert genau einmal, danach gelten die
+    abgeschlossenen als fertig.
+    """
+    seit = parse_deutsches_datum(schiedsrichter_seit)
+    erste = saison_start_jahr(saison_fuer_datum(seit)) if seit else None
+
+    return [
+        saison for saison in angebotene
+        if saison not in fertig
+        and (erste is None or (saison_start_jahr(saison) or 0) >= erste)
+    ]
+
+
+def persist_beobachtungen(user_id: int, beobachtungen: dict) -> int:
+    """
+    Schreibt die gelesenen Beobachtungen - je Quelle und Saison ersetzend.
+
+    Wie bei den Saisons: unvollstaendig Gelesenes bleibt liegen, und eine
+    gespeicherte Saison mit Noten wird nie durch eine leere ersetzt. Beides
+    waere ein Anzeigefehler von DFBnet, kein Verschwinden der Beobachtungen.
+
+    Returns:
+        Anzahl der ersetzten Saisons.
+    """
+    ersetzt = 0
+
+    for quelle, saisons in beobachtungen.items():
+        for saison, daten in saisons.items():
+            if not daten.get("vollstaendig"):
+                logger.warning(f"Beobachtungen {quelle} {saison} unvollstaendig - bleiben unveraendert")
+                continue
+
+            liste = daten.get("beobachtungen") or []
+            if not liste and count_beobachtungen(user_id, quelle, saison):
+                logger.warning(
+                    f"Beobachtungen {quelle} {saison} leer gelesen, gespeichert sind welche - "
+                    "bleiben unveraendert"
+                )
+                continue
+
+            try:
+                replace_beobachtungs_saison(user_id, quelle, saison, liste)
+                ersetzt += 1
+            except Exception as e:
+                logger.error(f"Beobachtungen {quelle} {saison} nicht gespeichert: {e}")
+
+    logger.info(f"{ersetzt} Beobachtungs-Saisons in der Datenbank")
+    return ersetzt
+
+
 def scrape_matches(
     username: Optional[str] = None,
     password: Optional[str] = None,
@@ -223,11 +284,41 @@ def scrape_matches(
         scraper.click_login()
         scraper.login()
         scraper.open_menu_if_needed()
-        scraper.navigate_to_schiriansetzung()
 
         def fortschritt(current, total, step):
             melde(current, total, step)
             logger.info(f"Progress: {current}/{total} - {step}")
+
+        # Die Beobachtungen liegen in den alten DFBnet-Modulen, deren Einstieg
+        # nur im Hauptmenue der Startseite steht - deshalb VOR dem Wechsel in
+        # die Schiriansetzung, die die Seite durch ihren eigenen Tab ersetzt.
+        # Gelesen wird in einem eigenen Tab; die Startseite bleibt unberuehrt.
+        #
+        # Wie Stammdaten und Saisons mit eigenem try/except: die Ansetzungen
+        # sind das Produkt und duerfen an den Beobachtungen nie scheitern.
+        beobachtungen = {}
+
+        try:
+            melde(0, 0, "Lese Beobachtungen...")
+
+            stammdaten_bisher = (get_stammdaten(user_id) or {}) if user_id is not None else {}
+            schiedsrichter_seit = stammdaten_bisher.get("schiedsrichter_seit") or ""
+
+            def saisons_fuer(quelle, angebotene):
+                fertig = (
+                    get_fertige_beobachtungs_saisons(user_id, quelle)
+                    if user_id is not None else set()
+                )
+                return waehle_beobachtungs_saisons(angebotene, schiedsrichter_seit, fertig)
+
+            beobachtungen = scraper.scrape_beobachtungen(
+                saisons_fuer=saisons_fuer, progress_callback=fortschritt
+            )
+
+        except Exception as e:
+            logger.warning(f"Beobachtungen konnten nicht gelesen werden: {e}")
+
+        scraper.navigate_to_schiriansetzung()
 
         all_matches = scraper.scrape_all_matches(progress_callback=fortschritt)
 
@@ -301,6 +392,7 @@ def scrape_matches(
         persist_matches(user_id, all_matches, vollstaendig=vollstaendig)
         persist_stammdaten(user_id, stammdaten)
         persist_saisons(user_id, saisons)
+        persist_beobachtungen(user_id, beobachtungen)
 
     logger.info(f"Erfolgreich {len(all_matches)} Spiele gescrapt")
     return all_matches

@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from utils.logger import setup_logger
 from core.errors import DFBCredentialsInvalidError
+from scraper.beobachtungen import finde_module, lies_quelle
 
 logger = setup_logger("dfb_scraper")
 
@@ -1513,6 +1514,48 @@ class DFBScraper:
             f"=== Saisonzusammenfassung: {len(ergebnis)} gelesen, "
             f"{len(saisons) - len(zu_lesen)} uebersprungen ==="
         )
+        return ergebnis
+
+    def scrape_beobachtungen(self, saisons_fuer, progress_callback=None) -> dict:
+        """
+        Liest die eigenen Beobachtungen aus Schiri-Beobachtung und Schiri-Portal.
+
+        Muss auf der DFBnet-Startseite nach dem Login laufen, also VOR
+        navigate_to_schiriansetzung: nur dort steht das Hauptmenue mit den
+        Einstiegen in die beiden Module.
+
+        Gelesen wird in einem eigenen Tab desselben Browser-Kontexts. Die
+        Startseite bleibt dadurch unberuehrt, und navigate_to_schiriansetzung
+        findet ihr Menue genau so vor wie ohne diesen Schritt.
+
+        Args:
+            saisons_fuer: (quelle, angebotene Saisons) -> zu lesende Saisons
+            progress_callback: wird als (aktuell, gesamt, schritt) aufgerufen
+
+        Returns:
+            quelle -> saison -> {"beobachtungen", "vollstaendig"}. Eine Quelle
+            fehlt, wenn der Account das Modul nicht hat oder es nicht
+            gelesen werden konnte.
+        """
+        logger.info("=== Lese Beobachtungen ===")
+
+        module = finde_module(self.page)
+        logger.info(f"Beobachtungsmodule im Menue: {sorted(module)}")
+
+        ergebnis = {}
+        seite = self.page.context.new_page()
+
+        try:
+            for quelle, modul_url in module.items():
+                try:
+                    ergebnis[quelle] = lies_quelle(
+                        seite, quelle, modul_url, saisons_fuer, progress_callback
+                    )
+                except Exception as e:
+                    logger.warning(f"Beobachtungen {quelle} konnten nicht gelesen werden: {e}")
+        finally:
+            seite.close()
+
         return ergebnis
 
     def scrape_all_matches(self, progress_callback=None):
