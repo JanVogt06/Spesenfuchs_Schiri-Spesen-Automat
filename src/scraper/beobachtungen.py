@@ -28,6 +28,11 @@ Drei Dinge, die man wissen muss:
    Abgeschickt wird dagegen mit einem echten Klick - ein per Skript
    ausgeloester Klick erzeugte im Test eine ungueltige Webflow-Seite
    ("moeglicherweise haben Sie die Browser-Back Funktion benutzt").
+
+4. Eine Suche ohne Treffer zeigt im Herren-Modul den Kasten "Fehlermeldungen
+   / Hinweise" mit "Ihre Suchanfrage ergab keine Treffer!". Das ist kein
+   Fehler, sondern der Normalfall fuer jede Rolle, in der man in einer Saison
+   nie eingesetzt war.
 """
 from typing import Callable, Dict, List, Optional
 from urllib.parse import urlparse
@@ -160,13 +165,20 @@ _LISTE_JS = """
             });
         }
 
+        // Das Herren-Modul meldet eine leere Suche im Kasten "Fehlermeldungen /
+        // Hinweise" ("Ihre Suchanfrage ergab keine Treffer!"); das Portal
+        // zeigt dann einfach nichts. Nur was dort SONST steht, ist ein Fehler.
+        const kasten = /Fehlermeldungen[^\\n]*\\n([^\\n]*)/.exec(text);
+        const keineTreffer = /ergab keine Treffer/.test(text);
+
         return {
             seite: seite ? Number(seite[1]) : null,
             seiten: seite ? Number(seite[2]) : null,
             treffer: seite ? Number(seite[3]) : 0,
             zeilen,
             weiter: !!document.querySelector('input.naviNext'),
-            fehler: /Fehlermeldungen/.test(text),
+            keine_treffer: keineTreffer,
+            fehler: kasten && !keineTreffer ? (kasten[1] || 'Fehlermeldung ohne Text').trim() : '',
         };
     }
 """
@@ -196,20 +208,46 @@ def oeffne_liste(page: Page, modul_url: str) -> str:
     """
     page.goto(modul_url, wait_until="domcontentloaded", timeout=_ZEITLIMIT_MS)
 
-    modulpfad = urlparse(modul_url).path.rsplit("/", 1)[0]
+    teile = urlparse(modul_url)
+    modulpfad = teile.path.rsplit("/", 1)[0]
     listen_url = page.evaluate(_LISTEN_LINK_JS, modulpfad)
+
+    # Steht der Menuepunkt nicht auf der Einstiegsseite, wird die Liste direkt
+    # aufgerufen - das Ereignis OBSERVATION laesst sich auch ohne vorherigen
+    # Klick ins Modul oeffnen.
     if not listen_url:
-        raise RuntimeError(f"Menuepunkt 'Beobachtung' in {modulpfad} nicht gefunden")
+        listen_url = f"{teile.scheme}://{teile.netloc}{modulpfad}/webflow.do?event=OBSERVATION"
+        logger.info(f"Menuepunkt 'Beobachtung' in {modulpfad} nicht gefunden - rufe die Liste direkt auf")
 
     lade_liste(page, listen_url)
     return listen_url
 
 
+def _warte_auf_formular(page: Page) -> None:
+    """
+    Wartet auf das Suchformular - und sagt im Fehlerfall, was stattdessen da
+    steht.
+
+    Die Seiten werden auf dem Server gerendert; nach domcontentloaded ist das
+    Formular da oder es kommt nicht mehr. Statt einer Fehlerseite 45 Sekunden
+    lang zuzusehen, wird kurz gewartet und der Seitenanfang ins Protokoll
+    geschrieben ("Die aufgerufene Seite ist ungueltig ..." o.ae.).
+    """
+    try:
+        page.locator('select[name="kontext.searchPanel.seasonId"]').wait_for(
+            state="attached", timeout=5000
+        )
+    except Exception:
+        try:
+            anfang = " ".join(page.locator("main, body").first.inner_text().split())[:300]
+        except Exception:
+            anfang = "?"
+        raise RuntimeError(f"Kein Suchformular auf {urlparse(page.url).path}: {anfang}")
+
+
 def lade_liste(page: Page, listen_url: str) -> None:
     page.goto(listen_url, wait_until="domcontentloaded", timeout=_ZEITLIMIT_MS)
-    page.locator('select[name="kontext.searchPanel.seasonId"]').wait_for(
-        state="attached", timeout=_ZEITLIMIT_MS
-    )
+    _warte_auf_formular(page)
 
 
 def angebotene_saisons(page: Page) -> List[str]:
@@ -220,12 +258,10 @@ def angebotene_saisons(page: Page) -> List[str]:
 def _abschicken(page: Page, ausloeser: str) -> dict:
     with page.expect_navigation(wait_until="domcontentloaded", timeout=_ZEITLIMIT_MS):
         page.locator(ausloeser).first.click()
-    page.locator('select[name="kontext.searchPanel.seasonId"]').wait_for(
-        state="attached", timeout=_ZEITLIMIT_MS
-    )
+    _warte_auf_formular(page)
     ergebnis = page.evaluate(_LISTE_JS)
     if ergebnis.get("fehler"):
-        raise RuntimeError("DFBnet meldet einen Fehler statt der Ergebnisliste")
+        raise RuntimeError(f"DFBnet meldet: {ergebnis['fehler']}")
     return ergebnis
 
 
