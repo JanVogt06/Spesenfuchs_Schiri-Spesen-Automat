@@ -69,6 +69,7 @@ from db.database import (
 from db.stammdaten import get_stammdaten
 from utils.geocoder import geocode, GeocoderNichtErreichbar
 from db.season import get_saisons, get_saison
+from db.beobachtungen import get_beobachtungen
 from api.auth import router as auth_router, get_current_user
 from core.errors import (
     APIError,
@@ -881,6 +882,23 @@ async def get_own_saison(saison: str, current_user: dict = Depends(get_current_u
         raise NotFoundError(f"Zur Saison {saison} ist nichts gespeichert")
 
     return daten
+
+@app.get("/api/beobachtungen")
+async def get_own_beobachtungen(current_user: dict = Depends(get_current_user)):
+    """
+    Die eigenen Beobachtungen aus Schiri-Beobachtung und Schiri-Portal.
+
+    Die Schnitte rechnet das Frontend: es braucht die Einzelnoten ohnehin
+    fuer die aufklappbare Liste, und je Saison sind es eine Handvoll Zeilen.
+
+    schiedsrichter_seit kommt mit, weil der Reiter die Herren-Saisons ab
+    diesem Datum zeigt - auch die ohne eine einzige Beobachtung.
+    """
+    stammdaten = get_stammdaten(current_user['id']) or {}
+    daten = get_beobachtungen(current_user['id'])
+    daten["schiedsrichter_seit"] = stammdaten.get("schiedsrichter_seit") or None
+    return daten
+
 
 @app.get("/api/ligen")
 async def get_ligen(current_user: dict = Depends(get_current_user)):
