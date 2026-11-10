@@ -9,6 +9,10 @@ Anwendung auch die eigenen Stammdaten aus DFB.net und zeigt sie im Reiter
 *Stammdaten*; die persönlichen Angaben darunter liegen verschlüsselt in der
 Datenbank. Der Reiter *Saison* zeigt alle geleiteten Spiele je Saison mit
 Ergebnis, Kartenstatistik und Gespann, dazu Einsatzbilanz und Lehrabende.
+Der Reiter *Beobachtungen* zeigt die eigenen Noten aus Schiri-Beobachtung
+(Herren, ab der Saison von „Schiedsrichter seit“) und – wer es hat – aus dem
+Schiri-Portal (DFB-Nachwuchs): je Saison ein Schnitt als Schiedsrichter, als
+Assistent und als 4. Offizieller, bei den Herren zusätzlich je Spielklasse.
 Abgeschlossene Saisons werden nur einmal gelesen — erneut geholt werden die
 laufende Saison und jede, deren Bestand unvollständig ist. Bei den Fahrtkosten
 eines Spiels liegt eine Karte, die die Anschriften der angesetzten
@@ -23,9 +27,9 @@ FUSSBALL.DE; der Reiter *Ligen* zeigt sie. Lässt sich eine Mannschaft nicht
 zweifelsfrei zuordnen oder ist eine überregional spielende beteiligt, bleibt
 das Spesenfeld leer statt geraten.
 
-Die Oberfläche hat sechs Reiter: *Dashboard* mit der Übersicht, *Spesen* mit den
-Abrechnungen zum Herunterladen, *Saison*, *Ligen*, *Stammdaten* und
-*Fehler melden*.
+Die Oberfläche hat sieben Reiter: *Dashboard* mit der Übersicht, *Spesen* mit den
+Abrechnungen zum Herunterladen, *Saison*, *Ligen*, *Beobachtungen*, *Stammdaten*
+und *Fehler melden*.
 
 Self-hosted: ein Container, eine `docker-compose.yml`, ein `data`-Ordner.
 
@@ -86,7 +90,7 @@ neben der Compose-Datei — es übersteht Neustarts und Updates:
 | Pfad | Inhalt |
 | --- | --- |
 | `data/.env` | `JWT_SECRET_KEY` und `ENCRYPTION_KEY` |
-| `data/app.db` | Nutzer, eigene Stammdaten, Spiele, Unparteiische, Fahrtkosten, geleitete Spiele je Saison, aufgelöste Adressen der Karte, Ligatabellen, Abruf-Protokoll, Login- und Download-Log |
+| `data/app.db` | Nutzer, eigene Stammdaten, Spiele, Unparteiische, Fahrtkosten, geleitete Spiele je Saison, eigene Beobachtungsnoten, aufgelöste Adressen der Karte, Ligatabellen, Abruf-Protokoll, Login- und Download-Log |
 | `data/logs/spesenfuchs.log` | Protokoll der Anwendung und der nächtlichen Abrufe, rotiert bei 5 MB (vier ältere Dateien bleiben liegen) |
 
 Erzeugte Dokumente werden nicht gespeichert: sie entstehen bei jedem Download

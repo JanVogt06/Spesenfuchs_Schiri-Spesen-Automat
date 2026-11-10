@@ -3,7 +3,7 @@ import {useNavigate, useLocation, Link} from 'react-router-dom';
 import {Button} from '@/components/ui/button';
 import {logout} from '@/lib/auth';
 import {
-    Receipt, Settings, LogOut, LayoutDashboard, IdCard, Trophy, FileText, Table2, Bug, Ellipsis,
+    Receipt, Settings, LogOut, LayoutDashboard, IdCard, Trophy, FileText, Table2, Bug, Ellipsis, ClipboardCheck,
 } from 'lucide-react';
 import {cn} from '@/lib/utils';
 
@@ -29,6 +29,7 @@ const hauptItems: NavItem[] = [
 
 // ... und die, die dort hinter "Mehr" liegen
 const mehrItems: NavItem[] = [
+    {label: 'Beobachtungen', path: '/beobachtungen', icon: ClipboardCheck},
     {label: 'Stammdaten', path: '/stammdaten', icon: IdCard},
     {label: 'Fehler melden', path: '/fehler-melden', icon: Bug},
     {label: 'Einstellungen', path: '/settings', icon: Settings},
