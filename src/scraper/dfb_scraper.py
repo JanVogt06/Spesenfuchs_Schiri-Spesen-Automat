@@ -245,6 +245,10 @@ class DFBScraper:
             new_page = new_page_info.value
             new_page.wait_for_load_state("domcontentloaded", timeout=30000)
 
+            # Die Startseite mit dem Hauptmenue bleibt offen und wird gemerkt:
+            # die Beobachtungen laufen am Ende des Abrufs ueber deren Menue.
+            self.startseite = self.page
+
             # Update page reference
             self.page = new_page
 
@@ -1520,13 +1524,14 @@ class DFBScraper:
         """
         Liest die eigenen Beobachtungen aus Schiri-Beobachtung und Schiri-Portal.
 
-        Muss auf der DFBnet-Startseite nach dem Login laufen, also VOR
-        navigate_to_schiriansetzung: nur dort steht das Hauptmenue mit den
-        Einstiegen in die beiden Module.
+        Laeuft als LETZTER Schritt des Abrufs. Die alten DFBnet-Module halten
+        ihren Zustand in der Sitzung; im ersten Versuch lief dieser Schritt vor
+        der Schiriansetzung, und danach klappte deren Menue nicht mehr auf -
+        der ganze Abruf brach ab. Am Ende kann er nichts mehr kaputt machen.
 
-        Gelesen wird in einem eigenen Tab desselben Browser-Kontexts. Die
-        Startseite bleibt dadurch unberuehrt, und navigate_to_schiriansetzung
-        findet ihr Menue genau so vor wie ohne diesen Schritt.
+        Die Einstiege stehen im Hauptmenue der Startseite, die
+        navigate_to_schiriansetzung als self.startseite stehen laesst.
+        Gelesen wird in einem eigenen Tab desselben Browser-Kontexts.
 
         Args:
             saisons_fuer: (quelle, angebotene Saisons) -> zu lesende Saisons
@@ -1539,11 +1544,12 @@ class DFBScraper:
         """
         logger.info("=== Lese Beobachtungen ===")
 
-        module = finde_module(self.page)
+        startseite = getattr(self, "startseite", None) or self.page
+        module = finde_module(startseite)
         logger.info(f"Beobachtungsmodule im Menue: {sorted(module)}")
 
         ergebnis = {}
-        seite = self.page.context.new_page()
+        seite = startseite.context.new_page()
 
         try:
             for quelle, modul_url in module.items():

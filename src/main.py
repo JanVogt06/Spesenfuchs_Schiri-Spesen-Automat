@@ -289,35 +289,6 @@ def scrape_matches(
             melde(current, total, step)
             logger.info(f"Progress: {current}/{total} - {step}")
 
-        # Die Beobachtungen liegen in den alten DFBnet-Modulen, deren Einstieg
-        # nur im Hauptmenue der Startseite steht - deshalb VOR dem Wechsel in
-        # die Schiriansetzung, die die Seite durch ihren eigenen Tab ersetzt.
-        # Gelesen wird in einem eigenen Tab; die Startseite bleibt unberuehrt.
-        #
-        # Wie Stammdaten und Saisons mit eigenem try/except: die Ansetzungen
-        # sind das Produkt und duerfen an den Beobachtungen nie scheitern.
-        beobachtungen = {}
-
-        try:
-            melde(0, 0, "Lese Beobachtungen...")
-
-            stammdaten_bisher = (get_stammdaten(user_id) or {}) if user_id is not None else {}
-            schiedsrichter_seit = stammdaten_bisher.get("schiedsrichter_seit") or ""
-
-            def saisons_fuer(quelle, angebotene):
-                fertig = (
-                    get_fertige_beobachtungs_saisons(user_id, quelle)
-                    if user_id is not None else set()
-                )
-                return waehle_beobachtungs_saisons(angebotene, schiedsrichter_seit, fertig)
-
-            beobachtungen = scraper.scrape_beobachtungen(
-                saisons_fuer=saisons_fuer, progress_callback=fortschritt
-            )
-
-        except Exception as e:
-            logger.warning(f"Beobachtungen konnten nicht gelesen werden: {e}")
-
         scraper.navigate_to_schiriansetzung()
 
         all_matches = scraper.scrape_all_matches(progress_callback=fortschritt)
@@ -387,6 +358,36 @@ def scrape_matches(
 
         except Exception as e:
             logger.warning(f"Saisonzusammenfassung konnte nicht gelesen werden: {e}")
+
+        # Ganz zum Schluss die Beobachtungen aus den alten DFBnet-Modulen
+        # (Schiri-Beobachtung, Schiri-Portal). Bewusst als letzter Schritt:
+        # diese Module halten ihren Zustand in der Sitzung, und als sie vor der
+        # Schiriansetzung liefen, klappte deren Menue danach nicht mehr auf -
+        # der komplette Abruf ging verloren. Wie alles nach den Ansetzungen
+        # mit eigenem try/except.
+        beobachtungen = {}
+
+        try:
+            melde(len(all_matches), erwartet, "Lese Beobachtungen...")
+
+            # Frisch gelesen, sonst der Stand aus dem letzten Abruf
+            schiedsrichter_seit = stammdaten.get("schiedsrichter_seit") or ""
+            if not schiedsrichter_seit and user_id is not None:
+                schiedsrichter_seit = (get_stammdaten(user_id) or {}).get("schiedsrichter_seit") or ""
+
+            def saisons_fuer(quelle, angebotene):
+                fertig = (
+                    get_fertige_beobachtungs_saisons(user_id, quelle)
+                    if user_id is not None else set()
+                )
+                return waehle_beobachtungs_saisons(angebotene, schiedsrichter_seit, fertig)
+
+            beobachtungen = scraper.scrape_beobachtungen(
+                saisons_fuer=saisons_fuer, progress_callback=fortschritt
+            )
+
+        except Exception as e:
+            logger.warning(f"Beobachtungen konnten nicht gelesen werden: {e}")
 
     if user_id is not None:
         persist_matches(user_id, all_matches, vollstaendig=vollstaendig)
