@@ -1,6 +1,4 @@
-import type {ReactNode} from 'react';
-import {ArrowDown, ArrowRight, Check, CheckCircle2, Lock, Route, ShieldCheck, Trophy, FileText, ChartColumn, Link2} from 'lucide-react';
-import {Marke, Spielfeld} from '@/pages/Landing';
+import {ArrowDown, Check, CheckCircle2, Link2, Lock, Route, ShieldCheck, Trophy, FileText, ChartColumn} from 'lucide-react';
 import {
     Abrechnungskarte,
     Anfahrtschip,
@@ -10,6 +8,7 @@ import {
     Saisontafel,
     Spieleliste,
 } from '@/components/landing/Schaufenster';
+import {ADRESSE, Beitrag, Etikett, Folie, Kachel, Leucht, STORY, Titel} from './Rahmen';
 
 /*
  * Instagram-Beitrag zur Vorstellung von Spesenfuchs: fuenf Slides im Format
@@ -17,94 +16,16 @@ import {
  * ausgedachten Beispieldaten. ?s=1 bis ?s=5 zeigt eine einzelne Slide fuer
  * den Export, ohne Parameter stehen alle untereinander.
  *
- * Mit ?f=story entstehen dieselben Slides als Story im Format 9:16. Oben und
- * unten bleibt dort Platz fuer die Leisten von Instagram (Fortschritt, Profil,
- * Antwortfeld); Wisch-Hinweis und Punkte entfallen, die Story hat ihre eigenen.
- * Auf der letzten Slide bleibt eine Luecke fuer den Link-Sticker.
+ * Mit ?f=story entstehen dieselben Slides als Story im Format 9:16 (siehe
+ * Rahmen.tsx). Auf der letzten Slide bleibt eine Luecke fuer den Link-Sticker.
  */
 
 const ANZAHL = 5;
-const ADRESSE = 'spesenfuchs.jan-vogt.dev';
-const STORY = new URLSearchParams(window.location.search).get('f') === 'story';
-
-function Fortschritt({nummer}: { nummer: number }) {
-    return (
-        <span className="flex items-center gap-1.5">
-            {Array.from({length: ANZAHL}, (_, index) => (
-                <span
-                    key={index}
-                    className={`h-1.5 rounded-full ${index + 1 === nummer ? 'w-6 bg-flutlicht' : 'w-1.5 bg-white/25'}`}
-                />
-            ))}
-        </span>
-    );
-}
-
-/** Rahmen jeder Slide: Nacht-Grund, Flutlicht, Korn, Marke oben, Fortschritt unten */
-function Folie({nummer, feld, children}: { nummer: number; feld?: boolean; children: ReactNode }) {
-    return (
-        <section className={`ig-slide spesen-nacht spesen-landing relative isolate flex w-[540px] flex-col overflow-hidden text-white ${STORY ? 'h-[960px]' : 'h-[720px]'}`}>
-            {feld && (
-                <div className="spesen-feld pointer-events-none absolute inset-x-0 bottom-0 h-[55%]">
-                    <div className="absolute inset-0">
-                        <div className="spesen-rasen absolute inset-0"/>
-                        <Spielfeld className="absolute inset-x-[6%] inset-y-[8%] h-[84%] w-[88%] text-white/20"/>
-                    </div>
-                </div>
-            )}
-            <div className="spesen-strahl spesen-flutlicht pointer-events-none absolute inset-0"/>
-            <div className="spesen-koerner pointer-events-none absolute inset-0"/>
-
-            <header className={`relative flex items-center justify-between px-10 ${STORY ? 'pt-[118px]' : 'pt-9'}`}>
-                <span className="[zoom:1.15]"><Marke hell/></span>
-                <span className="text-[13px] font-medium text-white/45 tabular-nums">{nummer} / {ANZAHL}</span>
-            </header>
-
-            <div className={`relative flex min-h-0 flex-1 flex-col px-10 pt-7 ${STORY ? 'justify-center pb-[130px]' : ''}`}>
-                {children}
-            </div>
-
-            {!STORY && <footer className="relative flex items-center justify-between px-10 pt-5 pb-9">
-                <Fortschritt nummer={nummer}/>
-                {nummer < ANZAHL ? (
-                    <span className="flex items-center gap-1.5 text-[13px] font-medium text-white/55">
-                        Wischen
-                        <ArrowRight className="size-4"/>
-                    </span>
-                ) : (
-                    <span className="flex items-center gap-1.5 text-[13px] font-medium text-flutlicht">
-                        <Link2 className="size-4"/>
-                        Link in Bio
-                    </span>
-                )}
-            </footer>}
-        </section>
-    );
-}
-
-function Etikett({children}: { children: ReactNode }) {
-    return (
-        <p className="inline-flex w-fit items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[13px] font-medium text-white/80">
-            <span className="size-1.5 rounded-full bg-flutlicht"/>
-            {children}
-        </p>
-    );
-}
-
-function Titel({children}: { children: ReactNode }) {
-    return (
-        <h2 className="mt-4 text-[40px] leading-[1.05] font-semibold tracking-[-0.03em] text-balance">{children}</h2>
-    );
-}
-
-function Leucht({children}: { children: ReactNode }) {
-    return <span className="spesen-leuchtschrift text-flutlicht">{children}</span>;
-}
 
 /* 1 - Aufhaenger: das Versprechen und die Anwendung dazu */
 function Ankuendigung() {
     return (
-        <Folie nummer={1} feld>
+        <Folie anzahl={ANZAHL} nummer={1} feld>
             <Etikett>Neu für Schiedsrichter im TFV</Etikett>
             <h1 className="mt-5 text-[52px] leading-[1.02] font-semibold tracking-[-0.035em]">
                 Abpfiff für den<br/><Leucht>Papierkram</Leucht>.
@@ -138,7 +59,7 @@ const AUFGABEN: { text: string; selbst?: boolean }[] = [
 /* 2 - Das Problem: was nach jedem Spiel ansteht und was davon wegfaellt */
 function Problem() {
     return (
-        <Folie nummer={2}>
+        <Folie anzahl={ANZAHL} nummer={2}>
             <Etikett>Kennst du das?</Etikett>
             <Titel>Nach dem Spiel ist <Leucht>vor der Abrechnung</Leucht>.</Titel>
             <p className="mt-4 text-[17px] leading-relaxed text-white/70">
@@ -186,7 +107,7 @@ const SCHRITTE = [
 /* 3 - So geht's: der Spielablauf in vier Schritten */
 function Ablauf() {
     return (
-        <Folie nummer={3}>
+        <Folie anzahl={ANZAHL} nummer={3}>
             <div className="flex items-start justify-between gap-4">
                 <div>
                     <Etikett>So geht's</Etikett>
@@ -221,30 +142,10 @@ function Ablauf() {
     );
 }
 
-function Kachel({icon: Icon, titel, text, children}: {
-    icon: typeof Route;
-    titel: string;
-    text: string;
-    children: ReactNode;
-}) {
-    return (
-        <div className="flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04]">
-            <div className={`flex items-center justify-center bg-black/20 p-3 ${STORY ? 'h-[156px]' : 'h-[132px]'}`}>{children}</div>
-            <div className="border-t border-white/10 px-3.5 py-2.5">
-                <p className="flex items-center gap-1.5 text-[14px] font-semibold">
-                    <Icon className="size-4 text-flutlicht"/>
-                    {titel}
-                </p>
-                <p className="mt-1 text-[12.5px] leading-snug text-white/60">{text}</p>
-            </div>
-        </div>
-    );
-}
-
 /* 4 - Was drinsteckt: vier Belege aus der Anwendung */
 function Funktionen() {
     return (
-        <Folie nummer={4}>
+        <Folie anzahl={ANZAHL} nummer={4}>
             <Etikett>Was drinsteckt</Etikett>
             <Titel>Mehr als nur <Leucht>Spesen</Leucht>.</Titel>
 
@@ -270,7 +171,7 @@ function Funktionen() {
 /* 5 - Aufruf: die Adresse, gross genug zum Abtippen */
 function Aufruf() {
     return (
-        <Folie nummer={5} feld>
+        <Folie anzahl={ANZAHL} nummer={5} feld>
             <Etikett>Jetzt live</Etikett>
             <Titel>Bereit für den <Leucht>Anpfiff</Leucht>?</Titel>
             <p className="mt-4 text-[17px] leading-relaxed text-white/70">
@@ -321,12 +222,5 @@ function Aufruf() {
 const FOLIEN = [Ankuendigung, Problem, Ablauf, Funktionen, Aufruf];
 
 export function Slides() {
-    const gewaehlt = Number(new URLSearchParams(window.location.search).get('s'));
-    const folien = gewaehlt >= 1 && gewaehlt <= ANZAHL ? [FOLIEN[gewaehlt - 1]] : FOLIEN;
-
-    return (
-        <div className={gewaehlt ? '' : 'grid justify-center gap-6 bg-neutral-900 p-6'}>
-            {folien.map((Inhalt, index) => <Inhalt key={index}/>)}
-        </div>
-    );
+    return <Beitrag folien={FOLIEN}/>;
 }
