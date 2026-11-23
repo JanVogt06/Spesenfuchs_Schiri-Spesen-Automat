@@ -58,6 +58,9 @@ export function ThemeProvider({children}: { children: React.ReactNode }) {
     );
 }
 
+// Hook und Provider gehoeren zusammen; Fast Refresh laedt diese Datei dann
+// eben vollstaendig neu.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useTheme() {
     const context = useContext(ThemeContext);
     if (!context) {

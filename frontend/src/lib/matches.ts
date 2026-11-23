@@ -11,7 +11,7 @@ export interface SpielInfo {
     staffel?: string;
     spieltag?: string;
 
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 export interface Schiedsrichter {
@@ -22,7 +22,7 @@ export interface Schiedsrichter {
     strasse?: string;
     plz_ort?: string;
 
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 export interface Spielstaette {
@@ -30,7 +30,7 @@ export interface Spielstaette {
     adresse?: string;
     platz_typ?: string;
 
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 export interface MatchExpenses {

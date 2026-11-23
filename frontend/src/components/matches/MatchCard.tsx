@@ -282,7 +282,7 @@ export function MatchCard({
                     {fieldsToShow.map(([key, value]) => (
                         <div key={key} className={fieldRowClass}>
                             <span className="break-words text-muted-foreground">{formatFieldName(key)}</span>
-                            <span className="break-words">{value}</span>
+                            <span className="break-words">{String(value)}</span>
                         </div>
                     ))}
                 </div>
@@ -500,7 +500,7 @@ export function MatchCard({
                     {match.schiedsrichter.map((sr, idx) => (
                         <div key={idx} className="grid gap-1.5 rounded-lg border border-dashed p-3 text-sm">
                             {Object.entries(sr)
-                                .filter(([_, value]) => value)
+                                .filter(([, value]) => value)
                                 .map(([key, value]) => (
                                     <div key={key} className={fieldRowClass}>
                                         <span className="break-words text-muted-foreground">{formatFieldName(key)}</span>
@@ -519,7 +519,7 @@ export function MatchCard({
             return null;
         }
 
-        const fieldsToShow = Object.entries(match.spielstaette).filter(([_, value]) => value);
+        const fieldsToShow = Object.entries(match.spielstaette).filter(([, value]) => value);
 
         if (fieldsToShow.length === 0) {
             return null;
@@ -535,7 +535,7 @@ export function MatchCard({
                     {fieldsToShow.map(([key, value]) => (
                         <div key={key} className={fieldRowClass}>
                             <span className="break-words text-muted-foreground">{formatFieldName(key)}</span>
-                            <span className="break-words">{value}</span>
+                            <span className="break-words">{String(value)}</span>
                         </div>
                     ))}
                 </div>

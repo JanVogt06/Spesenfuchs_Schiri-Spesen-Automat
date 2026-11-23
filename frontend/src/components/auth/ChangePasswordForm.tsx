@@ -49,7 +49,10 @@ export function ChangePasswordForm() {
             setCurrentPassword('');
             setNewPassword('');
             setConfirmPassword('');
-        } catch (err: any) {
+        } catch (fehler: unknown) {
+            const err = fehler as {
+                response?: {status?: number; data?: {error?: {message?: string}; detail?: string}};
+            };
             // Detaillierte Fehlermeldung extrahieren
             const errorData = err.response?.data;
             let message = 'Unbekannter Fehler beim Ändern des Passworts';
