@@ -72,6 +72,7 @@ from db.stammdaten import get_stammdaten
 from utils.geocoder import geocode, GeocoderNichtErreichbar
 from db.season import get_saisons, get_saison
 from db.beobachtungen import get_beobachtungen
+from db.spielberichte import get_bericht, get_dokument, get_index, Zuordnung, kurzinfo
 from api.auth import router as auth_router, get_current_user
 from core.errors import (
     APIError,
@@ -415,9 +416,14 @@ async def get_all_user_matches(current_user: dict = Depends(get_current_user)):
     passiert jetzt schon beim Scrapen ueber den match_key.
     """
     matches = get_matches_for_user(current_user['id'])
+    zuordnung = Zuordnung(get_index(current_user['id']))
 
     for match in matches:
         _decorate_match(match)
+        info = match.get('spiel_info') or {}
+        match['_spielbericht'] = kurzinfo(zuordnung.finde(
+            match.get('datum') or '', info.get('heim_team') or '', info.get('gast_team') or ''
+        ))
 
     return matches
 
@@ -910,7 +916,50 @@ async def get_own_saison(saison: str, current_user: dict = Depends(get_current_u
     if not daten:
         raise NotFoundError(f"Zur Saison {saison} ist nichts gespeichert")
 
+    zuordnung = Zuordnung(get_index(current_user['id']))
+    for spiel in daten['spiele']:
+        spiel['spielbericht'] = kurzinfo(zuordnung.finde(spiel['datum'], spiel['heim'], spiel['gast']))
+
     return daten
+
+
+@app.get("/api/spielberichte/{bericht_id}")
+async def get_own_spielbericht(bericht_id: int, current_user: dict = Depends(get_current_user)):
+    """
+    Ein Spielbericht mit Spielverlauf, Aufstellungen, Gespann-Kosten und der
+    Liste der angehaengten Dokumente.
+
+    Gescoped ueber die user_id in der Abfrage - ein fremder Bericht ist
+    schlicht "nicht gefunden".
+    """
+    bericht = get_bericht(current_user['id'], bericht_id)
+
+    if not bericht:
+        raise NotFoundError("Spielbericht nicht gefunden")
+
+    return bericht
+
+
+@app.get("/api/spielberichte/{bericht_id}/dokumente/{dokument_id}")
+async def download_spielbericht_dokument(
+    bericht_id: int,
+    dokument_id: int,
+    current_user: dict = Depends(get_current_user),
+):
+    """Ein an den Spielbericht angehaengtes Dokument (Sonderbericht, Spesendokument, ...)."""
+    dokument = get_dokument(current_user['id'], bericht_id, dokument_id)
+
+    if not dokument or not dokument['absolut'].is_file():
+        raise NotFoundError("Dokument nicht gefunden")
+
+    dateiname = dokument['dateiname']
+    media_type = "application/pdf" if dateiname.lower().endswith(".pdf") else "application/octet-stream"
+
+    return FileResponse(
+        str(dokument['absolut']),
+        media_type=media_type,
+        headers=_content_disposition(dateiname),
+    )
 
 @app.get("/api/beobachtungen")
 async def get_own_beobachtungen(current_user: dict = Depends(get_current_user)):
