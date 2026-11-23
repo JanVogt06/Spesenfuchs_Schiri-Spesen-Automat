@@ -975,6 +975,83 @@ def _migration_018_nofv_saetze(conn: sqlite3.Connection) -> None:
     logger.info(f"NOFV-Saetze nachgetragen: {ergaenzt} Spiele")
 
 
+def _migration_019_spielberichte(conn: sqlite3.Connection) -> None:
+    """
+    Die Spielberichte der eigenen Spiele aus "Spielberichte -> Einsatzplan".
+
+    Schluessel ist die Spiel-ID, die DFBnet im Link auf den Bericht fuehrt -
+    sie ist ueber Saisons und Verlegungen hinweg stabil. Mit den geleiteten
+    Spielen (season_matches) und den Ansetzungen (matches) wird beim Lesen
+    ueber Datum und Mannschaften verknuepft, nicht per Fremdschluessel: beide
+    Tabellen werden unabhaengig davon ersetzt bzw. neu verschluesselt.
+
+    daten haelt den aufbereiteten Spielverlauf als JSON (Ereignisse,
+    Aufstellungen, Kontrollen, Bestaetigungen). Er wird nur angezeigt, nie
+    ausgewertet; eine Tabelle je Ereignisart waere hier nur Ballast.
+
+    fahrtkosten und spesen sind die Summen des ganzen Gespanns, wie DFBnet
+    sie im Bericht fuehrt. Sie stehen als eigene Spalten da, weil die
+    Spesenseite sie je Spiel anzeigt, ohne den ganzen Bericht zu laden.
+
+    Die Dokumente liegen als Dateien unter DATA_DIR/spielberichte/<user>/;
+    pfad ist relativ zu DATA_DIR, damit ein umgezogener Datenordner gueltig
+    bleibt.
+
+    spielbericht_saisons merkt sich, welche Saisons fertig gelesen sind -
+    abgeschlossen und ohne Bericht, der noch auf seine Freigabe wartet.
+    """
+    _run_script(conn, """
+        CREATE TABLE spielberichte (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            dfb_spiel_id TEXT NOT NULL,
+            saison TEXT NOT NULL,
+            datum TEXT NOT NULL,
+            uhrzeit TEXT NOT NULL DEFAULT '',
+            gruppe TEXT NOT NULL DEFAULT '',
+            spielnummer TEXT NOT NULL DEFAULT '',
+            spielkennung TEXT NOT NULL DEFAULT '',
+            heim TEXT NOT NULL DEFAULT '',
+            gast TEXT NOT NULL DEFAULT '',
+            ergebnis TEXT NOT NULL DEFAULT '',
+            fahrtkosten REAL,
+            spesen REAL,
+            daten TEXT NOT NULL,
+            scraped_at TEXT NOT NULL,
+            UNIQUE (user_id, dfb_spiel_id),
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        );
+
+        CREATE INDEX idx_spielberichte_user_datum ON spielberichte (user_id, datum);
+
+        CREATE TABLE spielbericht_dokumente (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            spielbericht_id INTEGER NOT NULL,
+            dfb_dokument_id TEXT NOT NULL,
+            kategorie TEXT NOT NULL DEFAULT '',
+            dateiname TEXT NOT NULL,
+            beschreibung TEXT NOT NULL DEFAULT '',
+            hochgeladen_von TEXT NOT NULL DEFAULT '',
+            hochgeladen_am TEXT NOT NULL DEFAULT '',
+            groesse INTEGER NOT NULL DEFAULT 0,
+            pfad TEXT NOT NULL,
+            scraped_at TEXT NOT NULL,
+            UNIQUE (spielbericht_id, dfb_dokument_id),
+            FOREIGN KEY (spielbericht_id) REFERENCES spielberichte (id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE spielbericht_saisons (
+            user_id INTEGER NOT NULL,
+            saison TEXT NOT NULL,
+            anzahl INTEGER NOT NULL DEFAULT 0,
+            fertig INTEGER NOT NULL DEFAULT 0,
+            scraped_at TEXT NOT NULL,
+            PRIMARY KEY (user_id, saison),
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        );
+    """)
+
+
 # (Version, Beschreibung, Funktion) - aufsteigend, Luecken sind nicht erlaubt.
 MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "baseline schema", _migration_001_baseline),
@@ -995,6 +1072,7 @@ MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (16, "thuringian league tables for cup and friendly rates", _migration_016_ligen),
     (17, "own observation grades per season", _migration_017_beobachtungen),
     (18, "nofv rates for regionalliga and oberliga league matches", _migration_018_nofv_saetze),
+    (19, "match reports with events, expenses and documents", _migration_019_spielberichte),
 ]
 
 

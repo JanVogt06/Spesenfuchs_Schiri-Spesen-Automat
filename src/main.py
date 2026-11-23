@@ -3,6 +3,7 @@ Spesenfuchs - Main Entry Point
 Startet die FastAPI Backend-Anwendung
 """
 import os
+from datetime import date, timedelta
 from typing import Callable, Optional, List
 
 # .env laden, bevor Module importiert werden, die Secrets beim Import lesen
@@ -19,9 +20,14 @@ from db.beobachtungen import (
     replace_beobachtungs_saison, count_beobachtungen, get_fertige_beobachtungs_saisons,
 )
 from db.season import replace_saison, get_komplette_saisons, count_saison_spiele
+from db.spielberichte import (
+    speichere_bericht, setze_saison, get_fertige_saisons as get_fertige_bericht_saisons,
+    get_gespeicherte as get_gespeicherte_berichte, get_dokument_ids,
+)
+from scraper.spielberichte import ist_lesbar, wartet_auf_freigabe
 from utils.logger import setup_logger
 from utils.match_utils import extract_iso_date_from_anpfiff, parse_saison_datum
-from utils.saison_utils import saison_start_jahr, saison_fuer_datum, parse_deutsches_datum
+from utils.saison_utils import saison_start_jahr, saison_fuer_datum, parse_deutsches_datum, saison_zeitraum
 
 logger = setup_logger("main")
 
@@ -238,6 +244,77 @@ def persist_beobachtungen(user_id: int, beobachtungen: dict) -> int:
     return ersetzt
 
 
+# Wie lange ein gespeicherter Bericht nach dem Spiel noch nachgelesen wird.
+# Sonderberichte, Spesendokumente und Korrekturen kommen oft Tage spaeter.
+BERICHT_NACHLAUF_TAGE = 30
+
+
+def braucht_bericht(zeile: dict, gespeichert: dict, heute: Optional[date] = None) -> bool:
+    """Neu, oder noch so frisch, dass DFBnet etwas nachgetragen haben koennte."""
+    if zeile.get("dfb_spiel_id") not in gespeichert:
+        return True
+    heute = heute or date.today()
+    try:
+        return date.fromisoformat(zeile.get("datum") or "") >= heute - timedelta(days=BERICHT_NACHLAUF_TAGE)
+    except ValueError:
+        return False
+
+
+def persist_spielberichte(user_id: int, ergebnis: dict, heute: Optional[date] = None) -> int:
+    """
+    Schreibt die gelesenen Spielberichte und merkt sich fertige Saisons.
+
+    Eine Saison ist fertig, wenn sie vorbei ist (plus Nachlauf), jeder
+    freigegebene Bericht gespeichert ist und keiner mehr auf seine Freigabe
+    wartet. Dann wird ihr Einsatzplan nicht mehr gelesen.
+
+    Returns:
+        Anzahl gespeicherter Berichte.
+    """
+    heute = heute or date.today()
+    saisons = ergebnis.get("saisons") or {}
+    berichte = ergebnis.get("berichte") or {}
+
+    saison_von = {}
+    for saison, daten in saisons.items():
+        for zeile in daten.get("zeilen") or []:
+            if zeile.get("dfb_spiel_id"):
+                saison_von.setdefault(zeile["dfb_spiel_id"], saison)
+
+    gespeichert = 0
+    for spiel_id, bericht in berichte.items():
+        zeile = bericht["zeile"]
+        try:
+            saison = saison_von.get(spiel_id) or saison_fuer_datum(date.fromisoformat(zeile["datum"]))
+            speichere_bericht(user_id, saison, zeile, bericht["daten"], bericht.get("dateien") or {})
+            gespeichert += 1
+        except Exception as e:
+            logger.error(f"Spielbericht {zeile.get('datum')} {zeile.get('heim')} nicht gespeichert: {e}")
+
+    vorhanden = set(get_gespeicherte_berichte(user_id))
+    for saison, daten in saisons.items():
+        zeilen = daten.get("zeilen") or []
+        lesbar = [z for z in zeilen if ist_lesbar(z, heute)]
+        fehlend = [z for z in lesbar if z["dfb_spiel_id"] not in vorhanden]
+        wartend = [z for z in zeilen if wartet_auf_freigabe(z, heute)]
+
+        zeitraum = saison_zeitraum(saison)
+        vorbei = bool(zeitraum) and zeitraum[1] + timedelta(days=BERICHT_NACHLAUF_TAGE) < heute
+
+        try:
+            setze_saison(user_id, saison, len(lesbar), vorbei and not fehlend and not wartend)
+        except Exception as e:
+            logger.error(f"Spielbericht-Saison {saison} nicht vermerkt: {e}")
+
+        if fehlend or wartend:
+            logger.info(
+                f"Spielberichte {saison}: {len(fehlend)} nicht gelesen, {len(wartend)} ohne Freigabe"
+            )
+
+    logger.info(f"{gespeichert}/{len(berichte)} Spielberichte in der Datenbank")
+    return gespeichert
+
+
 def scrape_matches(
     username: Optional[str] = None,
     password: Optional[str] = None,
@@ -389,11 +466,42 @@ def scrape_matches(
         except Exception as e:
             logger.warning(f"Beobachtungen konnten nicht gelesen werden: {e}")
 
+        # Danach die Spielberichte - auch sie laufen ueber die alten
+        # Formularmodule und kommen deshalb nach der Schiriansetzung. Sie
+        # werden ausschliesslich gelesen; was bei DFBnet etwas aendern
+        # koennte, kann der Scraper gar nicht aufrufen.
+        spielberichte = {}
+
+        try:
+            melde(len(all_matches), erwartet, "Lese Spielberichte...")
+
+            gespeicherte_berichte = get_gespeicherte_berichte(user_id) if user_id is not None else {}
+            vorhandene_dokumente = get_dokument_ids(user_id) if user_id is not None else set()
+            fertige_bericht_saisons = get_fertige_bericht_saisons(user_id) if user_id is not None else set()
+
+            seit = stammdaten.get("schiedsrichter_seit") or ""
+            if not seit and user_id is not None:
+                seit = (get_stammdaten(user_id) or {}).get("schiedsrichter_seit") or ""
+
+            spielberichte = scraper.scrape_spielberichte(
+                saisons_fuer=lambda angebotene: waehle_beobachtungs_saisons(
+                    angebotene, seit, fertige_bericht_saisons
+                ),
+                braucht_bericht=lambda zeile: braucht_bericht(zeile, gespeicherte_berichte),
+                dokument_vorhanden=lambda dok_id: dok_id in vorhandene_dokumente,
+                progress_callback=fortschritt,
+            )
+
+        except Exception as e:
+            logger.warning(f"Spielberichte konnten nicht gelesen werden: {e}")
+
     if user_id is not None:
         persist_matches(user_id, all_matches, vollstaendig=vollstaendig)
         persist_stammdaten(user_id, stammdaten)
         persist_saisons(user_id, saisons)
         persist_beobachtungen(user_id, beobachtungen)
+        if spielberichte:
+            persist_spielberichte(user_id, spielberichte)
 
     logger.info(f"Erfolgreich {len(all_matches)} Spiele gescrapt")
     return all_matches

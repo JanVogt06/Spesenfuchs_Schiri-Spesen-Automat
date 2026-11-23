@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from utils.logger import setup_logger
 from core.errors import DFBCredentialsInvalidError
 from scraper.beobachtungen import finde_module, lies_quelle
+from scraper import spielberichte
 
 logger = setup_logger("dfb_scraper")
 
@@ -1563,6 +1564,58 @@ class DFBScraper:
             seite.close()
 
         return ergebnis
+
+    def scrape_spielberichte(self, saisons_fuer, braucht_bericht, dokument_vorhanden,
+                             progress_callback=None) -> dict:
+        """
+        Liest die Spielberichte der eigenen Spiele - nur lesend.
+
+        Erst der Einsatzplan aller noetigen Saisons (altes Formularmodul, in
+        einem eigenen Tab), dann in einem weiteren Tab die Berichte ueber die
+        JSON-Schnittstelle der Bericht-App. In der App wird nichts angeklickt;
+        siehe scraper/spielberichte.py.
+
+        Args:
+            saisons_fuer: angebotene Saisons -> zu lesende Saisons
+            braucht_bericht: Einsatzplan-Zeile -> soll der Bericht (neu) gelesen werden?
+            dokument_vorhanden: dfb_dokument_id -> liegt die Datei schon vor?
+
+        Returns:
+            {"saisons": saison -> {"zeilen"}, "berichte": dfb_spiel_id -> {...}}
+        """
+        logger.info("=== Lese Spielberichte ===")
+
+        startseite = getattr(self, "startseite", None) or self.page
+        einsatzplan_url = spielberichte.finde_einsatzplan(startseite)
+
+        liste = startseite.context.new_page()
+        try:
+            saisons = spielberichte.lies_saisons(
+                liste, einsatzplan_url, saisons_fuer, progress_callback
+            )
+        finally:
+            liste.close()
+
+        zu_lesen = {}
+        for daten in saisons.values():
+            for zeile in daten["zeilen"]:
+                if spielberichte.ist_lesbar(zeile) and braucht_bericht(zeile):
+                    zu_lesen.setdefault(zeile["dfb_spiel_id"], zeile)
+
+        logger.info(f"Spielberichte: {len(zu_lesen)} zu lesen")
+
+        berichte = {}
+        if zu_lesen:
+            app = startseite.context.new_page()
+            try:
+                berichte = spielberichte.lies_berichte(
+                    app, list(zu_lesen.values()), dokument_vorhanden, progress_callback
+                )
+            finally:
+                app.close()
+
+        logger.info(f"=== Spielberichte: {len(berichte)}/{len(zu_lesen)} gelesen ===")
+        return {"saisons": saisons, "berichte": berichte}
 
     def scrape_all_matches(self, progress_callback=None):
         """
