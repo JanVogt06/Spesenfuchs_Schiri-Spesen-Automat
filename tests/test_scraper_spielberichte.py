@@ -757,11 +757,6 @@ class TestLiesBerichte:
 
         assert list(ergebnis) == [ZEILEN[1]["dfb_spiel_id"]]
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="Schlaegt das Neuladen der App nach SitzungAbgelaufen fehl, fliegt die Ausnahme aus "
-               "lies_berichte heraus und alle bis dahin gelesenen Berichte gehen verloren",
-    )
     def test_neuladen_scheitert_gelesenes_bleibt(self, app):
         zweite = ZEILEN[1]["dfb_spiel_id"]
         app.bericht_fehler[zweite] = [SitzungAbgelaufen("410")]

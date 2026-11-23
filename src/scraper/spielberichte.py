@@ -671,8 +671,14 @@ def lies_berichte(
                 # Einmal pro Lauf die App neu laden, dann aufgeben
                 if versuch == 1 and not neu_geoeffnet:
                     logger.info(f"Bericht-App neu laden ({e})")
-                    oeffne_bericht_app(page, spiel_id)
                     neu_geoeffnet = True
+                    try:
+                        oeffne_bericht_app(page, spiel_id)
+                    except Exception as fehler:
+                        # Das Gelesene behalten - sonst ginge mit einem
+                        # haengenden Neuladen der ganze Lauf verloren.
+                        logger.warning(f"Spielberichte abgebrochen, App laedt nicht neu: {fehler}")
+                        return ergebnis
                     continue
                 logger.warning(f"Spielberichte abgebrochen: {e}")
                 return ergebnis
