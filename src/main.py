@@ -248,6 +248,11 @@ def persist_beobachtungen(user_id: int, beobachtungen: dict) -> int:
 # Sonderberichte, Spesendokumente und Korrekturen kommen oft Tage spaeter.
 BERICHT_NACHLAUF_TAGE = 30
 
+# Wie lange auf die Freigabe eines Berichts gewartet wird. Hallenturniere und
+# manche Freundschaftsspiele bekommen nie einen freigegebenen Bericht; ohne
+# diese Grenze galte ihre Saison nie als fertig und wuerde jede Nacht gelesen.
+FREIGABE_WARTEN_TAGE = 60
+
 
 def braucht_bericht(zeile: dict, gespeichert: dict, heute: Optional[date] = None) -> bool:
     """Neu, oder noch so frisch, dass DFBnet etwas nachgetragen haben koennte."""
@@ -296,7 +301,11 @@ def persist_spielberichte(user_id: int, ergebnis: dict, heute: Optional[date] = 
         zeilen = daten.get("zeilen") or []
         lesbar = [z for z in zeilen if ist_lesbar(z, heute)]
         fehlend = [z for z in lesbar if z["dfb_spiel_id"] not in vorhanden]
-        wartend = [z for z in zeilen if wartet_auf_freigabe(z, heute)]
+        wartend = [
+            z for z in zeilen
+            if wartet_auf_freigabe(z, heute)
+            and (z.get("datum") or "") >= (heute - timedelta(days=FREIGABE_WARTEN_TAGE)).isoformat()
+        ]
 
         zeitraum = saison_zeitraum(saison)
         vorbei = bool(zeitraum) and zeitraum[1] + timedelta(days=BERICHT_NACHLAUF_TAGE) < heute
