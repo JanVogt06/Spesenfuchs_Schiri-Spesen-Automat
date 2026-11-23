@@ -574,14 +574,15 @@ class TestHerrenPokal:
         _staffel("landesklasse", "LK2", ["SV 09 Arnstadt"])
         assert calculate_spesen("Landespokal", "Herren", "", "SV 09 Arnstadt", "SV Niemand") == LEER
 
-    @pytest.mark.xfail(strict=True, reason=(
-        "Mehrdeutige Mannschaft wird als 'unterhalb der Landesklasse' gewertet: "
-        "der Pokal bekommt den Satz des Gegners, obwohl die mehrdeutige Mannschaft "
-        "hoeher spielen koennte"))
+    def test_mehrdeutiger_gastgeber_im_freundschaftsspiel_leer(self, ligen):
+        _staffel("landesklasse", "LK2", ["SV 09 Arnstadt"])
+        assert calculate_spesen("Freundschaftsspiele", "Herren", "",
+                                "SV 09 Arnstadt", "FC Empor Weimar 06") == LEER
+
     def test_mehrdeutige_mannschaft_mit_bekanntem_gegner_leer(self, ligen):
         # "SV 09 Arnstadt" steht in Verbandsliga UND Landesklasse - welche Zeile
         # gilt, ist nicht zu entscheiden. Der Gegner spielt Landesklasse.
-        # Richtig waere leer (koennte 50/40 sein), herauskommt 40/30.
+        # Leer - der Satz des Gegners (40/30) waere geraten, es koennte 50/40 sein.
         _staffel("landesklasse", "LK2", ["SV 09 Arnstadt"])
         assert calculate_spesen("Landespokal", "Herren", "",
                                 "SV 09 Arnstadt", "FC Empor Weimar 06") == LEER

@@ -128,28 +128,24 @@ def tabelle(staffel_id: str) -> List[Dict]:
         conn.close()
 
 
-def finde_mannschaft(name: str) -> Optional[Dict]:
+def suche_mannschaft(name: str) -> List[Dict]:
     """
-    Sucht eine DFBnet-Mannschaft in den gespeicherten Tabellen.
+    Alle Tabellenzeilen, die zu einer DFBnet-Mannschaft passen.
 
-    Gibt None zurueck, sobald das Ergebnis nicht eindeutig ist - lieber keine
-    Spesen als die falschen. Zwei Bedingungen muessen zusammen erfuellt sein:
+    Passend heisst: Vereinskern UND Mannschaftsnummer stimmen ueberein. Die
+    Nummer ist nicht verhandelbar: "SG FC Saalfeld 3." und "FC Saalfeld"
+    haben denselben Kern, spielen aber Kreisliga und Verbandsliga - ohne diese
+    Bedingung wuerde aus 25 Euro 50.
 
-    1. Vereinskern UND Mannschaftsnummer stimmen ueberein. Die Nummer ist
-       nicht verhandelbar: "SG FC Saalfeld 3." und "FC Saalfeld" haben
-       denselben Kern, spielen aber Kreisliga und Verbandsliga - ohne diese
-       Bedingung wuerde aus 25 Euro 50.
-    2. Es gibt genau eine solche Zeile. Tauchte derselbe Kern in zwei Staffeln
-       auf, waere nicht zu entscheiden, welche gemeint ist.
-
-    Returns:
-        Zeile mit Spielklasse und Rang, oder None.
+    Wer Geld daraus ableitet, muss "keine Zeile" und "mehrere Zeilen"
+    auseinanderhalten: das erste heisst "spielt in keiner erfassten Liga",
+    das zweite "spielt in einer davon, nur nicht feststellbar in welcher".
     """
     from scraper.fussball_de import mannschaftsnummer, vereinskern
 
     kern = vereinskern(name)
     if not kern:
-        return None
+        return []
 
     conn = get_connection()
 
@@ -166,10 +162,20 @@ def finde_mannschaft(name: str) -> Optional[Dict]:
     finally:
         conn.close()
 
-    if len(treffer) != 1:
-        return None
+    return [dict(zeile) for zeile in treffer]
 
-    return dict(treffer[0])
+
+def finde_mannschaft(name: str) -> Optional[Dict]:
+    """
+    Die eine Tabellenzeile einer DFBnet-Mannschaft, oder None.
+
+    None, sobald das Ergebnis nicht eindeutig ist - lieber keine Spesen als
+    die falschen. Tauchte derselbe Kern mit derselben Nummer in zwei Staffeln
+    auf, waere nicht zu entscheiden, welche gemeint ist. Zur Abgrenzung von
+    "nicht gefunden" siehe suche_mannschaft.
+    """
+    treffer = suche_mannschaft(name)
+    return treffer[0] if len(treffer) == 1 else None
 
 
 # Ab diesem Rang gilt eine Mannschaft als ueberregional (Regionalliga und

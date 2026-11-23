@@ -9,6 +9,7 @@ from db.ligen import (
     bestand,
     ersetze_staffel,
     finde_mannschaft,
+    suche_mannschaft,
     kennt_ueberregionale_ligen,
     rang,
     tabelle,
@@ -110,6 +111,13 @@ class TestFindeMannschaft:
         ersetze_staffel(_staffel("a"), [_platz(1, "FC Saalfeld", team_id="t1")])
         ersetze_staffel(_staffel("b", "landesklasse"), [_platz(1, "FC Saalfeld", team_id="t2")])
         assert finde_mannschaft("FC Saalfeld") is None
+
+    def test_suche_unterscheidet_mehrdeutig_von_unbekannt(self, db):
+        ersetze_staffel(_staffel("a"), [_platz(1, "FC Saalfeld", team_id="t1")])
+        ersetze_staffel(_staffel("b", "landesklasse"), [_platz(1, "FC Saalfeld", team_id="t2")])
+        assert len(suche_mannschaft("FC Saalfeld")) == 2
+        assert suche_mannschaft("FC Nirgendwo") == []
+        assert suche_mannschaft("") == []
 
     def test_leerer_name(self, db):
         ersetze_staffel(_staffel(), [_platz(1, "FC Saalfeld")])

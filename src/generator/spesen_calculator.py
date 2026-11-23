@@ -452,6 +452,10 @@ def _calc_herren_nach_liga(spielklasse: str, heim_team: str,
       unterscheidet Abs. 2a zwischen Kreisoberliga (30/25) und Kreisliga
       (25/23) - welche der beiden, verraet die Ansetzung nicht.
     - Ist eine Mannschaft ueberregional, bleibt es leer.
+    - Steht eine Mannschaft in mehreren Tabellen, ist nicht zu sagen, welche
+      gilt - dann bleibt es leer. Sie darf nicht wie eine Mannschaft ohne
+      Tabelle behandelt werden, sonst setzte sich still der Satz des Gegners
+      durch, obwohl sie selbst hoeher spielen koennte.
     - Eine Mannschaft, die in keiner Tabelle steht, spielt unterhalb der
       Landesklasse und kann den Satz nicht anheben. Dieser Schluss gilt aber
       nur, solange die ueberregionalen Tabellen ueberhaupt vorhanden sind -
@@ -459,7 +463,7 @@ def _calc_herren_nach_liga(spielklasse: str, heim_team: str,
     - Beim Freundschaftsspiel zaehlt allein der Gastgeber, beim Pokal die
       hoehere der beiden Klassen.
     """
-    from db.ligen import finde_mannschaft, kennt_ueberregionale_ligen, RANG_UEBERREGIONAL
+    from db.ligen import suche_mannschaft, kennt_ueberregionale_ligen, RANG_UEBERREGIONAL
 
     if "pokal" in spielklasse and _is_kreisebene(spielklasse):
         logger.info("Kreispokal: Kreisoberliga oder Kreisliga nicht unterscheidbar")
@@ -472,7 +476,13 @@ def _calc_herren_nach_liga(spielklasse: str, heim_team: str,
 
     gefunden = []
     for name in beteiligte:
-        mannschaft = finde_mannschaft(name)
+        treffer = suche_mannschaft(name)
+
+        if len(treffer) > 1:
+            logger.info(f"{name} steht in mehreren Ligatabellen - Spielklasse nicht eindeutig")
+            return (None, None)
+
+        mannschaft = treffer[0] if treffer else None
 
         if mannschaft and mannschaft["rang"] <= RANG_UEBERREGIONAL:
             logger.info(
