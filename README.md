@@ -210,6 +210,21 @@ Frauen bleiben Pokal- und Freundschaftsspiele ohne Satz: dort müssten die
 Ligatabellen derselben Mannschaftsart vorliegen, und ein Verein ohne
 Herrenmannschaft stünde in keiner davon.
 
+## Anmeldung und Zugangsdaten
+
+Nach **fünf falschen Passwörtern** hintereinander ist der Login für dieses
+Konto 15 Minuten gesperrt, auch mit dem richtigen Passwort. Ab dem dritten
+Fehlversuch sagt die Anmeldung, wie viele Versuche noch bleiben. Gezählt wird je
+E-Mail-Adresse, nicht je IP: hinter einem Cloudflare Tunnel kommen alle
+Anfragen von derselben Adresse. Adressen ohne Konto werden genauso gezählt,
+damit die Sperre nicht verrät, wer registriert ist. Die Zähler liegen in
+`app.db` und überstehen einen Neustart.
+
+Lehnt DFBnet die gespeicherten Zugangsdaten ab, meist weil DFBnet ein neues
+Passwort verlangt hat, merkt sich die Anwendung das mit Datum. Bis neue
+Zugangsdaten gespeichert sind oder ein Abruf wieder durchkommt, steht auf jeder
+Seite ein roter Hinweis, und der Reiter *Einstellungen* trägt einen roten Punkt.
+
 ## Fehler melden
 
 Der gleichnamige Reiter schickt einen Bericht per Mail. Ohne Postausgang ist
@@ -323,6 +338,27 @@ Ohne gesetzte Umgebungsvariablen liegt `DATA_DIR` auf `./data` im Projekt — di
 lokale Entwicklung benutzt also dieselbe Struktur wie der Server. `data/` ist in
 `.gitignore`, für die Vorlage der Secrets siehe [.env.example](.env.example).
 
+### Tests
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest                      # Backend
+
+cd frontend && npm test               # Frontend (Vitest)
+npm run lint && npx tsc -b
+```
+
+Die Backend-Tests laufen gegen eine Wegwerf-Datenbank in einem temporären
+Ordner (siehe [`tests/conftest.py`](tests/conftest.py)) und fassen `data/` nie
+an. DFBnet, FUSSBALL.DE, Nominatim, SMTP und LibreOffice werden nachgestellt,
+es geht also nichts ins Netz und kein Browser startet. Vermutete, noch nicht
+behobene Fehler stehen als `xfail(strict=True)` in den Tests. Sobald einer
+behoben ist, schlägt der Test fehl, bis die Markierung entfernt wird.
+
+Der Workflow [`tests.yml`](.github/workflows/tests.yml) führt beides bei jedem
+Push und Pull Request aus. Der Release-Workflow ruft ihn vorher auf und baut
+kein Image, solange ein Test rot ist.
+
 Die DOCX→PDF-Konvertierung braucht LibreOffice; im Container ist
 `libreoffice-writer` enthalten, lokal muss es installiert sein — ohne
 LibreOffice funktioniert nur der DOCX-Download.
@@ -347,6 +383,8 @@ mehrerer Spiele kaum teurer als ein einzelner.
 | `docker-compose.yml` | Service, Port, Volume und Health Check — ohne Build, direkt server-tauglich |
 | `docker-compose.override.yml` | Ergänzt lokal `build: .`, wird von Compose automatisch geladen |
 | `.github/workflows/release.yml` | Image-Bau und Release beim Tag-Push |
+| `.github/workflows/tests.yml` | pytest, ESLint, TypeScript und Vitest bei jedem Push |
+| `tests/` | Backend-Tests (pytest) |
 
 ## Lizenz
 
