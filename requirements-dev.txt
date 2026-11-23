@@ -1,0 +1,6 @@
+-r requirements.txt
+
+# Tests
+pytest
+pytest-cov
+httpx  # fuer FastAPIs TestClient
