@@ -4,6 +4,7 @@ Ganz einfach, nur das Noetigste
 """
 import os
 import hashlib
+import hmac
 import secrets
 import jwt
 from datetime import datetime, timedelta, UTC
@@ -68,9 +69,10 @@ def verify_password(password: str, password_hash: str) -> bool:
             100000
         )
 
-        # Vergleiche
-        return new_hash.hex() == stored_hash
-    except:
+        # Zeitkonstant vergleichen, damit die Laufzeit nichts ueber den Hash verraet
+        return hmac.compare_digest(new_hash.hex(), stored_hash)
+    except (ValueError, TypeError, AttributeError):
+        # Kaputter oder fehlender Hash
         return False
 
 
