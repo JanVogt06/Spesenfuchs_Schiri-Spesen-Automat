@@ -246,6 +246,18 @@ describe('DashboardPage - Naechste Ansetzungen', () => {
         expect(kennzahl('Nächstes Spiel').wert).toBe('23.11.2026');
     });
 
+    it('sortiert Spiele am selben Tag nach der Anstosszeit', async () => {
+        zeige({matches: [
+            match('2026-11-29', {}, {heim_team: 'Abends', gast_team: 'X', anpfiff: 'Sonntag · 29.11.2026 · 18:30 Uhr'}),
+            match('2026-11-29', {}, {heim_team: 'Morgens', gast_team: 'X', anpfiff: 'Sonntag · 29.11.2026 · 9:30 Uhr'}),
+            match('2026-11-29', {}, {heim_team: 'Mittags', gast_team: 'X', anpfiff: 'Sonntag · 29.11.2026 · 13:00 Uhr'}),
+        ]});
+        await geladen();
+
+        const titel = naechsteAnsetzungen().getAllByText(/ – X$/).map((el) => el.textContent);
+        expect(titel).toEqual(['Morgens – X', 'Mittags – X', 'Abends – X']);
+    });
+
     it('zeigt Datum, Spielklasse, Spielstaette und die eigene Rolle', async () => {
         zeige({matches: [match('2026-11-29', {
             spielstaette: {name: 'Sportplatz am See'},

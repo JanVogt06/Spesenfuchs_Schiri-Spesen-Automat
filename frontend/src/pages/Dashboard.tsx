@@ -21,6 +21,12 @@ function heuteIso(): string {
     return `${jetzt.getFullYear()}-${String(jetzt.getMonth() + 1).padStart(2, '0')}-${String(jetzt.getDate()).padStart(2, '0')}`;
 }
 
+/** Anstosszeit als "HH:MM" zum Sortieren - zwei Spiele am selben Tag */
+function anstoss(match: MatchData): string {
+    const treffer = /(\d{1,2}):(\d{2})/.exec(match.spiel_info?.anpfiff || '');
+    return treffer ? `${treffer[1].padStart(2, '0')}:${treffer[2]}` : '99:99';
+}
+
 function formatDatum(iso?: string): string {
     if (!iso) return '';
     const teile = iso.split('-');
@@ -100,7 +106,8 @@ export function DashboardPage() {
     const naechste = useMemo(
         () => matches
             .filter((m) => (m._datum || '') >= heute && !m._missing_since)
-            .sort((a, b) => (a._datum || '').localeCompare(b._datum || ''))
+            .sort((a, b) => (a._datum || '').localeCompare(b._datum || '')
+                || anstoss(a).localeCompare(anstoss(b)))
             .slice(0, 3),
         [matches, heute],
     );
