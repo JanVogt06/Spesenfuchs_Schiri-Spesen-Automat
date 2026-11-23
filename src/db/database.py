@@ -3,7 +3,7 @@ Database Modul - SQLite Datenbank fuer User und Sessions
 """
 import sqlite3
 from pathlib import Path
-from datetime import datetime, UTC
+from datetime import datetime, timedelta, UTC
 from typing import Dict, List, Optional
 
 from core import config
@@ -240,6 +240,37 @@ def log_download(user_id: int, filename: str, file_type: str,
 
     conn.commit()
     conn.close()
+
+
+def log_spielbericht(user_id: int, spielbericht_id: int, aktion: str,
+                     quelle: str = "direkt", dokument_id: Optional[int] = None) -> None:
+    """
+    Protokolliert das Oeffnen eines Spielberichts oder seiner Dokumente (Nutzungsstatistik).
+
+    Derselbe Eintrag innerhalb von 10 Sekunden zaehlt nur einmal - ein
+    Doppelklick oder ein schnelles Neuladen ist kein zweiter Aufruf.
+    """
+    jetzt = datetime.now(UTC)
+    conn = get_connection()
+
+    try:
+        doppelt = conn.execute("""
+            SELECT 1 FROM spielbericht_log
+            WHERE user_id = ? AND spielbericht_id = ? AND aktion = ? AND quelle = ?
+              AND COALESCE(dokument_id, 0) = COALESCE(?, 0) AND geklickt_am >= ?
+            LIMIT 1
+        """, (user_id, spielbericht_id, aktion, quelle, dokument_id,
+              (jetzt - timedelta(seconds=10)).isoformat())).fetchone()
+        if doppelt:
+            return
+
+        conn.execute("""
+            INSERT INTO spielbericht_log (user_id, spielbericht_id, dokument_id, aktion, quelle, geklickt_am)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (user_id, spielbericht_id, dokument_id, aktion, quelle, jetzt.isoformat()))
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def count_downloads() -> int:

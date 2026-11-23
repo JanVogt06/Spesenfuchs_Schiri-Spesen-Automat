@@ -1052,6 +1052,35 @@ def _migration_019_spielberichte(conn: sqlite3.Connection) -> None:
     """)
 
 
+def _migration_020_spielbericht_log(conn: sqlite3.Connection) -> None:
+    """
+    Protokolliert, wie die Spielberichte genutzt werden - wie login_log und
+    download_log fuer die Nutzungsstatistik.
+
+    aktion: "ansehen" (Bericht geoeffnet), "dokument_oeffnen" oder
+    "dokument_laden". quelle sagt, von wo der Bericht geoeffnet wurde
+    ("saison", "spesen" oder "direkt" fuer einen Aufruf ohne Herkunft, etwa
+    ein Link von aussen; bei Dokumenten "bericht").
+
+    Kein Fremdschluessel auf spielberichte: das Log ist Historie und soll
+    einen geloeschten Bericht (Kontowechsel) ueberdauern.
+    """
+    _run_script(conn, """
+        CREATE TABLE spielbericht_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            spielbericht_id INTEGER NOT NULL,
+            dokument_id INTEGER,
+            aktion TEXT NOT NULL,
+            quelle TEXT NOT NULL DEFAULT 'direkt',
+            geklickt_am TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        );
+
+        CREATE INDEX idx_spielbericht_log_user ON spielbericht_log (user_id, geklickt_am DESC);
+    """)
+
+
 # (Version, Beschreibung, Funktion) - aufsteigend, Luecken sind nicht erlaubt.
 MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "baseline schema", _migration_001_baseline),
@@ -1073,6 +1102,7 @@ MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (17, "own observation grades per season", _migration_017_beobachtungen),
     (18, "nofv rates for regionalliga and oberliga league matches", _migration_018_nofv_saetze),
     (19, "match reports with events, expenses and documents", _migration_019_spielberichte),
+    (20, "log how match reports and their documents are opened", _migration_020_spielbericht_log),
 ]
 
 

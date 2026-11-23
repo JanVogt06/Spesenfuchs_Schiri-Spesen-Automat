@@ -67,6 +67,7 @@ from db.matches import (
 from db.database import (
     init_database,
     log_download,
+    log_spielbericht,
 )
 from db.stammdaten import get_stammdaten
 from utils.geocoder import geocode, GeocoderNichtErreichbar
@@ -927,8 +928,27 @@ async def get_own_saison(saison: str, current_user: dict = Depends(get_current_u
     return daten
 
 
+# Erlaubte Werte fuer das Log. Was das Frontend sonst schickt, wird "direkt" -
+# in die Tabelle kommt kein freier Text von aussen.
+_BERICHT_QUELLEN = {"saison", "spesen"}
+_DOKUMENT_AKTIONEN = {"oeffnen": "dokument_oeffnen", "laden": "dokument_laden"}
+
+
+def _log_spielbericht(user_id: int, bericht_id: int, aktion: str, quelle: str = "direkt",
+                      dokument_id: Optional[int] = None) -> None:
+    """Ein Fehler im Log darf den Bericht nicht verhindern - nur protokollieren."""
+    try:
+        log_spielbericht(user_id, bericht_id, aktion, quelle, dokument_id)
+    except Exception as e:
+        logger.warning(f"Spielbericht-Log nicht geschrieben: {e}")
+
+
 @app.get("/api/spielberichte/{bericht_id}")
-async def get_own_spielbericht(bericht_id: int, current_user: dict = Depends(get_current_user)):
+async def get_own_spielbericht(
+    bericht_id: int,
+    quelle: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
     """
     Ein Spielbericht mit Spielverlauf, Aufstellungen, Gespann-Kosten und der
     Liste der angehaengten Dokumente.
@@ -941,6 +961,8 @@ async def get_own_spielbericht(bericht_id: int, current_user: dict = Depends(get
     if not bericht:
         raise NotFoundError("Spielbericht nicht gefunden")
 
+    _log_spielbericht(current_user['id'], bericht_id, "ansehen",
+                      quelle if quelle in _BERICHT_QUELLEN else "direkt")
     return bericht
 
 
@@ -948,6 +970,7 @@ async def get_own_spielbericht(bericht_id: int, current_user: dict = Depends(get
 async def download_spielbericht_dokument(
     bericht_id: int,
     dokument_id: int,
+    aktion: Optional[str] = None,
     current_user: dict = Depends(get_current_user),
 ):
     """Ein an den Spielbericht angehaengtes Dokument (Sonderbericht, Spesendokument, ...)."""
@@ -955,6 +978,9 @@ async def download_spielbericht_dokument(
 
     if not dokument or not dokument['absolut'].is_file():
         raise NotFoundError("Dokument nicht gefunden")
+
+    _log_spielbericht(current_user['id'], bericht_id,
+                      _DOKUMENT_AKTIONEN.get(aktion or "", "dokument_laden"), "bericht", dokument_id)
 
     dateiname = dokument['dateiname']
     media_type = "application/pdf" if dateiname.lower().endswith(".pdf") else "application/octet-stream"
