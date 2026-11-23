@@ -11,7 +11,7 @@ import {useScrapeRun} from '@/hooks/useScrapeRun';
 import {getAllMatches, type MatchData} from '@/lib/matches';
 import {getSaisons, getSaison, type SaisonDetails} from '@/lib/saison';
 import {
-    AlertCircle, Loader2, Calendar, Receipt, Trophy, SquareStack,
+    AlertCircle, Loader2, Calendar, Trophy, SquareStack,
     ArrowRight, MapPin,
 } from 'lucide-react';
 
@@ -27,24 +27,17 @@ function formatDatum(iso?: string): string {
     return teile.length === 3 ? `${teile[2]}.${teile[1]}.${teile[0]}` : iso;
 }
 
-/** Ob zu einem Spiel schon Fahrtkosten erfasst sind */
-function hatSpesen(match: MatchData): boolean {
-    const e = match._expenses;
-    if (!e) return false;
-    return [e.sr_km, e.sr_oevm, e.sra1_km, e.sra1_oevm, e.sra2_km, e.sra2_oevm]
-        .some((wert) => wert !== null && wert !== undefined);
-}
-
 interface KennzahlProps {
     icon: typeof Calendar;
     label: string;
     wert: string;
     zusatz?: string;
+    className?: string;
 }
 
-function Kennzahl({icon: Icon, label, wert, zusatz}: KennzahlProps) {
+function Kennzahl({icon: Icon, label, wert, zusatz, className}: KennzahlProps) {
     return (
-        <Card className="gap-0 py-0">
+        <Card className={`gap-0 py-0 ${className ?? ''}`}>
             {/* Am Handy stehen zwei nebeneinander - dort rueckt das Icon klein
                 vor die Beschriftung, damit der Wert die volle Breite hat */}
             <CardContent className="flex items-start gap-3 p-3 sm:p-4">
@@ -112,11 +105,6 @@ export function DashboardPage() {
         [matches, heute],
     );
 
-    const offeneSpesen = useMemo(
-        () => matches.filter((m) => (m._datum || '') < heute && !m._missing_since && !hatSpesen(m)),
-        [matches, heute],
-    );
-
     /** Karten pro Spiel in der laufenden Saison, über beide Mannschaften */
     const kartenSchnitt = useMemo(() => {
         const spiele = saison?.spiele ?? [];
@@ -180,7 +168,8 @@ export function DashboardPage() {
                 </div>
             ) : (
                 <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+                    {/* Am Handy zwei nebeneinander, das naechste Spiel darunter ueber die volle Breite */}
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                         <Kennzahl
                             icon={Trophy}
                             label={saison ? `Spiele in ${saison.saison}` : 'Geleitete Spiele'}
@@ -197,19 +186,12 @@ export function DashboardPage() {
                         />
                         <Kennzahl
                             icon={Calendar}
+                            className="col-span-2 sm:col-span-1"
                             label="Nächstes Spiel"
                             wert={naechste.length > 0 ? formatDatum(naechste[0]._datum) : '–'}
                             zusatz={naechste.length > 0
                                 ? naechste[0].spiel_info.spielklasse || 'Ansetzung'
                                 : 'keine offene Ansetzung'}
-                        />
-                        <Kennzahl
-                            icon={Receipt}
-                            label="Ohne Kilometer"
-                            wert={String(offeneSpesen.length)}
-                            zusatz={offeneSpesen.length === 0
-                                ? 'alles erfasst'
-                                : 'gespielt, aber nichts eingetragen'}
                         />
                     </div>
 
@@ -326,43 +308,6 @@ export function DashboardPage() {
                             </CardContent>
                         </Card>
                     </div>
-
-                    {offeneSpesen.length > 0 && (
-                        <Card className="gap-0 overflow-hidden py-0">
-                            <CardHeader className="flex h-11 flex-row items-center justify-between gap-2 px-4 py-0 sm:px-6">
-                                <div className="flex items-center gap-2">
-                                    <Receipt className="size-4 text-muted-foreground"/>
-                                    <CardTitle className="text-sm">Noch ohne Kilometer</CardTitle>
-                                </div>
-                                <Button variant="ghost" size="sm" onClick={() => navigate('/spesen')}>
-                                    Eintragen
-                                    <ArrowRight className="size-3.5"/>
-                                </Button>
-                            </CardHeader>
-                            <Separator/>
-                            <CardContent className="p-4 sm:p-6">
-                                <div className="space-y-1.5 text-sm">
-                                    {offeneSpesen.slice(0, 5).map((match) => (
-                                        <div key={match._id} className="flex items-baseline justify-between gap-3">
-                                            <span className="min-w-0 truncate">
-                                                {match.spiel_info.heim_team && match.spiel_info.gast_team
-                                                    ? `${match.spiel_info.heim_team} – ${match.spiel_info.gast_team}`
-                                                    : 'Turnier'}
-                                            </span>
-                                            <span className="shrink-0 text-xs whitespace-nowrap text-muted-foreground">
-                                                {formatDatum(match._datum)}
-                                            </span>
-                                        </div>
-                                    ))}
-                                    {offeneSpesen.length > 5 && (
-                                        <p className="pt-1 text-xs text-muted-foreground">
-                                            … und {offeneSpesen.length - 5} weitere
-                                        </p>
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )}
                 </div>
             )}
         </AppShell>
