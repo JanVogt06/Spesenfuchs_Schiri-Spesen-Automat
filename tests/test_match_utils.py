@@ -88,9 +88,6 @@ class TestDateiname:
                        spielklasse=spielklasse, mannschaftsart=mannschaftsart, staffel=staffel)
         assert generate_filename_from_match(match).endswith(".docx")
 
-    @pytest.mark.xfail(strict=True, raises=TypeError, reason=(
-        "anpfiff=None (Spalte matches.anpfiff ist nullable) laesst re.search "
-        "mit TypeError abstuerzen; heim/gast werden dagegen mit 'or' abgefangen"))
     def test_anpfiff_none(self):
         match = _match(heim_team="A", gast_team="B", anpfiff=None)
         assert generate_filename_from_match(match) == "Spesen_A_vs_B_01-01-2000.docx"
@@ -137,9 +134,6 @@ class TestIsoDatum:
         assert [extract_iso_date_from_anpfiff(d) for d in sortiert] == \
             ["2025-12-31", "2026-01-02", "2026-06-15"]
 
-    @pytest.mark.xfail(strict=True, raises=TypeError, reason=(
-        "anpfiff=None laesst re.search mit TypeError abstuerzen statt den "
-        "dokumentierten Fallback 1900-01-01 zu liefern"))
     def test_none(self):
         assert extract_iso_date_from_anpfiff(None) == "1900-01-01"
 
@@ -163,9 +157,6 @@ class TestSanitizeTeamName:
     def test_leer_wird_unbekannt(self, name):
         assert sanitize_team_name(name) == "Unbekannt"
 
-    @pytest.mark.xfail(strict=True, reason=(
-        "Nur-Leerzeichen bzw. nur verbotene Zeichen ergeben einen leeren Namen "
-        "statt 'Unbekannt' wie bei leerer Eingabe"))
     @pytest.mark.parametrize("name", ["   ", "***", "?<>"])
     def test_bereinigt_leer_wird_unbekannt(self, name):
         assert sanitize_team_name(name) == "Unbekannt"

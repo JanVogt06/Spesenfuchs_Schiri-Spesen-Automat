@@ -35,7 +35,8 @@ def generate_filename_from_match(match: dict) -> str:
     spiel_info = match.get('spiel_info', {})
     heim = spiel_info.get('heim_team') or ''
     gast = spiel_info.get('gast_team') or ''
-    anpfiff = spiel_info.get('anpfiff', '')
+    # Die Spalte darf NULL sein - ein None wuerde re.search abstuerzen lassen
+    anpfiff = spiel_info.get('anpfiff') or ''
 
     # Extrahiere Datum im Format "08.11.2025"
     datum_match = re.search(r'(\d{2}\.\d{2}\.\d{4})', anpfiff)
@@ -106,7 +107,7 @@ def extract_iso_date_from_anpfiff(anpfiff: str) -> str:
         >>> extract_iso_date_from_anpfiff("Samstag · 08.11.2025 · 13:00 Uhr")
         '2025-11-08'
     """
-    match = re.search(r'(\d{2})\.(\d{2})\.(\d{4})', anpfiff)
+    match = re.search(r'(\d{2})\.(\d{2})\.(\d{4})', anpfiff or '')
     if match:
         day, month, year = match.groups()
         return f"{year}-{month}-{day}"
@@ -146,7 +147,8 @@ def sanitize_team_name(team_name: str) -> str:
     for old, new in replacements.items():
         result = result.replace(old, new)
 
-    return result.strip()
+    # Bleibt nach dem Bereinigen nichts uebrig, gilt dasselbe wie fuer leer
+    return result.strip() or "Unbekannt"
 
 
 def parse_saison_datum(text: str) -> Tuple[str, str]:

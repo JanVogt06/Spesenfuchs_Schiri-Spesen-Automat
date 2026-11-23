@@ -25,8 +25,11 @@ def saison_start_jahr(saison: str, heute: Optional[date] = None) -> Optional[int
         return None
 
     kurz = int(treffer.group(1))
-    grenze = ((heute or date.today()).year + 1) % 100
-    return (1900 if kurz > grenze else 2000) + kurz
+    obergrenze = (heute or date.today()).year + 1
+    # Im Jahrhundert der Obergrenze, notfalls eins davor. Mit "% 100" auf
+    # die Grenze kippte das im Jahr 2099, wo die Grenze zu 0 wuerde.
+    jahr = obergrenze // 100 * 100 + kurz
+    return jahr - 100 if jahr > obergrenze else jahr
 
 
 def saison_fuer_datum(tag: date) -> str:

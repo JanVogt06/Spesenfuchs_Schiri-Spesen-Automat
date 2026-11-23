@@ -71,9 +71,6 @@ class TestSaisonStartJahr:
         assert saison_start_jahr("27/28") == 2027
         assert saison_start_jahr("28/29") == 1928
 
-    @pytest.mark.xfail(strict=True, reason=(
-        "Jahrhundertwechsel: im Jahr 2099 ist grenze = 2100 % 100 = 0, "
-        "die laufende Saison '99/00' wird zu 1999"))
     def test_jahrhundertwechsel(self):
         assert saison_start_jahr("99/00", date(2099, 11, 1)) == 2099
 
