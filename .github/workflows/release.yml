@@ -15,8 +15,13 @@ permissions:
   packages: write
 
 jobs:
+  # Kein Image aus einem Stand, dessen Tests rot sind
+  tests:
+    uses: ./.github/workflows/tests.yml
+
   release:
     name: Build image and publish release
+    needs: tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
