@@ -274,6 +274,17 @@ class TestFehler:
         assert "geheim" not in info.value.message
         assert "geheim" not in (info.value.details or "")
 
+    def test_passwort_nicht_im_protokoll(self, smtp_konfiguriert, server, monkeypatch):
+        zeilen = []
+        monkeypatch.setattr(mailer.logger, "error", lambda text, *a, **k: zeilen.append(text))
+        server["fehler_bei"] = "login"
+        server["fehler"] = smtplib.SMTPAuthenticationError(535, b"bad password geheim")
+        with pytest.raises(MailVersandFehlgeschlagen):
+            _senden()
+        assert len(zeilen) == 1
+        assert "geheim" not in zeilen[0]
+        assert "SMTPAuthenticationError (SMTP 535)" in zeilen[0]
+
 
 class TestFehlermeldung:
     def test_authentifizierung(self):

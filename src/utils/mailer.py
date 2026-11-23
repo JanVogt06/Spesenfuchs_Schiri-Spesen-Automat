@@ -158,10 +158,15 @@ def sende_bug_report(titel: str, beschreibung: str, bereich: str,
                 server.login(os.getenv("SMTP_USER"), os.getenv("SMTP_PASSWORD"))
                 server.send_message(nachricht)
     except (smtplib.SMTPException, OSError) as fehler:
-        # Der Fehlertext kann Zugangsdaten enthalten, deshalb nur der Typ
-        logger.error(f"Fehlerbericht nicht versendet: {type(fehler).__name__}: {fehler}")
-        raise MailVersandFehlgeschlagen(
-            _fehlermeldung(fehler, host, port), type(fehler).__name__
-        ) from fehler
+        # Der Fehlertext des Servers kann Zugangsdaten enthalten - weder in die
+        # Antwort noch ins Protokoll. Typ, SMTP-Code und die eigene Deutung
+        # genuegen zur Fehlersuche.
+        meldung = _fehlermeldung(fehler, host, port)
+        code = getattr(fehler, "smtp_code", None)
+        logger.error(
+            f"Fehlerbericht nicht versendet: {type(fehler).__name__}"
+            f"{f' (SMTP {code})' if code else ''} - {meldung}"
+        )
+        raise MailVersandFehlgeschlagen(meldung, type(fehler).__name__) from fehler
 
     logger.info(f"Fehlerbericht an {empfaenger()} versendet")
