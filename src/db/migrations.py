@@ -1102,6 +1102,20 @@ def _migration_021_login_sperren(conn: sqlite3.Connection) -> None:
     """)
 
 
+def _migration_022_dfb_login_abgelehnt(conn: sqlite3.Connection) -> None:
+    """
+    Merkt sich, seit wann DFBnet die gespeicherten Zugangsdaten ablehnt.
+
+    Bisher stand das nur im letzten Abruf. Der naechste Lauf - oder ein
+    abgebrochener - ueberschrieb es, und der Hinweis verschwand, obwohl die
+    Zugangsdaten weiter falsch waren. NULL heisst: zuletzt angenommen oder
+    noch nicht geprueft.
+    """
+    _run_script(conn, """
+        ALTER TABLE users ADD COLUMN dfb_login_abgelehnt_seit TEXT;
+    """)
+
+
 # (Version, Beschreibung, Funktion) - aufsteigend, Luecken sind nicht erlaubt.
 MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "baseline schema", _migration_001_baseline),
@@ -1125,6 +1139,7 @@ MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (19, "match reports with events, expenses and documents", _migration_019_spielberichte),
     (20, "log how match reports and their documents are opened", _migration_020_spielbericht_log),
     (21, "lock the login after repeated failed attempts", _migration_021_login_sperren),
+    (22, "remember since when dfbnet rejects the stored credentials", _migration_022_dfb_login_abgelehnt),
 ]
 
 

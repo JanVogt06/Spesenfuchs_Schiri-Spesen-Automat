@@ -70,6 +70,8 @@ class UserInfo(BaseModel):
     user_id: int
     email: str
     has_dfb_credentials: bool
+    # Seit wann DFBnet die gespeicherten Zugangsdaten ablehnt (ISO, UTC)
+    dfb_login_abgelehnt_seit: Optional[str] = None
 
 
 class DFBCredentialsRequest(BaseModel):
@@ -223,7 +225,8 @@ async def get_me(current_user: dict = Depends(get_current_user)):
     return UserInfo(
         user_id=current_user['id'],
         email=current_user['email'],
-        has_dfb_credentials=dfb_creds is not None
+        has_dfb_credentials=dfb_creds is not None,
+        dfb_login_abgelehnt_seit=current_user.get('dfb_login_abgelehnt_seit') if dfb_creds else None,
     )
 
 
@@ -293,6 +296,7 @@ async def check_dfb_credentials(current_user: dict = Depends(get_current_user)):
 
     return {
         "has_credentials": dfb_creds is not None,
+        "abgelehnt_seit": current_user.get('dfb_login_abgelehnt_seit') if dfb_creds else None,
         "message": "DFB-Credentials gespeichert" if dfb_creds else "Keine DFB-Credentials gespeichert"
     }
 

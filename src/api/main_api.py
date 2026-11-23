@@ -65,6 +65,7 @@ from db.matches import (
     count_distinct_matches,
 )
 from db.database import (
+    dfb_login_abgelehnt,
     init_database,
     log_download,
     log_spielbericht,
@@ -308,6 +309,9 @@ def run_scrape_process(dfb_username: str, dfb_password: str, user_id: int, run_i
                           "und Passwort in den Einstellungen.",
             finished=True,
         )
+        # Erst nach dem Lauf: scheitert dieser Schreibzugriff, soll der Lauf
+        # trotzdem als fehlgeschlagen dastehen.
+        dfb_login_abgelehnt(user_id)
 
     except Exception as e:
         process_logger.error(f"[User {user_id}] Fehler beim Scrape: {e}", exc_info=True)

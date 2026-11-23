@@ -14,6 +14,7 @@ load_environment()
 from scraper.dfb_scraper import DFBScraper
 from generator.docx_generator import KM_SATZ_EURO
 from generator.spesen_calculator import calculate_spesen
+from db.database import dfb_login_angenommen
 from db.matches import upsert_match, mark_missing_matches, build_match_key
 from db.stammdaten import upsert_stammdaten, get_stammdaten
 from db.beobachtungen import (
@@ -369,6 +370,13 @@ def scrape_matches(
         scraper.accept_cookies()
         scraper.click_login()
         scraper.login()
+
+        # login() wirft bei abgelehnten Zugangsdaten; hier hat DFBnet sie
+        # angenommen. Faellt der Abruf danach aus anderem Grund aus, sind die
+        # Zugangsdaten trotzdem in Ordnung.
+        if user_id is not None:
+            dfb_login_angenommen(user_id)
+
         scraper.open_menu_if_needed()
 
         def fortschritt(current, total, step):

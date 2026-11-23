@@ -148,9 +148,12 @@ def update_dfb_credentials(user_id: int, encrypted_username: str, encrypted_pass
     conn = get_connection()
     cursor = conn.cursor()
 
+    # Neue Zugangsdaten sind ungeprueft - ein alter Ablehnungs-Hinweis
+    # gilt fuer sie nicht mehr.
     cursor.execute("""
         UPDATE users 
-        SET dfb_username_encrypted = ?, dfb_password_encrypted = ?
+        SET dfb_username_encrypted = ?, dfb_password_encrypted = ?,
+            dfb_login_abgelehnt_seit = NULL
         WHERE id = ?
     """, (encrypted_username, encrypted_password, user_id))
 
@@ -180,6 +183,38 @@ def get_dfb_credentials(user_id: int) -> Optional[Dict]:
     if result and result['dfb_username_encrypted'] and result['dfb_password_encrypted']:
         return dict(result)
     return None
+
+
+def dfb_login_abgelehnt(user_id: int) -> None:
+    """
+    DFBnet hat die gespeicherten Zugangsdaten abgelehnt.
+
+    Der erste Zeitpunkt bleibt stehen: jede weitere Nacht mit demselben
+    Fehler aendert nichts daran, seit wann keine Daten mehr kommen.
+    """
+    conn = get_connection()
+
+    try:
+        conn.execute("""
+            UPDATE users SET dfb_login_abgelehnt_seit = COALESCE(dfb_login_abgelehnt_seit, ?)
+            WHERE id = ?
+        """, (datetime.now(UTC).isoformat(), user_id))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def dfb_login_angenommen(user_id: int) -> None:
+    """DFBnet hat die Zugangsdaten angenommen - ein alter Hinweis erledigt sich."""
+    conn = get_connection()
+
+    try:
+        conn.execute(
+            "UPDATE users SET dfb_login_abgelehnt_seit = NULL WHERE id = ?", (user_id,)
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def update_user_password(user_id: int, password_hash: str) -> bool:

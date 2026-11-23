@@ -14,7 +14,7 @@ from typing import Any, Dict
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from db.database import get_all_users, get_dfb_credentials
+from db.database import get_all_users, get_dfb_credentials, dfb_login_abgelehnt
 from db.scrape_runs import start_run, update_run, fail_stale_runs
 from core.encryption import decrypt_credential
 from core.errors import DFBCredentialsInvalidError
@@ -76,6 +76,9 @@ def run_scrape_for_user(user_id: int, email: str, dfb_username: str, dfb_passwor
                           "und Passwort in den Einstellungen.",
             finished=True,
         )
+        # Erst nach dem Lauf: scheitert dieser Schreibzugriff, soll der Lauf
+        # trotzdem als fehlgeschlagen dastehen.
+        dfb_login_abgelehnt(user_id)
 
     except Exception as e:
         process_logger.error(f"[User {user_id}] Fehler: {e}", exc_info=True)
