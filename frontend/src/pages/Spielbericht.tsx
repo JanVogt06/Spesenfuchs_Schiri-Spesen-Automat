@@ -1,5 +1,5 @@
 import {useEffect, useState, type ReactNode} from 'react';
-import {useNavigate, useParams} from 'react-router-dom';
+import {useNavigate, useParams, useSearchParams} from 'react-router-dom';
 import {AppShell} from '@/components/layout/AppShell';
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import {Separator} from '@/components/ui/separator';
@@ -223,19 +223,21 @@ function DokumentZeile({berichtId, dokument}: {berichtId: number; dokument: Spie
 
 export function SpielberichtPage() {
     const {id} = useParams();
+    const [suche] = useSearchParams();
+    const von = suche.get('von');
     const navigate = useNavigate();
     const [bericht, setBericht] = useState<Spielbericht | null>(null);
     const [fehler, setFehler] = useState('');
 
     useEffect(() => {
         let aktiv = true;
-        getSpielbericht(Number(id))
+        getSpielbericht(Number(id), von)
             .then((b) => aktiv && setBericht(b))
             .catch(async (err) => aktiv && setFehler(await extractApiError(err, 'Der Spielbericht konnte nicht geladen werden.')));
         return () => {
             aktiv = false;
         };
-    }, [id]);
+    }, [id, von]);
 
     const zurueck = (
         <Button variant="ghost" size="sm" className="-ml-2 mb-3 text-muted-foreground" onClick={() => navigate(-1)}>

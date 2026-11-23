@@ -122,14 +122,25 @@ export interface Spielbericht {
     dokumente: SpielberichtDokument[];
 }
 
-export async function getSpielbericht(id: number): Promise<Spielbericht> {
-    const response = await api.get<Spielbericht>(`/api/spielberichte/${id}`);
+/** Von wo ein Bericht geöffnet wurde - landet im Nutzungsprotokoll */
+export type BerichtQuelle = 'saison' | 'spesen';
+
+/** Pfad der Detailseite; die Herkunft reist als ?von= mit */
+export function spielberichtPfad(id: number, von: BerichtQuelle): string {
+    return `/spielbericht/${id}?von=${von}`;
+}
+
+export async function getSpielbericht(id: number, quelle?: string | null): Promise<Spielbericht> {
+    const response = await api.get<Spielbericht>(`/api/spielberichte/${id}`, {
+        params: quelle ? {quelle} : undefined,
+    });
     return response.data;
 }
 
 export async function downloadDokument(berichtId: number, dokument: SpielberichtDokument): Promise<void> {
     const response = await api.get(`/api/spielberichte/${berichtId}/dokumente/${dokument.id}`, {
         responseType: 'blob',
+        params: {aktion: 'laden'},
     });
     triggerBrowserDownload(response.data, dokument.dateiname);
 }
@@ -142,6 +153,7 @@ export async function oeffneDokument(berichtId: number, dokument: SpielberichtDo
     try {
         const response = await api.get(`/api/spielberichte/${berichtId}/dokumente/${dokument.id}`, {
             responseType: 'blob',
+            params: {aktion: 'oeffnen'},
         });
         const url = window.URL.createObjectURL(response.data);
         if (fenster) {

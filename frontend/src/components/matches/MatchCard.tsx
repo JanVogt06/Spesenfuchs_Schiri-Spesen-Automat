@@ -8,7 +8,7 @@ import {Input} from '@/components/ui/input';
 import {MatchMap} from '@/components/matches/MatchMap';
 import {cn} from '@/lib/utils';
 import {Link} from 'react-router-dom';
-import {formatEuro as formatDfbEuro} from '@/lib/spielberichte';
+import {formatEuro as formatDfbEuro, spielberichtPfad} from '@/lib/spielberichte';
 import {Calendar, ChevronDown, ChevronUp, Download, Users, MapPin, Map, Euro, Car, Check, Loader2, Info, FileText, Paperclip} from 'lucide-react';
 
 /** "12,5" oder "12.5" -> 12.5; leer -> null; ungültig -> undefined */
@@ -612,27 +612,29 @@ export function MatchCard({
                                 </span>
                             )}
                             {renderHeaderSpesen()}
-                            {match._spielbericht && (
-                                <Link
-                                    to={`/spielbericht/${match._spielbericht.id}`}
-                                    className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary hover:bg-primary/15"
-                                >
-                                    <FileText className="size-3"/>
-                                    Spielbericht
-                                    {match._spielbericht.dokumente > 0 && (
-                                        <span className="inline-flex items-center gap-0.5 opacity-80">
-                                            <Paperclip className="size-3"/>{match._spielbericht.dokumente}
-                                        </span>
-                                    )}
-                                </Link>
-                            )}
                         </div>
                         <p className="flex items-center gap-1.5 break-words text-xs text-muted-foreground sm:text-sm">
                             <Calendar className="size-3.5 shrink-0"/>
                             {getMatchSubtitle()}
                         </p>
                     </div>
-                    <div className="flex gap-2 self-start">
+                    <div className="flex flex-wrap gap-2 self-start">
+                        {match._spielbericht && (
+                            <Button asChild size="sm" variant="outline" className="whitespace-nowrap">
+                                <Link
+                                    to={spielberichtPfad(match._spielbericht.id, 'spesen')}
+                                    title="Spielbericht aus DFBnet öffnen"
+                                >
+                                    <FileText className="size-3.5 text-primary"/>
+                                    Spielbericht
+                                    {match._spielbericht.dokumente > 0 && (
+                                        <span className="inline-flex items-center gap-0.5 text-xs text-muted-foreground">
+                                            <Paperclip className="size-3"/>{match._spielbericht.dokumente}
+                                        </span>
+                                    )}
+                                </Link>
+                            </Button>
+                        )}
                         <Button
                             onClick={() => onDownload('docx')}
                             disabled={laufendeFormate.includes('docx')}
