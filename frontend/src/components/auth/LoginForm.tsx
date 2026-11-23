@@ -24,8 +24,14 @@ export function LoginForm() {
             await login(email, password);
             navigate('/dashboard');
         } catch (err: unknown) {
-            const axiosError = err as { response?: { data?: { error?: { message?: string } } } };
-            const errorMessage = axiosError.response?.data?.error?.message || 'Login fehlgeschlagen';
+            const axiosError = err as {
+                message?: string;
+                response?: { data?: { error?: { message?: string } } };
+            };
+            // Ohne Antwort hat der API-Client schon "Keine Verbindung ..." eingesetzt
+            const errorMessage = axiosError.response
+                ? axiosError.response.data?.error?.message || 'Login fehlgeschlagen'
+                : axiosError.message || 'Login fehlgeschlagen';
             setError(errorMessage);
         } finally {
             setIsLoading(false);

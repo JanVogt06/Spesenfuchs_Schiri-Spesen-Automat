@@ -63,8 +63,17 @@ describe('LoginForm', () => {
         expect(screen.getByLabelText('E-Mail')).toHaveValue('sr@example.org');
     });
 
-    it('faellt ohne Servermeldung auf "Login fehlgeschlagen" zurueck', async () => {
+    it('zeigt ohne Verbindung die Meldung des API-Clients', async () => {
         apiPost.mockRejectedValue(new Error('Keine Verbindung zum Server. Prüfe deine Internetverbindung.'));
+        zeige();
+
+        await anmelden();
+
+        expect(await screen.findByText(/Keine Verbindung zum Server/)).toBeInTheDocument();
+    });
+
+    it('faellt bei einer Antwort ohne Meldung auf "Login fehlgeschlagen" zurueck', async () => {
+        apiPost.mockRejectedValue(Object.assign(new Error('Request failed'), {response: {status: 500, data: {}}}));
         zeige();
 
         await anmelden();
