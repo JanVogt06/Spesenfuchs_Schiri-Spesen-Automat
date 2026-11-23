@@ -145,7 +145,13 @@ export async function downloadMatchesAsZip(
         {match_ids: matchIds, file_format: fileFormat},
         {responseType: 'blob'},
     );
-    const datum = new Date().toISOString().slice(0, 10);
+    // Lokales Datum: toISOString waere UTC, kurz nach Mitternacht also gestern
+    const jetzt = new Date();
+    const datum = [
+        jetzt.getFullYear(),
+        String(jetzt.getMonth() + 1).padStart(2, '0'),
+        String(jetzt.getDate()).padStart(2, '0'),
+    ].join('-');
     triggerBrowserDownload(response.data, `Spesen_${datum}.zip`);
 }
 

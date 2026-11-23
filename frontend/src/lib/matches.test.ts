@@ -127,10 +127,9 @@ describe('Endpunkte', () => {
         expect(apiPost.mock.calls[0][1]).toEqual({match_ids: [5], file_format: 'docx'});
     });
 
-    // BUG: Der Dateiname nimmt das UTC-Datum (toISOString), nicht das lokale.
-    // Wer in Deutschland kurz nach Mitternacht herunterlaedt, bekommt das Datum
-    // von gestern - das Dashboard rechnet "heute" dagegen bewusst lokal.
-    it.fails('downloadMatchesAsZip nimmt kurz nach Mitternacht das lokale Datum', async () => {
+    // Der Dateiname nimmt das lokale Datum, nicht UTC: wer in Deutschland kurz
+    // nach Mitternacht herunterlaedt, bekommt sonst das Datum von gestern.
+    it('downloadMatchesAsZip nimmt kurz nach Mitternacht das lokale Datum', async () => {
         vi.stubEnv('TZ', 'Europe/Berlin');
         vi.useFakeTimers({toFake: ['Date']});
         // 23.11.2026, 00:30 in Berlin = 22.11.2026, 23:30 UTC
