@@ -1,0 +1,112 @@
+{
+  "_hinweis": "Erfundener Spielbericht im Aufbau der DFBnet-Bericht-App (GET report/<id>/matches und match/<id>/details). Alle Namen sind ausgedacht.",
+  "spiel": {
+    "id": "SPIELBERICHT0000000001",
+    "identifier": "460101001",
+    "homeTeam": {"teamName": "FC ­Beispiel­stadt"},
+    "awayTeam": {"teamName": "SV  Musterdorf 2."},
+    "round": {"name": "5. Spieltag"},
+    "kickOff": "2025-09-14T15:00:00",
+    "venue": {"name": "Sportplatz Am Beispielweg", "zipCode": "99999", "town": "Beispielstadt", "street": "Beispielweg 1", "typeName": "Kunstrasen"}
+  },
+  "details": {
+    "matchInfo": {
+      "id": "BERICHTSPIEL0000000001",
+      "identifier": "460101001",
+      "homeTeam": {"id": "HEIM"},
+      "awayTeam": {"id": "GAST"}
+    },
+    "actualKickoff": "2025-09-14T15:02:00",
+    "actualEnd": "2025-09-14T16:52:00",
+    "additionalTimeHalf1": 2,
+    "additionalTimeHalf2": 4,
+    "homeTeamPlayers": [
+      {"id": "P1", "jerseyNumber": 1, "lastName": "Torwart", "firstName": "Tim", "goalkeeper": true, "captain": false, "reserve": false,
+       "birthDate": "2000-01-01", "passNumber": "PASS-GEHEIM-1", "photo": "FOTO-GEHEIM", "playerStatusShort": {"shortName": "A"}},
+      {"id": "P2", "jerseyNumber": 9, "lastName": "Stuermer", "firstName": "Sven", "captain": true,
+       "birthDate": "2001-02-02", "passNumber": "PASS-GEHEIM-2", "playerStatus": {"name": "Amateur"}},
+      {"id": "P3", "jerseyNumber": 14, "lastName": "Ersatz", "firstName": "Erik", "reserve": true}
+    ],
+    "awayTeamPlayers": [
+      {"id": "P4", "jerseyNumber": 5, "lastName": "Verteidiger", "firstName": "Volker"},
+      {"id": "P5", "jerseyNumber": 7, "lastName": "Fluegel", "firstName": ""}
+    ],
+    "homeTeamOfficials": [
+      {"id": "O1", "lastName": "Trainer", "firstName": "Theo", "types": [{"name": "Trainer"}, {"name": "Betreuer"}],
+       "phone": "0000 TELEFON-GEHEIM", "email": "geheim@example.org"}
+    ],
+    "awayTeamOfficials": [
+      {"id": "O2", "lastName": "Coach", "firstName": "Carla", "types": [{"name": "Trainerin"}, {}]}
+    ],
+    "goalEvents": [
+      {"typeId": 7, "matchMinute": 67, "additionalMinute": null, "teamId": "HEIM", "teamPersonId1": "P2"},
+      {"typeId": 9, "matchMinute": 45, "additionalMinute": 2, "teamId": "HEIM", "teamPersonId1": "P2"},
+      {"typeId": 8, "matchMinute": 45, "additionalMinute": null, "teamId": "GAST", "teamPersonId1": "P4"}
+    ],
+    "substitutionEvents": [
+      {"typeId": 1, "matchMinute": 60, "teamId": "HEIM", "teamPersonId1": "P3", "teamPersonId2": "P2"}
+    ],
+    "playerPenaltyEvents": [
+      {"typeId": 2, "matchMinute": 12, "teamId": "GAST", "teamPersonId1": "P5", "description": "  Foulspiel  ", "extraReportAttached": false},
+      {"typeId": 3, "matchMinute": 88, "teamId": "GAST", "teamPersonId1": "P4", "description": "Taetlichkeit", "extraReportAttached": true},
+      {"typeId": 99, "matchMinute": null, "teamId": "NIEMAND", "teamPersonId1": "UNBEKANNT"}
+    ],
+    "teamOfficialPenaltyEvents": [
+      {"typeId": 2, "matchMinute": 30, "teamId": "HEIM", "teamPersonId1": "O1", "description": "Reklamieren"}
+    ],
+    "appointedOfficials": [
+      {"id": "A1", "lastName": "Muster", "firstName": "Max", "clubName": "FC Schiriverein", "rolePosition": 1, "phone": "0000 SCHIRI-TELEFON"},
+      {"id": "A2", "lastName": "Beispiel", "firstName": "Erika", "clubName": "SV Pfeife", "rolePosition": 2},
+      {"id": "A3", "lastName": "Probe", "firstName": "Paul", "clubName": "", "rolePosition": 3, "notAppeared": true}
+    ],
+    "matchOfficials": [
+      {"roleId": 1, "roleName": "Schiedsrichter", "appointedOfficialId": "A1"},
+      {"roleId": 2, "roleName": "1. Assistent", "appointedOfficialId": "A2"},
+      {"roleId": 3, "roleName": "2. Assistent", "appointedOfficialId": "A3"},
+      {"roleId": 4, "roleName": "4. Offizieller", "appointedOfficialId": "FEHLT"}
+    ],
+    "matchResult": {
+      "resultAtHalfTime": {"homeTeamGoals": 1, "awayTeamGoals": 1},
+      "resultAfterRegularTime": {"homeTeamGoals": 2, "awayTeamGoals": 1},
+      "resultAfterExtraTime": null,
+      "finalResult": {"homeTeamGoals": 2, "awayTeamGoals": 1},
+      "cancellationReasonName": null,
+      "abortionMinute": null
+    },
+    "matchSpectatorsInfo": {"spectators": 120},
+    "matchRefereeExpensesInfo": {"refereeTravelExpenses": 42.6, "refereeRsRsaExpenses": 75.0},
+    "matchConfirmationInfo": {
+      "homeConfirmed": true,
+      "homeConfirmInfo": {"userName": "Heim, Betreuer", "timestamp": "2025-09-14T17:00:00", "phone": "0000 BESTAETIGER-TELEFON"},
+      "awayConfirmed": false,
+      "awayConfirmInfo": {"userName": "Gast, Betreuer", "timestamp": "2025-09-14T17:05:00"},
+      "refereeConfirmInfo": {"userName": "Muster, Max", "timestamp": "2025-09-14T18:00:00", "email": "schiri-geheim@example.org"}
+    },
+    "matchIncidents": {
+      "incidentsSpecified": true,
+      "violence": false,
+      "discrimination": true,
+      "matchAbandoned": false,
+      "offenderPlayer": true,
+      "offenderSpectator": true,
+      "offenderReferee": false,
+      "victimReferee": true
+    },
+    "matchCommentsInfo": {"otherComments": "  Platz war tief.  ", "especiallyFairPlay": true},
+    "matchCheckInfos": [
+      {"checkType": {"name": "Passkontrolle"}, "availableSelections": [{"id": 1, "name": "ja"}, {"id": 2, "name": "nein"}], "selectedValue": 1, "remarkValue": ""},
+      {"checkType": {"name": "Platzaufbau"}, "availableSelections": [{"id": 1, "name": "ok"}], "selectedValue": 7, "remarkValue": "Netz fehlte"}
+    ],
+    "matchDocuments": [
+      {"id": "DOKUMENT00000000001", "categoryId": 3, "fileName": "spesen.pdf", "description": " Spesen ", "authorizedToView": true,
+       "uploadInfo": {"userName": "Muster, Max", "timestamp": "2025-09-14T18:10:00"}},
+      {"id": "DOKUMENT00000000002", "categoryId": 2, "fileName": "sonderbericht.pdf", "description": null},
+      {"id": "DOKUMENT00000000003", "categoryId": 4, "fileName": "geheim.pdf", "authorizedToView": false}
+    ],
+    "documentCategories": [
+      {"id": 2, "name": "Sonderbericht"},
+      {"id": 3, "name": "Spesendokument"},
+      {"id": 4, "name": "Sonstiges"}
+    ]
+  }
+}
