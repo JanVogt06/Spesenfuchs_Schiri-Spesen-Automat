@@ -82,8 +82,11 @@ export function useScrapeRun(onFinished?: () => void) {
         setError('');
         try {
             await api.post('/api/generate', {});
-            await loadStatus();
+            // Vor dem ersten Status setzen: ist der Lauf da schon vorbei
+            // (Prozess sofort gescheitert), erkennt loadStatus so die Flanke
+            // und ruft onFinished - statt dass es nie oder verspaetet kommt.
             warRunning.current = true;
+            await loadStatus();
         } catch (err: unknown) {
             const detail = (err as { response?: { data?: { error?: { message?: string } } } })
                 ?.response?.data?.error?.message;

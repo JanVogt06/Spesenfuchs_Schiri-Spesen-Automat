@@ -277,12 +277,10 @@ describe('useScrapeRun - startGeneration', () => {
         expect(result.current.isRunning).toBe(true);
     });
 
-    // BUG: startGeneration setzt warRunning nach dem ersten Status pauschal auf
-    // true - auch wenn dieser Status schon "fertig" ist (Prozess sofort
-    // abgestuerzt) oder gar nicht geladen werden konnte. Dann pollt nichts,
-    // onFinished kommt nie, und erst ein spaeteres reload() loest es verspaetet
-    // und grundlos aus.
-    it.fails('ruft onFinished, auch wenn der Lauf beim ersten Status schon beendet ist', async () => {
+    // Ist der Lauf beim ersten Status nach dem Start schon vorbei (Prozess
+    // sofort gescheitert), muss onFinished trotzdem genau einmal kommen -
+    // und ein spaeteres reload() darf es nicht noch einmal ausloesen.
+    it('ruft onFinished, auch wenn der Lauf beim ersten Status schon beendet ist', async () => {
         const onFinished = vi.fn();
         statusFolge(lauf('idle'), lauf('failed'));
         apiPost.mockResolvedValue({data: {}});
