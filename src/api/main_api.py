@@ -79,7 +79,6 @@ from api.auth import router as auth_router, get_current_user
 from core.errors import (
     APIError,
     NotFoundError,
-    AuthorizationError,
     CredentialsMissingError,
     ValidationError,
     api_error_handler,
@@ -659,8 +658,10 @@ def _owned_match(match_id: int, user_id: int) -> dict:
     if not match:
         raise NotFoundError("Spiel nicht gefunden")
 
+    # Wie ein fehlendes Spiel behandeln: ein 403 verriete, dass es die ID gibt.
+    # Spielberichte halten es genauso.
     if match['user_id'] != user_id:
-        raise AuthorizationError("Dieses Spiel gehört einem anderen User")
+        raise NotFoundError("Spiel nicht gefunden")
 
     return match
 

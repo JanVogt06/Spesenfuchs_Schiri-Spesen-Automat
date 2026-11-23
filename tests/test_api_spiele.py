@@ -258,13 +258,13 @@ class TestFahrtkosten:
         assert antwort.status_code == 404
         assert fehlerbild(antwort)["code"] == "NOT_FOUND"
 
-    def test_fremdes_spiel_403_und_unveraendert(self, client, user, auth_header, ein_spiel, fremder):
+    def test_fremdes_spiel_404_und_unveraendert(self, client, user, auth_header, ein_spiel, fremder):
         from db.matches import get_match
 
         antwort = _kosten(client, fremder["header"], match_id=ein_spiel, sr_km=1)
 
-        assert antwort.status_code == 403
-        assert fehlerbild(antwort)["code"] == "AUTHORIZATION_ERROR"
+        assert antwort.status_code == 404
+        assert fehlerbild(antwort)["code"] == "NOT_FOUND"
         assert get_match(ein_spiel)["expenses"] is None
 
     def test_ueberlebt_erneuten_scrape(self, client, user, auth_header, ein_spiel):
@@ -403,10 +403,10 @@ class TestKarte:
     def test_unbekanntes_spiel_404(self, client, user, auth_header, geocoder):
         assert client.get("/api/matches/999/geo", headers=auth_header).status_code == 404
 
-    def test_fremdes_spiel_403_ohne_anfrage(self, client, user, ein_spiel, fremder, geocoder):
+    def test_fremdes_spiel_404_ohne_anfrage(self, client, user, ein_spiel, fremder, geocoder):
         _, aufrufe = geocoder
         antwort = client.get(f"/api/matches/{ein_spiel}/geo", headers=fremder["header"])
-        assert antwort.status_code == 403
+        assert antwort.status_code == 404
         assert aufrufe == []
 
 
@@ -530,10 +530,10 @@ class TestEinzelDownload:
     def test_unbekanntes_spiel_404(self, client, user, auth_header):
         assert client.get("/api/matches/999/download/docx", headers=auth_header).status_code == 404
 
-    def test_fremdes_spiel_403(self, client, user, ein_spiel, fremder, pdf):
+    def test_fremdes_spiel_404(self, client, user, ein_spiel, fremder, pdf):
         for format_ in ("docx", "pdf"):
             antwort = client.get(f"/api/matches/{ein_spiel}/download/{format_}", headers=fremder["header"])
-            assert antwort.status_code == 403
+            assert antwort.status_code == 404
         assert pdf == []
         assert _downloads() == []
 
@@ -694,13 +694,13 @@ class TestSammelDownload:
         assert client.post("/api/matches/download", headers=auth_header,
                            json={"match_ids": ["a"]}).status_code == 422
 
-    def test_ein_fremdes_spiel_in_der_auswahl_403(self, client, user, auth_header, drei_spiele,
+    def test_ein_fremdes_spiel_in_der_auswahl_404(self, client, user, auth_header, drei_spiele,
                                                   fremder, pdf):
         (fremdes,) = spiele_anlegen(fremder["id"], spiel(heim="FC Fremd"))
 
         antwort = _sammel(client, auth_header, [*drei_spiele, fremdes])
 
-        assert antwort.status_code == 403
+        assert antwort.status_code == 404
         assert pdf == []
         assert _downloads() == []
 
