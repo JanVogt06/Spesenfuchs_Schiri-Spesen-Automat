@@ -178,6 +178,9 @@ MAX_BULK_DOWNLOAD = int(os.getenv("MAX_BULK_DOWNLOAD", "50"))
 
 app.include_router(auth_router)
 
+# Laufende Hintergrund-Tasks (siehe trigger_scheduler)
+_hintergrund_tasks: set = set()
+
 
 # ===== Request/Response Models =====
 
@@ -839,7 +842,11 @@ async def trigger_scheduler_now(current_user: dict = Depends(get_current_user)):
     logger.warning(f"Manueller Scheduler-Trigger durch User {current_user['id']}")
 
     scheduler = get_scheduler()
-    asyncio.create_task(scheduler.scrape_all_users())
+    task = asyncio.create_task(scheduler.scrape_all_users())
+    # asyncio haelt nur eine schwache Referenz - ohne diese hier koennte der
+    # Garbage Collector den Lauf mittendrin abraeumen.
+    _hintergrund_tasks.add(task)
+    task.add_done_callback(_hintergrund_tasks.discard)
 
     return {
         "success": True,
