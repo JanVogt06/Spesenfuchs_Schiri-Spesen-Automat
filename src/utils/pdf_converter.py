@@ -82,7 +82,14 @@ def convert_docx_bytes_to_pdf(documents: List[Tuple[str, bytes]]) -> List[Option
             path.write_bytes(content)
             paths.append(path)
 
-        convert_docx_files_to_pdf(paths)
+        try:
+            convert_docx_files_to_pdf(paths)
+        except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as fehler:
+            # Haengendes oder fehlendes LibreOffice: wie eine gescheiterte
+            # Konvertierung behandeln. Der Download meldet dann 503 mit
+            # verstaendlicher Meldung statt eines allgemeinen 500.
+            logger.error(f"PDF-Konvertierung abgebrochen: {type(fehler).__name__}: {fehler}")
+            return [None] * len(paths)
 
         ergebnis: List[Optional[bytes]] = []
         for path in paths:

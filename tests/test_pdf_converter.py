@@ -251,8 +251,8 @@ class TestBytesKonvertieren:
     def test_zeitueberschreitung_raeumt_alles_auf(self, monkeypatch, soffice_da, temp_dirs):
         monkeypatch.setattr(pdf_converter.subprocess, "run", FalschesSoffice(
             ausnahme=subprocess.TimeoutExpired(cmd="soffice", timeout=120)))
-        with pytest.raises(subprocess.TimeoutExpired):
-            convert_docx_bytes_to_pdf([("a.docx", b"A")])
+        # Haengendes LibreOffice gilt als gescheiterte Konvertierung (-> 503)
+        assert convert_docx_bytes_to_pdf([("a.docx", b"A"), ("b.docx", b"B")]) == [None, None]
         assert not any(p.exists() for p in temp_dirs)
 
     def test_soffice_fehlt_raeumt_auf(self, monkeypatch, temp_dirs):
@@ -260,6 +260,5 @@ class TestBytesKonvertieren:
             raise FileNotFoundError("nicht installiert")
 
         monkeypatch.setattr(pdf_converter, "_find_soffice", fehlt)
-        with pytest.raises(FileNotFoundError):
-            convert_docx_bytes_to_pdf([("a.docx", b"A")])
+        assert convert_docx_bytes_to_pdf([("a.docx", b"A")]) == [None]
         assert temp_dirs and not any(p.exists() for p in temp_dirs)

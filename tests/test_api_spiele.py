@@ -505,6 +505,20 @@ class TestEinzelDownload:
         assert fehlerbild(antwort)["code"] == "PDF_CONVERSION_FAILED"
         assert _downloads() == []
 
+    def test_ohne_libreoffice_503(self, client, user, auth_header, ein_spiel, monkeypatch):
+        """Fehlt LibreOffice, gibt es die verstaendliche 503 statt eines 500."""
+        from utils import pdf_converter
+
+        def fehlt():
+            raise FileNotFoundError("soffice nicht installiert")
+
+        monkeypatch.setattr(pdf_converter, "_find_soffice", fehlt)
+
+        antwort = client.get(f"/api/matches/{ein_spiel}/download/pdf", headers=auth_header)
+
+        assert antwort.status_code == 503
+        assert fehlerbild(antwort)["code"] == "PDF_CONVERSION_FAILED"
+
     @pytest.mark.parametrize("format_", ["doc", "zip", "PDF", "odt"])
     def test_falsches_format_400(self, client, user, auth_header, ein_spiel, format_):
         antwort = client.get(f"/api/matches/{ein_spiel}/download/{format_}", headers=auth_header)
@@ -705,3 +719,4 @@ class TestSammelDownload:
         assert fehler["code"] == "PDF_CONVERSION_FAILED"
         assert "1 von 3" in fehler["message"]
         assert _downloads() == []
+
