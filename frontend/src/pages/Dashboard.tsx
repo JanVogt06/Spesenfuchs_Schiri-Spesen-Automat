@@ -123,7 +123,6 @@ export function DashboardPage() {
     }, [saison]);
 
     const displayError = error || ladeFehler;
-    const istAnmeldefehler = run?.progress?.error_code === 'DFB_CREDENTIALS_INVALID';
 
     return (
         <AppShell actions={<GenerateButton isGenerating={isStarting || isRunning} onClick={startGeneration}/>}>
@@ -133,21 +132,6 @@ export function DashboardPage() {
                 <div className="mb-6 flex items-start gap-2 rounded-lg bg-destructive/10 px-4 py-3 ring-1 ring-destructive/20">
                     <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive"/>
                     <p className="text-sm break-words text-destructive">{displayError}</p>
-                </div>
-            )}
-
-            {run?.status === 'failed' && istAnmeldefehler && (
-                <div className="mb-6 flex items-start gap-3 rounded-lg bg-destructive/10 px-4 py-3 ring-1 ring-destructive/20">
-                    <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive"/>
-                    <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-destructive">DFBnet-Login fehlgeschlagen</p>
-                        <p className="mt-0.5 text-sm text-destructive/80">
-                            {run.progress?.error_message || 'Bitte prüfe deine Zugangsdaten.'}
-                        </p>
-                        <Button variant="destructive" size="sm" className="mt-2" onClick={() => navigate('/settings')}>
-                            Zugangsdaten prüfen
-                        </Button>
-                    </div>
                 </div>
             )}
 

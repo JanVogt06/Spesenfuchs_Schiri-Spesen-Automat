@@ -1,6 +1,4 @@
 import {useState, useEffect, useCallback} from 'react';
-import {useNavigate} from 'react-router-dom';
-import {Button} from '@/components/ui/button';
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import {Separator} from '@/components/ui/separator';
 import {AppShell} from '@/components/layout/AppShell';
@@ -12,7 +10,6 @@ import {AlertCircle, Loader2} from 'lucide-react';
 import {cn} from '@/lib/utils';
 
 export function SpesenPage() {
-    const navigate = useNavigate();
     const [matches, setMatches] = useState<MatchData[]>([]);
     const [isLoadingMatches, setIsLoadingMatches] = useState(true);
     const [matchesError, setMatchesError] = useState('');
@@ -96,28 +93,17 @@ export function SpesenPage() {
                 </div>
             ) : (
                 <div className="space-y-4">
-                    {run?.status === 'failed' && (
+                    {/* Abgelehnte Zugangsdaten meldet der Hinweis oben auf jeder Seite */}
+                    {run?.status === 'failed' && !istAnmeldefehler && (
                         <div className="flex items-start gap-3 rounded-lg bg-destructive/10 px-4 py-3 ring-1 ring-destructive/20">
                             <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive"/>
                             <div className="min-w-0 flex-1">
                                 <p className="text-sm font-medium text-destructive">
-                                    {istAnmeldefehler
-                                        ? 'DFBnet-Login fehlgeschlagen'
-                                        : 'Letzte Aktualisierung fehlgeschlagen'}
+                                    Letzte Aktualisierung fehlgeschlagen
                                 </p>
                                 <p className="mt-0.5 text-sm text-destructive/80">
                                     {run.progress?.error_message || 'Bei der Aktualisierung ist ein Fehler aufgetreten.'}
                                 </p>
-                                {istAnmeldefehler && (
-                                    <Button
-                                        variant="destructive"
-                                        size="sm"
-                                        className="mt-2"
-                                        onClick={() => navigate('/settings')}
-                                    >
-                                        Zugangsdaten prüfen
-                                    </Button>
-                                )}
                             </div>
                         </div>
                     )}

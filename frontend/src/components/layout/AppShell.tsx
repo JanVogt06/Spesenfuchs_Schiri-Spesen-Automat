@@ -6,6 +6,8 @@ import {
     Receipt, Settings, LogOut, LayoutDashboard, IdCard, Trophy, FileText, Table2, Bug, Ellipsis, ClipboardCheck,
 } from 'lucide-react';
 import {cn} from '@/lib/utils';
+import {useDfbLoginStatus} from '@/hooks/useDfbLoginStatus';
+import {DfbLoginHinweis} from '@/components/layout/DfbLoginHinweis';
 
 interface AppShellProps {
     children: ReactNode;
@@ -37,6 +39,16 @@ const mehrItems: NavItem[] = [
 
 const navItems = [...hauptItems, ...mehrItems];
 
+/** Roter Punkt an einem Reiter, der Aufmerksamkeit braucht */
+function Warnpunkt({className}: {className?: string}) {
+    return (
+        <span
+            aria-hidden="true"
+            className={cn('absolute size-2 rounded-full bg-destructive ring-2 ring-card', className)}
+        />
+    );
+}
+
 /**
  * viewport-fit=cover, solange die Anwendung offen ist: erst damit meldet das
  * iPhone seine sicheren Raender, und die Tab-Leiste rueckt ueber den
@@ -59,6 +71,7 @@ export function AppShell({children, actions}: AppShellProps) {
     const navigate = useNavigate();
     const location = useLocation();
     const [mehrOffen, setMehrOffen] = useState(false);
+    const dfbAbgelehntSeit = useDfbLoginStatus();
     useSichereRaender();
 
     useEffect(() => {
@@ -109,7 +122,12 @@ export function AppShell({children, actions}: AppShellProps) {
                                     isActive && 'bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary'
                                 )}
                             >
-                                <item.icon className="size-4"/>
+                                <span className="relative">
+                                    <item.icon className="size-4"/>
+                                    {dfbAbgelehntSeit && item.path === '/settings' && (
+                                        <Warnpunkt className="-top-1 -right-1"/>
+                                    )}
+                                </span>
                                 <span className="hidden xl:inline">{item.label}</span>
                             </Button>
                         );
@@ -132,6 +150,7 @@ export function AppShell({children, actions}: AppShellProps) {
             </header>
 
             <main className="app-rahmen app-unten mx-auto w-full max-w-[96rem] flex-1 pt-6 sm:pt-8">
+                {dfbAbgelehntSeit && <DfbLoginHinweis abgelehntSeit={dfbAbgelehntSeit}/>}
                 {children}
             </main>
 
@@ -164,7 +183,12 @@ export function AppShell({children, actions}: AppShellProps) {
                                             isActive && 'bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary'
                                         )}
                                     >
-                                        <item.icon className="size-4"/>
+                                        <span className="relative">
+                                            <item.icon className="size-4"/>
+                                            {dfbAbgelehntSeit && item.path === '/settings' && (
+                                                <Warnpunkt className="-top-1 -right-1"/>
+                                            )}
+                                        </span>
                                         {item.label}
                                     </Button>
                                 );
@@ -225,7 +249,10 @@ export function AppShell({children, actions}: AppShellProps) {
                             mehrOffen || aufMehrSeite ? 'text-primary' : 'text-muted-foreground'
                         )}
                     >
-                        <Ellipsis className="size-5"/>
+                        <span className="relative">
+                            <Ellipsis className="size-5"/>
+                            {dfbAbgelehntSeit && <Warnpunkt className="-top-0.5 -right-1"/>}
+                        </span>
                         Mehr
                     </button>
                 </div>

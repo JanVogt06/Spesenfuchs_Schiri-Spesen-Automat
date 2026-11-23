@@ -1,5 +1,6 @@
 import {useState, useEffect, useCallback, useRef} from 'react';
 import {api} from '@/lib/api';
+import {meldeDfbStatusGeaendert} from '@/lib/auth';
 
 export interface ScrapeProgress {
     current: number;
@@ -52,6 +53,8 @@ export function useScrapeRun(onFinished?: () => void) {
             const laeuft = RUNNING_STATUS.includes(aktuell.status);
             if (warRunning.current && !laeuft) {
                 onFinishedRef.current?.();
+                // Der Lauf hat die Zugangsdaten geprueft - angenommen oder abgelehnt
+                meldeDfbStatusGeaendert();
             }
             warRunning.current = laeuft;
 
