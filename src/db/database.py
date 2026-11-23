@@ -93,7 +93,14 @@ def get_user_by_email(email: str) -> Optional[Dict]:
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT * FROM users WHERE email = ?", (email,))
+    # Gross-/Kleinschreibung zaehlt bei E-Mail-Adressen praktisch nie. Aeltere
+    # Datenbanken koennen dieselbe Adresse noch in zwei Schreibweisen
+    # enthalten; dann gewinnt die exakt passende, sonst die aelteste.
+    cursor.execute("""
+        SELECT * FROM users WHERE email = ? COLLATE NOCASE
+        ORDER BY (email = ?) DESC, id
+        LIMIT 1
+    """, (email.strip(), email.strip()))
     user = cursor.fetchone()
 
     conn.close()

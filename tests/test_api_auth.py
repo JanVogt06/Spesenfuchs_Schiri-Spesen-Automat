@@ -57,19 +57,10 @@ class TestRegistrierung:
         assert antwort.status_code == 409
         assert fehlerbild(antwort)["code"] == "CONFLICT"
 
-    @pytest.mark.xfail(strict=True, reason=(
-        "E-Mail-Adressen werden nicht case-insensitiv verglichen: dieselbe Adresse "
-        "in anderer Schreibweise legt ein zweites Konto an (users.email ohne NOCASE, "
-        "get_user_by_email vergleicht exakt)"
-    ))
     def test_doppelte_adresse_in_anderer_schreibweise_409(self, client, user):
         antwort = _registrieren(client, email=user["email"].upper())
         assert antwort.status_code == 409
 
-    @pytest.mark.xfail(strict=True, reason=(
-        "Register prueft die Passwortlaenge nicht serverseitig: RegisterForm.tsx und "
-        "change-password verlangen mindestens 8 Zeichen, /api/auth/register nimmt auch '' an"
-    ))
     @pytest.mark.parametrize("passwort", ["", "kurz", "1234567"])
     def test_zu_kurzes_passwort_abgelehnt(self, client, db, passwort):
         from db.database import get_user_by_email

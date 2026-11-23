@@ -42,6 +42,10 @@ logger = setup_logger("auth")
 
 router = APIRouter(prefix="/api/auth", tags=["authentication"])
 
+# Gilt fuer Registrierung und Passwortwechsel gleichermassen. Das Frontend
+# prueft dasselbe, aber wer die API direkt aufruft, umginge es sonst.
+MIN_PASSWORT_LAENGE = 8
+
 
 # ===== Request/Response Models =====
 
@@ -141,24 +145,24 @@ async def register(request: RegisterRequest):
     - Erstellt User in DB
     - Gibt JWT Token zurueck
     """
-    # Pruefe ob Email schon existiert
-    existing_user = get_user_by_email(request.email)
-    if existing_user:
+    if len(request.password) < MIN_PASSWORT_LAENGE:
+        raise ValidationError(f"Passwort muss mindestens {MIN_PASSWORT_LAENGE} Zeichen lang sein")
+
+    # Klein geschrieben gespeichert; get_user_by_email vergleicht ohnehin
+    # ohne Ruecksicht auf Gross-/Kleinschreibung.
+    email = request.email.strip().lower()
+
+    if get_user_by_email(email):
         raise ConflictError("Email bereits registriert")
 
-    # Hash Passwort
     password_hash = hash_password(request.password)
-
-    # Erstelle User
-    user_id = create_user(request.email, password_hash)
-
-    # Erstelle Token
+    user_id = create_user(email, password_hash)
     token = create_access_token(user_id)
 
     return AuthResponse(
         access_token=token,
         user_id=user_id,
-        email=request.email
+        email=email
     )
 
 
@@ -326,8 +330,8 @@ async def change_password(
         raise ValidationError("Aktuelles Passwort ist falsch")
 
     # Validiere neues Passwort
-    if len(request.new_password) < 8:
-        raise ValidationError("Neues Passwort muss mindestens 8 Zeichen lang sein")
+    if len(request.new_password) < MIN_PASSWORT_LAENGE:
+        raise ValidationError(f"Neues Passwort muss mindestens {MIN_PASSWORT_LAENGE} Zeichen lang sein")
 
     if request.current_password == request.new_password:
         raise ValidationError("Neues Passwort muss sich vom aktuellen unterscheiden")
