@@ -1081,6 +1081,27 @@ def _migration_020_spielbericht_log(conn: sqlite3.Connection) -> None:
     """)
 
 
+def _migration_021_login_sperren(conn: sqlite3.Connection) -> None:
+    """
+    Zaehlt fehlgeschlagene Logins je E-Mail-Adresse, damit nach fuenf
+    Fehlversuchen eine Sperre greift.
+
+    Bewusst nach Adresse und nicht nach IP: die Instanz steht hinter einem
+    Cloudflare Tunnel, alle Anfragen kommen dort von derselben Adresse - eine
+    IP-Sperre wuerde jeden aussperren. Auch Adressen ohne Konto werden
+    gezaehlt, sonst verriete die Sperre, welche Adressen registriert sind.
+    Kein Fremdschluessel auf users aus demselben Grund.
+    """
+    _run_script(conn, """
+        CREATE TABLE login_sperren (
+            email TEXT PRIMARY KEY,
+            fehlversuche INTEGER NOT NULL DEFAULT 0,
+            letzter_fehlversuch TEXT NOT NULL,
+            gesperrt_bis TEXT
+        );
+    """)
+
+
 # (Version, Beschreibung, Funktion) - aufsteigend, Luecken sind nicht erlaubt.
 MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "baseline schema", _migration_001_baseline),
@@ -1103,6 +1124,7 @@ MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (18, "nofv rates for regionalliga and oberliga league matches", _migration_018_nofv_saetze),
     (19, "match reports with events, expenses and documents", _migration_019_spielberichte),
     (20, "log how match reports and their documents are opened", _migration_020_spielbericht_log),
+    (21, "lock the login after repeated failed attempts", _migration_021_login_sperren),
 ]
 
 

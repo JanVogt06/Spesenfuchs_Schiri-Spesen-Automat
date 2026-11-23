@@ -1,6 +1,9 @@
 """
 Authentication Endpoints - Register und Login mit JWT + DFB-Credentials
 """
+import math
+from datetime import datetime, UTC
+
 from fastapi import APIRouter, Depends, Header
 from pydantic import BaseModel, EmailStr
 from typing import Optional
@@ -14,6 +17,13 @@ from db.database import (
     update_user_password,
     log_login
 )
+from db.login_sperren import (
+    MAX_FEHLVERSUCHE,
+    SPERRDAUER_MINUTEN,
+    gesperrt_bis,
+    fehlversuch_merken,
+    fehlversuche_loeschen,
+)
 from db.stammdaten import delete_stammdaten
 from db.season import delete_saisons
 from db.beobachtungen import delete_beobachtungen
@@ -23,8 +33,12 @@ from core.encryption import encrypt_credential, decrypt_credential
 from core.errors import (
     AuthenticationError,
     ConflictError,
+    LoginGesperrtError,
     ValidationError
 )
+from utils.logger import setup_logger
+
+logger = setup_logger("auth")
 
 router = APIRouter(prefix="/api/auth", tags=["authentication"])
 
@@ -151,19 +165,35 @@ async def login(request: LoginRequest):
     """
     Login mit Email und Passwort, gibt Token zurueck.
 
-    - Findet User in DB
-    - Prueft Passwort
-    - Gibt JWT Token zurueck
+    Nach MAX_FEHLVERSUCHE falschen Passwoertern hintereinander ist die
+    Adresse SPERRDAUER_MINUTEN lang gesperrt - auch fuer das richtige
+    Passwort, sonst liesse sich waehrend der Sperre weiter raten.
     """
-    # Finde User
+    if bis := gesperrt_bis(request.email):
+        minuten = math.ceil((bis - datetime.now(UTC)).total_seconds() / 60)
+        raise LoginGesperrtError(max(minuten, 1))
+
     user = get_user_by_email(request.email)
 
-    if not user:
+    # Unbekannte Adresse und falsches Passwort zaehlen gleich, damit weder
+    # Meldung noch Sperre verraten, ob es ein Konto gibt.
+    if not user or not verify_password(request.password, user['password_hash']):
+        verbleibend = fehlversuch_merken(request.email)
+
+        if verbleibend == 0:
+            logger.warning(f"Login nach {MAX_FEHLVERSUCHE} Fehlversuchen gesperrt")
+            raise LoginGesperrtError(SPERRDAUER_MINUTEN)
+
+        if verbleibend <= 2:
+            versuche = "Versuch" if verbleibend == 1 else "Versuche"
+            raise AuthenticationError(
+                f"Falsche Email oder Passwort. Noch {verbleibend} {versuche}, "
+                f"danach ist der Login {SPERRDAUER_MINUTEN} Minuten gesperrt."
+            )
+
         raise AuthenticationError("Falsche Email oder Passwort")
 
-    # Pruefe Passwort
-    if not verify_password(request.password, user['password_hash']):
-        raise AuthenticationError("Falsche Email oder Passwort")
+    fehlversuche_loeschen(request.email)
 
     # Erstelle Token
     token = create_access_token(user['id'])

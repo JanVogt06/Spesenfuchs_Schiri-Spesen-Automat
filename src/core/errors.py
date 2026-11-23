@@ -106,6 +106,18 @@ class ConflictError(APIError):
         )
 
 
+class LoginGesperrtError(APIError):
+    """429 - Zu viele falsche Passwoerter hintereinander"""
+
+    def __init__(self, minuten: int):
+        einheit = "Minute" if minuten == 1 else "Minuten"
+        super().__init__(
+            status_code=429,
+            error_code="LOGIN_LOCKED",
+            message=f"Zu viele Fehlversuche. Der Login ist für {minuten} {einheit} gesperrt.",
+        )
+
+
 class ServerError(APIError):
     """500 - Interner Server-Fehler"""
 
