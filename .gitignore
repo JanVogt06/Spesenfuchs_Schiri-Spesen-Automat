@@ -51,3 +51,6 @@ playwright/.auth/
 # Temporary files
 *.tmp
 .cache/
+# Tests
+.coverage
+.pytest_cache/
