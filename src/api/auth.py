@@ -319,9 +319,11 @@ async def change_password(
     if not user:
         raise AuthenticationError("User nicht gefunden")
 
-    # Prüfe aktuelles Passwort
+    # Prüfe aktuelles Passwort. Bewusst kein 401: das Frontend wertet jeden
+    # 401 ausserhalb des Logins als abgelaufene Sitzung und meldet ab - wer
+    # sich hier vertippt, stuende sonst unvermittelt auf der Login-Seite.
     if not verify_password(request.current_password, user['password_hash']):
-        raise AuthenticationError("Aktuelles Passwort ist falsch")
+        raise ValidationError("Aktuelles Passwort ist falsch")
 
     # Validiere neues Passwort
     if len(request.new_password) < 8:
