@@ -193,10 +193,8 @@ describe('DashboardPage - Kennzahlen', () => {
         expect(zusatz).toBe('9 Karten, davon 2 Platzverweise');
     });
 
-    // BUG: Der Kartenschnitt steht mit Dezimalpunkt da ("2.3"), weil
-    // Dashboard.tsx:166 toFixed(1) statt einer deutschen Zahlformatierung nimmt.
-    // Ueberall sonst (Beobachtungen, Euro, Marketing-Bild "1,6") steht ein Komma.
-    it.fails('schreibt den Kartenschnitt mit deutschem Komma', async () => {
+    // Wie ueberall in der App mit deutschem Komma, nicht "2.3"
+    it('schreibt den Kartenschnitt mit deutschem Komma', async () => {
         zeige();
         await geladen();
 

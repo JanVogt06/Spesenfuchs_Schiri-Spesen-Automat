@@ -163,7 +163,7 @@ export function DashboardPage() {
                         <Kennzahl
                             icon={SquareStack}
                             label="Kartenschnitt"
-                            wert={kartenSchnitt ? kartenSchnitt.schnitt.toFixed(1) : '–'}
+                            wert={kartenSchnitt ? kartenSchnitt.schnitt.toLocaleString('de-DE', {minimumFractionDigits: 1, maximumFractionDigits: 1}) : '–'}
                             zusatz={kartenSchnitt
                                 ? `${kartenSchnitt.summe} Karten, davon ${kartenSchnitt.rot} Platzverweise`
                                 : 'pro Spiel, laufende Saison'}
