@@ -111,11 +111,6 @@ class TestFrischeDatenbank:
         database.init_database()
         assert user_version() == _letzte_version()
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="sqlite3.connect legt die Datei schon vor apply_migrations an; "
-               "_backup_database sichert deshalb auch eine frische Installation (v0)",
-    )
     def test_frische_installation_ohne_backup(self, leere_db):
         database.init_database()
         assert _backups(leere_db) == []
@@ -518,11 +513,6 @@ class TestMigration015FremdeVerbaende:
         assert saetze["altmark"] == (None, None)
         assert saetze["tfv_richtig"] == (30.0, 25.0)
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="Migration 015 rechnet jede Zeile neu, nicht nur Spiele fremder Verbaende - "
-               "ein eingefrorener TFV-Punktspielsatz wird ueberschrieben",
-    )
     def test_tfv_punktspiel_bleibt_eingefroren(self, leere_db, monkeypatch):
         saetze = self._seed(monkeypatch)
         assert saetze["tfv_alt_eingefroren"] == (28.0, 22.0)

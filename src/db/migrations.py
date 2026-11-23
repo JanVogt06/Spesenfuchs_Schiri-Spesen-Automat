@@ -805,13 +805,18 @@ def _migration_015_fremde_verbaende(conn: sqlite3.Connection) -> None:
     werden die betroffenen Zeilen nachgezogen - wie in Migration 013 ist ein
     falscher eingefrorener Wert kein schuetzenswerter Stand.
     """
-    from generator.spesen_calculator import calculate_spesen
+    from generator.spesen_calculator import calculate_spesen, _ist_fremder_verband
 
     geaendert = 0
 
     for row in conn.execute(
         "SELECT id, spielklasse, mannschaftsart, staffel, sr_spesen, sra_spesen FROM matches"
     ).fetchall():
+        # Nur Spiele anderer Verbaende. Ein TFV-Spiel behaelt seinen einmal
+        # eingefrorenen Satz, auch wenn die Ordnung inzwischen anders zahlt.
+        if not _ist_fremder_verband(row["staffel"] or ""):
+            continue
+
         sr, sra = calculate_spesen(
             row["spielklasse"] or "", row["mannschaftsart"] or "", row["staffel"] or ""
         )
@@ -1157,6 +1162,11 @@ def _backup_database(conn: sqlite3.Connection, db_path: Path, from_version: int)
     WAL-Inhalt.
     """
     if not db_path.exists():
+        return None
+
+    # sqlite3.connect legt die Datei schon beim Oeffnen an. Eine Datei ohne
+    # ein einziges Schema-Objekt ist deshalb ebenfalls eine frische Installation.
+    if conn.execute("SELECT COUNT(*) FROM sqlite_master").fetchone()[0] == 0:
         return None
 
     stamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
