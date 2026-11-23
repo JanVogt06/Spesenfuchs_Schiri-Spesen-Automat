@@ -327,10 +327,6 @@ class TestFahrtkosten:
         assert blatt["J24"].value == 5
         assert blatt["E32"].value == "dreihundertfünf Euro"
 
-    @pytest.mark.xfail(strict=True, reason=(
-        "0 € OeVM ohne km gilt als erfasst und fuellt 'In Worten', traegt aber "
-        "weder E26 noch J24 ein - die Gesamt-Formel bleibt leer"
-    ))
     def test_null_bahn_ohne_kilometer_fuellt_die_summe(self, generator):
         blatt = _mappe(generator, _spiel(), {"sr_oevm": 0})["SR"]
         assert blatt["E32"].value == "dreihundert Euro"

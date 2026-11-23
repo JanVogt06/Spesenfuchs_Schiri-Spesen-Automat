@@ -272,8 +272,13 @@ class NofvGenerator:
             blatt[ZELLE_KM] = km
         if oevm:
             blatt[ZELLE_BAHN] = oevm
-        if km is not None and not km and not oevm:
-            blatt[ZELLE_KM] = 0
+        # Sonst bliebe die Gesamt-Formel leer, waehrend "In Worten" schon
+        # einen Betrag nennt. Die 0 landet in dem Feld, das erfasst wurde.
+        if not km and not oevm:
+            if km is not None:
+                blatt[ZELLE_KM] = 0
+            elif oevm is not None:
+                blatt[ZELLE_BAHN] = 0
 
         blatt[ZELLE_KM_SATZ] = km_satz
         blatt[ZELLE_PKW] = FORMEL_PKW
