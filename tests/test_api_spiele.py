@@ -629,6 +629,8 @@ class TestSammelDownload:
         namen = _eintraege(_sammel(client, auth_header, drei_spiele, "pdf"))
         assert len(namen) == 3
         assert all(n.endswith(".pdf") for n in namen)
+        # Das Protokoll nennt dieselbe Datei wie beim Einzel-Download
+        assert all(eintrag["filename"].endswith(".pdf") for eintrag in _downloads())
 
     def test_zip_name_und_header(self, client, user, auth_header, drei_spiele):
         antwort = _sammel(client, auth_header, drei_spiele, "docx")

@@ -809,7 +809,9 @@ async def download_matches_as_zip(
     zip_name = f"Spesen_{datetime.now().strftime('%Y-%m-%d')}.zip"
 
     for match, (filename, _) in zip(matches, documents):
-        log_download(user_id, filename, request.file_format, match_id=match['id'])
+        # Wie beim Einzel-Download: wer nur PDFs holt, hat die PDF bekommen
+        name = _pdf_name(filename) if request.file_format == "pdf" else filename
+        log_download(user_id, name, request.file_format, match_id=match['id'])
 
     return Response(
         content=buffer.getvalue(),
