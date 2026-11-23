@@ -31,7 +31,7 @@ import {ADRESSE, Beitrag, Etikett, Folie, Kachel, Leucht, STORY, Titel} from './
  * gedacht fuer &f=story (9:16), ohne den Parameter entsteht dasselbe in 3:4.
  *
  * Die Ausschnitte sind nachgebaut, die Daten ausgedacht - wie auf der
- * Landingpage. Die Noten folgen der Punkteskala der Schiri-Beobachtung.
+ * Landingpage. Die Noten folgen den Skalen der Schiri-Beobachtung: als SR um 240 Punkte, als Assistent um 60.
  */
 
 const ANZAHL = 5;
@@ -47,11 +47,11 @@ function Karte({className = '', children}: { className?: string; children: React
 
 const SCHNITTE = [
     {label: 'Schiedsrichter', schnitt: '243,50', anzahl: '4 Beobachtungen'},
-    {label: 'Assistent', schnitt: '245,00', anzahl: '2 Beobachtungen'},
+    {label: 'Assistent', schnitt: '61,50', anzahl: '2 Beobachtungen'},
 ];
 
 const KLASSEN = [
-    {klasse: 'Thüringenliga', sr: '242,00', srAnzahl: 2, sra: '245,00', sraAnzahl: 2},
+    {klasse: 'Thüringenliga', sr: '242,00', srAnzahl: 2, sra: '61,50', sraAnzahl: 2},
     {klasse: 'Landesklasse', sr: '245,00', srAnzahl: 2, sra: null, sraAnzahl: 0},
 ];
 
