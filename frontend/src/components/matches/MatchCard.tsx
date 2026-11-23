@@ -7,7 +7,9 @@ import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {MatchMap} from '@/components/matches/MatchMap';
 import {cn} from '@/lib/utils';
-import {Calendar, ChevronDown, ChevronUp, Download, Users, MapPin, Map, Euro, Car, Check, Loader2, Info} from 'lucide-react';
+import {Link} from 'react-router-dom';
+import {formatEuro as formatDfbEuro} from '@/lib/spielberichte';
+import {Calendar, ChevronDown, ChevronUp, Download, Users, MapPin, Map, Euro, Car, Check, Loader2, Info, FileText, Paperclip} from 'lucide-react';
 
 /** "12,5" oder "12.5" -> 12.5; leer -> null; ungültig -> undefined */
 function parseGermanNumber(value: string): number | null | undefined {
@@ -333,6 +335,33 @@ export function MatchCard({
         );
     };
 
+    // Was DFBnet im Spielbericht an Kosten fuehrt - nur die Summen des ganzen
+    // Gespanns. Reine Anzeige: welcher Anteil die eigenen Fahrtkosten waren,
+    // laesst sich daraus nicht ablesen, also wird nichts uebernommen.
+    const renderDfbKosten = () => {
+        const bericht = match._spielbericht;
+        if (!bericht || (bericht.fahrtkosten === null && bericht.spesen === null)) return null;
+
+        return (
+            <div className="space-y-2">
+                <h4 className={sectionHeaderClass}>
+                    <FileText className="size-3.5"/>
+                    Laut DFBnet-Spielbericht (ganzes Gespann)
+                </h4>
+                <div className="grid gap-1.5 rounded-lg border border-dashed p-3 text-sm">
+                    <div className={fieldRowClass}>
+                        <span className="text-muted-foreground">Fahrtkosten</span>
+                        <span className="font-mono font-medium">{formatDfbEuro(bericht.fahrtkosten)}</span>
+                    </div>
+                    <div className={fieldRowClass}>
+                        <span className="text-muted-foreground">SR-/SRA-Spesen</span>
+                        <span className="font-mono font-medium">{formatDfbEuro(bericht.spesen)}</span>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     const renderExpenses = () => {
         // Nur Rollen anzeigen, die tatsächlich angesetzt sind (SR immer)
         const rows = [
@@ -583,6 +612,20 @@ export function MatchCard({
                                 </span>
                             )}
                             {renderHeaderSpesen()}
+                            {match._spielbericht && (
+                                <Link
+                                    to={`/spielbericht/${match._spielbericht.id}`}
+                                    className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary hover:bg-primary/15"
+                                >
+                                    <FileText className="size-3"/>
+                                    Spielbericht
+                                    {match._spielbericht.dokumente > 0 && (
+                                        <span className="inline-flex items-center gap-0.5 opacity-80">
+                                            <Paperclip className="size-3"/>{match._spielbericht.dokumente}
+                                        </span>
+                                    )}
+                                </Link>
+                            )}
                         </div>
                         <p className="flex items-center gap-1.5 break-words text-xs text-muted-foreground sm:text-sm">
                             <Calendar className="size-3.5 shrink-0"/>
@@ -635,6 +678,7 @@ export function MatchCard({
                         {renderSpielInfo()}
                         {renderSpesen()}
                         {renderExpenses()}
+                        {renderDfbKosten()}
                         {renderSchiedsrichter()}
                         {renderSpielstaette()}
                     </CardContent>

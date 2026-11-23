@@ -7,6 +7,7 @@ import {DashboardPage} from './pages/Dashboard';
 import {SettingsPage} from './pages/Settings';
 import {SpesenPage} from './pages/Spesen';
 import {SaisonPage} from './pages/Saison';
+import {SpielberichtPage} from './pages/Spielbericht';
 import {BeobachtungenPage} from './pages/Beobachtungen';
 import {StammdatenPage} from './pages/Stammdaten';
 import {LigenPage} from './pages/Ligen';
@@ -71,6 +72,15 @@ function App() {
                     element={
                         <ProtectedRoute>
                             <SaisonPage/>
+                        </ProtectedRoute>
+                    }
+                />
+
+                <Route
+                    path="/spielbericht/:id"
+                    element={
+                        <ProtectedRoute>
+                            <SpielberichtPage/>
                         </ProtectedRoute>
                     }
                 />

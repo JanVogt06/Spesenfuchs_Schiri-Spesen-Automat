@@ -1,7 +1,8 @@
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import {Separator} from '@/components/ui/separator';
 import {Badge} from '@/components/ui/badge';
-import {Calendar} from 'lucide-react';
+import {Link} from 'react-router-dom';
+import {Calendar, FileText, Paperclip} from 'lucide-react';
 import {formatKarte, summeKarten, type SaisonSpiel} from '@/lib/saison';
 
 interface SaisonSpieleProps {
@@ -16,6 +17,27 @@ function formatDatum(iso: string): string {
 
 function gespannText(spiel: SaisonSpiel): string {
     return spiel.gespann.map((p) => `${p.rolle} ${p.name}`).join(' · ');
+}
+
+/** Link auf den Spielbericht - mit Büroklammer, wenn Dokumente dranhängen */
+function BerichtLink({spiel, mitText}: {spiel: SaisonSpiel; mitText?: boolean}) {
+    if (!spiel.spielbericht) return null;
+    const {id, dokumente} = spiel.spielbericht;
+    return (
+        <Link
+            to={`/spielbericht/${id}`}
+            title={dokumente ? `Spielbericht · ${dokumente} Dokument(e)` : 'Spielbericht'}
+            className="inline-flex items-center gap-1 rounded-md text-xs font-medium text-primary hover:underline"
+        >
+            <FileText className="size-3.5"/>
+            {mitText && 'Spielbericht'}
+            {dokumente > 0 && (
+                <span className="inline-flex items-center gap-0.5 text-muted-foreground">
+                    <Paperclip className="size-3"/>{dokumente}
+                </span>
+            )}
+        </Link>
+    );
 }
 
 /**
@@ -81,6 +103,7 @@ export function SaisonSpiele({spiele}: SaisonSpieleProps) {
                                 <th className="border-l px-1.5 pt-2 text-center font-medium" colSpan={3}>Heim</th>
                                 <th className="border-l px-1.5 pt-2 text-center font-medium" colSpan={3}>Gast</th>
                                 <th className="border-l px-4 pt-2 text-left font-medium sm:px-6" rowSpan={2}>Gespann</th>
+                                <th className="px-3 pt-2 text-left font-medium" rowSpan={2}>Bericht</th>
                             </tr>
                             <tr className="border-b text-xs text-muted-foreground">
                                 {KARTEN.map((karte, i) => (
@@ -129,6 +152,9 @@ export function SaisonSpiele({spiele}: SaisonSpieleProps) {
                                             ))}
                                         </div>
                                     </td>
+                                    <td className="px-3 py-2 whitespace-nowrap">
+                                        <BerichtLink spiel={spiel}/>
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
@@ -145,6 +171,7 @@ export function SaisonSpiele({spiele}: SaisonSpieleProps) {
                                     </td>
                                 ))}
                                 <td className="border-l"/>
+                                <td/>
                             </tr>
                         </tfoot>
                     </table>
@@ -183,6 +210,12 @@ export function SaisonSpiele({spiele}: SaisonSpieleProps) {
                             <p className="mt-1.5 text-xs break-words text-muted-foreground">
                                 {gespannText(spiel)}
                             </p>
+                        )}
+
+                        {spiel.spielbericht && (
+                            <div className="mt-2">
+                                <BerichtLink spiel={spiel} mitText/>
+                            </div>
                         )}
                     </div>
                 ))}

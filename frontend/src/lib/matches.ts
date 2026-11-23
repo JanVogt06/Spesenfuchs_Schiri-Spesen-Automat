@@ -1,4 +1,5 @@
 import {api} from './api';
+import type {SpielberichtKurz} from './spielberichte';
 
 // Match Data Types - basierend auf tatsächlicher DFBnet-Struktur
 export interface SpielInfo {
@@ -52,6 +53,8 @@ export interface MatchData {
     _expenses?: MatchExpenses | null;
     /** Gesetzt, wenn eine künftige Ansetzung nicht mehr in DFBnet steht */
     _missing_since?: string | null;
+    /** Der Spielbericht aus DFBnet, sobald das Spiel vorbei und der Bericht gelesen ist */
+    _spielbericht?: SpielberichtKurz | null;
 }
 
 export interface SaveExpensesResult {
@@ -166,7 +169,7 @@ export async function extractApiError(error: unknown, fallback: string): Promise
     }
 }
 
-function triggerBrowserDownload(blob: Blob, filename: string): void {
+export function triggerBrowserDownload(blob: Blob, filename: string): void {
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;

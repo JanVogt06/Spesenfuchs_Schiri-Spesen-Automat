@@ -1,4 +1,5 @@
 import {api} from './api';
+import type {SpielberichtKurz} from './spielberichte';
 
 /** Eine Person im Gespann eines geleiteten Spiels */
 export interface SaisonGespann {
@@ -26,6 +27,8 @@ export interface SaisonSpiel {
     gast_rot: number | null;
     eigene_rolle: string;
     gespann: SaisonGespann[];
+    /** Der zugeordnete Spielbericht aus DFBnet, falls schon gelesen */
+    spielbericht?: SpielberichtKurz | null;
 }
 
 /** Eine Zeile der Einsatzbilanz (SR, SRA 1, ..., Summe) */
