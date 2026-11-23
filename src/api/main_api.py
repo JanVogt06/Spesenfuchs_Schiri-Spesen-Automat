@@ -39,6 +39,7 @@ from utils.logger import setup_logger
 from utils.match_utils import generate_filename_from_match
 from utils.pdf_converter import convert_docx_bytes_to_pdf
 from generator.docx_generator import SpesenGenerator
+from generator.nofv_generator import NofvGenerator
 from db.ligen import alle_staffeln, bestand, tabelle
 from utils.mailer import empfaenger, ist_konfiguriert, sende_bug_report
 from generator.spesen_calculator import (
@@ -47,6 +48,7 @@ from generator.spesen_calculator import (
     PUNKTSPIEL,
     calculate_spesen,
     format_spesen,
+    ist_nofv_spiel,
     wettbewerbsart,
 )
 from db.scrape_runs import (
@@ -157,6 +159,11 @@ async def serve_favicon():
 # Zustand und braucht kein Ausgabeverzeichnis - er liefert Bytes.
 TEMPLATE_PATH = src_path / "data" / "Spesenabrechnung_Vorlage.docx"
 document_generator = SpesenGenerator(TEMPLATE_PATH)
+
+# NOFV-Pflichtspiele haben ein eigenes Formular: eine Excel-Mappe mit einer
+# Quittung je Schiedsrichter, als PDF drei Seiten.
+NOFV_TEMPLATE_PATH = src_path / "data" / "SR-Reisekostenabrechnung_NOFV.xlsx"
+nofv_generator = NofvGenerator(NOFV_TEMPLATE_PATH)
 
 # Jede PDF-Konvertierung startet einen eigenen LibreOffice-Prozess mit 150-300 MB.
 # Ohne Begrenzung legen ein paar gleichzeitige Downloads den Container lahm.
@@ -599,6 +606,20 @@ async def get_match_geo(match_id: int, current_user: dict = Depends(get_current_
 # ===== Download-Endpunkte: Dokumente entstehen bei jedem Abruf neu =====
 
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+# "docx" ist der historische Name fuer "die bearbeitbare Datei" - bei
+# NOFV-Spielen ist das eine Excel-Mappe. Beide Namen meinen dasselbe.
+BEARBEITBARE_FORMATE = ("docx", "xlsx")
+
+
+def _mime_fuer(filename: str) -> str:
+    return XLSX_MIME if filename.endswith(".xlsx") else DOCX_MIME
+
+
+def _pdf_name(filename: str) -> str:
+    """Spesen_A_vs_B.docx / .xlsx -> Spesen_A_vs_B.pdf"""
+    return str(Path(filename).with_suffix(".pdf"))
 
 
 def _content_disposition(filename: str) -> Dict[str, str]:
@@ -631,16 +652,24 @@ def _owned_match(match_id: int, user_id: int) -> dict:
     return match
 
 
-def _render_docx(match: dict) -> tuple:
-    """Rendert ein Spiel zu (Dateiname, DOCX-Bytes)."""
+def _render_dokument(match: dict) -> tuple:
+    """
+    Rendert ein Spiel zu (Dateiname, Bytes) - DOCX fuer das TFV-Formular,
+    XLSX fuer die NOFV-Quittung. Welches, verraet die Endung des Dateinamens.
+    """
     filename = generate_filename_from_match(match)
-    content = document_generator.render_document(match, expenses=match.get('expenses'))
+
+    if ist_nofv_spiel(match.get('spiel_info', {})):
+        content = nofv_generator.render_workbook(match, expenses=match.get('expenses'))
+    else:
+        content = document_generator.render_document(match, expenses=match.get('expenses'))
+
     return filename, content
 
 
 async def _render_pdfs(documents: List[tuple]) -> List[Optional[bytes]]:
     """
-    Konvertiert gerenderte DOCX zu PDF.
+    Konvertiert gerenderte DOCX/XLSX zu PDF.
 
     Zwei Dinge sind hier wesentlich: die Konvertierung laeuft in einem Thread,
     weil sie sekundenlang blockiert und sonst den kompletten Event-Loop
@@ -661,30 +690,30 @@ async def download_match_document(
     Erzeugt die Abrechnung eines Spiels und liefert sie aus - ohne dass
     jemals eine Datei auf der Platte entsteht.
     """
-    if file_format not in ("docx", "pdf"):
-        raise APIError(400, "INVALID_FORMAT", "Format muss docx oder pdf sein")
+    if file_format not in (*BEARBEITBARE_FORMATE, "pdf"):
+        raise APIError(400, "INVALID_FORMAT", "Format muss docx, xlsx oder pdf sein")
 
     user_id = current_user['id']
     match = _owned_match(match_id, user_id)
 
-    filename, docx_bytes = await run_in_threadpool(_render_docx, match)
+    filename, content = await run_in_threadpool(_render_dokument, match)
 
-    if file_format == "docx":
-        log_download(user_id, filename, "docx", match_id=match_id)
+    if file_format in BEARBEITBARE_FORMATE:
+        log_download(user_id, filename, Path(filename).suffix.lstrip("."), match_id=match_id)
         return Response(
-            content=docx_bytes,
-            media_type=DOCX_MIME,
+            content=content,
+            media_type=_mime_fuer(filename),
             headers=_content_disposition(filename),
         )
 
-    pdf_bytes = (await _render_pdfs([(filename, docx_bytes)]))[0]
+    pdf_bytes = (await _render_pdfs([(filename, content)]))[0]
 
     if not pdf_bytes:
         raise APIError(503, "PDF_CONVERSION_FAILED",
                        "Die PDF-Erzeugung ist fehlgeschlagen. Bitte erneut versuchen "
-                       "oder das Word-Dokument herunterladen.")
+                       "oder das bearbeitbare Dokument herunterladen.")
 
-    pdf_filename = filename.replace(".docx", ".pdf")
+    pdf_filename = _pdf_name(filename)
     log_download(user_id, pdf_filename, "pdf", match_id=match_id)
 
     return Response(
@@ -723,7 +752,7 @@ async def download_matches_as_zip(
     user_id = current_user['id']
     matches = [_owned_match(match_id, user_id) for match_id in request.match_ids]
 
-    documents = await run_in_threadpool(lambda: [_render_docx(m) for m in matches])
+    documents = await run_in_threadpool(lambda: [_render_dokument(m) for m in matches])
 
     pdfs: List[Optional[bytes]] = [None] * len(documents)
     if request.file_format in ("pdf", "both"):
@@ -736,8 +765,8 @@ async def download_matches_as_zip(
         if fehlend:
             raise APIError(503, "PDF_CONVERSION_FAILED",
                            f"Für {fehlend} von {len(documents)} Spielen konnte keine PDF "
-                           "erzeugt werden. Bitte erneut versuchen oder die Word-Dokumente "
-                           "herunterladen.")
+                           "erzeugt werden. Bitte erneut versuchen oder die bearbeitbaren "
+                           "Dokumente herunterladen.")
 
     buffer = BytesIO()
     # Gleiche Dateinamen sind moeglich (zwei Turniere am selben Tag), deshalb
@@ -761,7 +790,7 @@ async def download_matches_as_zip(
                 archive.writestr(basis, content)
 
             if pdf_bytes:
-                archive.writestr(basis.replace(".docx", ".pdf"), pdf_bytes)
+                archive.writestr(_pdf_name(basis), pdf_bytes)
 
     zip_name = f"Spesen_{datetime.now().strftime('%Y-%m-%d')}.zip"
 

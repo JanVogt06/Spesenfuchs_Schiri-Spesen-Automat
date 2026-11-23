@@ -28,7 +28,8 @@ LABEL org.opencontainers.image.title="Spesenfuchs" \
 
 WORKDIR /app
 
-# System-Dependencies für Playwright + LibreOffice (DOCX->PDF Konvertierung)
+# System-Dependencies für Playwright + LibreOffice (DOCX/XLSX->PDF Konvertierung).
+# Carlito ist metrisch gleich zu Calibri, der Schrift der NOFV-Vorlage.
 RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
@@ -53,6 +54,8 @@ RUN apt-get update && apt-get install -y \
     libxrandr2 \
     xdg-utils \
     libreoffice-writer \
+    libreoffice-calc \
+    fonts-crosextra-carlito \
     && rm -rf /var/lib/apt/lists/*
 
 # Python Dependencies installieren

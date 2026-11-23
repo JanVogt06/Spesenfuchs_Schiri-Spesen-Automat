@@ -9,6 +9,8 @@ Diese Funktionen werden von mehreren Modulen verwendet:
 import re
 from typing import Tuple
 
+from generator.spesen_calculator import ist_nofv_spiel
+
 
 def generate_filename_from_match(match: dict) -> str:
     """
@@ -21,7 +23,9 @@ def generate_filename_from_match(match: dict) -> str:
         match: Match-Dictionary mit spiel_info
 
     Returns:
-        Dateiname im Format: Spesen_{heim}_vs_{gast}_{datum}.docx
+        Dateiname im Format: Spesen_{heim}_vs_{gast}_{datum}.docx - bei
+        NOFV-Pflichtspielen mit .xlsx, denn deren Quittung ist eine Excel-Mappe
+        mit einem Blatt je Schiedsrichter.
 
     Example:
         >>> match = {'spiel_info': {'heim_team': 'FC Bayern', 'gast_team': 'BVB', 'anpfiff': 'Samstag · 08.11.2025 · 13:00 Uhr'}}
@@ -48,12 +52,14 @@ def generate_filename_from_match(match: dict) -> str:
     # Turnier-Ansetzungen haben keine Teams. Ohne die Anstosszeit hiessen alle
     # Turniere eines Tages gleich - im Sammel-ZIP landeten dann zwei Eintraege
     # unter demselben Namen.
+    endung = "xlsx" if ist_nofv_spiel(spiel_info) else "docx"
+
     if not heim.strip() or not gast.strip():
         _, uhrzeit = parse_anpfiff(anpfiff)
         zeit_clean = uhrzeit.replace(':', '-') if uhrzeit else 'ohne-Zeit'
-        return f"Spesen_Turnier_{datum_clean}_{zeit_clean}.docx"
+        return f"Spesen_Turnier_{datum_clean}_{zeit_clean}.{endung}"
 
-    return f"Spesen_{heim_clean}_vs_{gast_clean}_{datum_clean}.docx"
+    return f"Spesen_{heim_clean}_vs_{gast_clean}_{datum_clean}.{endung}"
 
 
 def parse_anpfiff(anpfiff_str: str) -> Tuple[str, str]:

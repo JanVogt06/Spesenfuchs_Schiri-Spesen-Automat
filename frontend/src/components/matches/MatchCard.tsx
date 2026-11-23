@@ -598,7 +598,9 @@ export function MatchCard({
                             className="whitespace-nowrap"
                         >
                             <Download className="size-3.5"/>
-                            {laufendeFormate.includes('docx') ? 'Lade...' : 'DOCX'}
+                            {laufendeFormate.includes('docx')
+                                ? 'Lade...'
+                                : match._filename?.endsWith('.xlsx') ? 'XLSX' : 'DOCX'}
                         </Button>
                         <Button
                             onClick={() => onDownload('pdf')}

@@ -21,8 +21,9 @@ export function MatchList({matches, onReload}: MatchListProps) {
     const [bulkError, setBulkError] = useState('');
 
     const handleDownload = async (match: MatchData, fileFormat: 'docx' | 'pdf') => {
-        const docxName = match._filename || `spiel_${match._id}.docx`;
-        const filename = fileFormat === 'pdf' ? docxName.replace(/\.docx$/i, '.pdf') : docxName;
+        // 'docx' heißt "die bearbeitbare Datei" - bei NOFV-Spielen eine Excel-Mappe
+        const originalName = match._filename || `spiel_${match._id}.docx`;
+        const filename = fileFormat === 'pdf' ? originalName.replace(/\.(docx|xlsx)$/i, '.pdf') : originalName;
         const key = `${match._id}:${fileFormat}`;
 
         setLaufendeDownloads(prev => [...prev, key]);

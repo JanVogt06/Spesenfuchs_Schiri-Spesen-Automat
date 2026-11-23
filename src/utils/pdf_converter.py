@@ -1,5 +1,7 @@
 """
-PDF-Konvertierung fuer generierte DOCX-Dokumente via LibreOffice headless.
+PDF-Konvertierung fuer generierte DOCX- und XLSX-Dokumente via LibreOffice
+headless. LibreOffice waehlt den Exportfilter nach Dateityp, also koennen
+TFV-Formulare (DOCX) und NOFV-Quittungen (XLSX) im selben Aufruf laufen.
 """
 import shutil
 import subprocess
@@ -55,7 +57,7 @@ def convert_docx_bytes_to_pdf(documents: List[Tuple[str, bytes]]) -> List[Option
     gehoert er in einen Thread, sonst steht der Event-Loop still.
 
     Args:
-        documents: Liste von (Dateiname mit .docx-Endung, DOCX-Bytes)
+        documents: Liste von (Dateiname mit .docx- oder .xlsx-Endung, Bytes)
 
     Returns:
         Liste in derselben Reihenfolge wie die Eingabe; None, wo die

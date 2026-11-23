@@ -18,3 +18,5 @@ playwright
 
 # Document Generation
 python-docx
+openpyxl
+pillow  # damit openpyxl das NOFV-Logo der Excel-Vorlage mitnimmt
