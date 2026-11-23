@@ -421,8 +421,10 @@ async def get_all_user_matches(current_user: dict = Depends(get_current_user)):
     for match in matches:
         _decorate_match(match)
         info = match.get('spiel_info') or {}
-        match['_spielbericht'] = kurzinfo(zuordnung.finde(
-            match.get('datum') or '', info.get('heim_team') or '', info.get('gast_team') or ''
+        # Ein zurueckgezogenes Spiel hat man nicht gepfiffen - es hat keinen Bericht
+        match['_spielbericht'] = None if match.get('missing_since') else kurzinfo(zuordnung.finde(
+            match.get('datum') or '', info.get('heim_team') or '', info.get('gast_team') or '',
+            info.get('anpfiff') or '',
         ))
 
     return matches
@@ -918,7 +920,9 @@ async def get_own_saison(saison: str, current_user: dict = Depends(get_current_u
 
     zuordnung = Zuordnung(get_index(current_user['id']))
     for spiel in daten['spiele']:
-        spiel['spielbericht'] = kurzinfo(zuordnung.finde(spiel['datum'], spiel['heim'], spiel['gast']))
+        spiel['spielbericht'] = kurzinfo(zuordnung.finde(
+            spiel['datum'], spiel['heim'], spiel['gast'], spiel.get('uhrzeit') or ''
+        ))
 
     return daten
 

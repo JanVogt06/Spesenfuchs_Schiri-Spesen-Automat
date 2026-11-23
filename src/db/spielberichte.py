@@ -302,14 +302,52 @@ def get_index(user_id: int) -> List[Dict]:
         conn.close()
 
 
+# Was in den DFBnet-Modulen mal am Mannschaftsnamen steht und mal nicht:
+# Altersklasse ("U19", "U18/U19"), Mannschaftsnummer ("2.", "II", "1") und
+# Rechtsform ("e.V."). Der Spielbericht schreibt "SG Dynamo Dresden", die
+# Saisonliste "SG Dynamo Dresden U19"; "Hertha BSC II" ist "Hertha BSC U23".
+_ZUSATZ = re.compile(r"^(u\d{1,2}|i{1,3}|iv|\d{1,2}|e|v|ev)$")
+
+
+def team_kern(name: str) -> str:
+    """Der Vereinsname ohne Altersklasse, Mannschaftsnummer und Rechtsform."""
+    text = (name or "").replace("\u00ad", "").casefold()
+    woerter = [w for w in re.split(r"[\W_]+", text) if w and not _ZUSATZ.match(w)]
+    return "".join(woerter)
+
+
+def _gleiches_team(a: str, b: str) -> bool:
+    """
+    Gleicher Kern, oder der eine steckt im anderen ("Arminia Bielefeld" in
+    "DSC Arminia Bielefeld"). Zu kurze Kerne zaehlen nicht - sonst passte
+    "SV" auf jeden Sportverein.
+    """
+    ka, kb = team_kern(a), team_kern(b)
+    if not ka or not kb:
+        return False
+    if ka == kb:
+        return True
+    kurz, lang = sorted((ka, kb), key=len)
+    return len(kurz) >= 8 and kurz in lang
+
+
+def uhrzeit_aus(text: str) -> str:
+    """'So., 22.11.2026 13:30' / '13:30' -> '13:30', sonst ''."""
+    treffer = re.search(r"(\d{1,2}):(\d{2})", text or "")
+    return f"{int(treffer.group(1)):02d}:{treffer.group(2)}" if treffer else ""
+
+
 class Zuordnung:
     """
-    Findet zu einem Spiel (Datum, Heim, Gast) den passenden Bericht.
+    Findet zu einem Spiel (Datum, Heim, Gast, Anstoss) den passenden Bericht.
 
-    Die Namen der Mannschaften sind in den DFBnet-Modulen nicht immer gleich
-    geschrieben (weiche Trennstriche, Zusaetze). Es reicht deshalb, wenn am
-    selben Tag eine der beiden Mannschaften passt - oder es an diesem Tag
-    ueberhaupt nur einen Bericht gibt.
+    Die Namen der Mannschaften sind in den DFBnet-Modulen nicht gleich
+    geschrieben (siehe team_kern). Zugeordnet wird deshalb, wenn am selben Tag
+    beide Mannschaften passen - oder eine passt UND die Anstosszeit stimmt.
+
+    Bewusst NICHT: "der einzige Bericht an diesem Tag". Das ordnete einem
+    zurueckgezogenen Spiel den Bericht des Spiels zu, das man an dem Tag
+    stattdessen gepfiffen hat.
     """
 
     def __init__(self, index: Iterable[Dict]):
@@ -317,23 +355,21 @@ class Zuordnung:
         for eintrag in index:
             self._nach_tag.setdefault(eintrag["datum"], []).append(eintrag)
 
-    def finde(self, datum: str, heim: str, gast: str) -> Optional[Dict]:
+    def finde(self, datum: str, heim: str, gast: str, uhrzeit: str = "") -> Optional[Dict]:
         kandidaten = self._nach_tag.get(datum) or []
         if not kandidaten:
             return None
 
-        h, g = normalisiere_team(heim), normalisiere_team(gast)
-        beide = [k for k in kandidaten
-                 if normalisiere_team(k["heim"]) == h and normalisiere_team(k["gast"]) == g]
+        zeit = uhrzeit_aus(uhrzeit)
+        zur_zeit = [k for k in kandidaten if zeit and uhrzeit_aus(k.get("uhrzeit") or "") == zeit]
+
+        beide = [k for k in kandidaten if _gleiches_team(k["heim"], heim) and _gleiches_team(k["gast"], gast)]
         if beide:
-            return beide[0]
+            # Bei zwei Treffern (Hin- und Rueckspiel eines Turniertags) entscheidet die Zeit
+            return next((k for k in beide if k in zur_zeit), beide[0])
 
-        eine = [k for k in kandidaten
-                if (h and normalisiere_team(k["heim"]) == h) or (g and normalisiere_team(k["gast"]) == g)]
-        if len(eine) == 1:
-            return eine[0]
-
-        return kandidaten[0] if len(kandidaten) == 1 else None
+        eine = [k for k in zur_zeit if _gleiches_team(k["heim"], heim) or _gleiches_team(k["gast"], gast)]
+        return eine[0] if len(eine) == 1 else None
 
 
 def kurzinfo(eintrag: Optional[Dict]) -> Optional[Dict]:
