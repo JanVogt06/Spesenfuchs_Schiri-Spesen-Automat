@@ -1,5 +1,7 @@
 """Stammdaten: verschluesselt gespeichert, im Klartext gelesen, leer heisst 'nichts geliefert'."""
 import pytest
+
+from core.encryption import decrypt_credential
 from cryptography.fernet import Fernet
 
 import db.database as database
@@ -51,7 +53,10 @@ class TestRoundtrip:
         roh = _roh(user["id"])
         for feld in stammdaten._VERSCHLUESSELTE_FELDER:
             assert roh[feld] != DATEN[feld], feld
-            assert DATEN[feld] not in roh[feld], feld
+            # Beweis fuer Verschluesselung ist das Entschluesseln. Ein
+            # Teilstring-Vergleich waere wackelig: kurze Werte wie "K1"
+            # tauchen zufaellig im Base64 des Geheimtexts auf.
+            assert decrypt_credential(roh[feld]) == DATEN[feld], feld
 
     def test_oeffentliche_felder_im_klartext(self, user):
         upsert_stammdaten(user["id"], DATEN)
