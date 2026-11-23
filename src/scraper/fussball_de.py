@@ -314,7 +314,8 @@ def _mit_anzeigename(staffel: Staffel) -> Staffel:
     # Die Staffelseite hat keine Ueberschrift mit ihrem Namen. Der Link zum
     # Merken als Favorit traegt ihn aber vollstaendig mit:
     #   text=26/27 - Herren - Landesklasse - Thüringen: Landesklasse Staffel 1
-    treffer = re.search(r'my\.add\.favorite\?[^"]*?[?&]text=([^&"]+)', seite)
+    # text= darf erster Parameter sein, und & steht im HTML oft als &amp;
+    treffer = re.search(r'my\.add\.favorite\?(?:[^"]*?&(?:amp;)?)?text=([^&"]+)', seite)
     if not treffer:
         return staffel
 

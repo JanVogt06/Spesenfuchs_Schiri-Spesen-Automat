@@ -330,6 +330,17 @@ class TestMitAnzeigename:
 
         assert fussball_de._mit_anzeigename(staffel).anzeigename == "11Teamsports Thüringenliga"
 
+    @pytest.mark.parametrize("href", [
+        "my.add.favorite?text=26%2F27+-+Herren+-+Landesklasse+-+Th%C3%BCringen%3A+Landesklasse+Staffel+1&amp;type=staffel",
+        "my.add.favorite?type=staffel&amp;text=26%2F27+-+Herren+-+Landesklasse+-+Th%C3%BCringen%3A+Landesklasse+Staffel+1",
+        "my.add.favorite?type=staffel&text=26%2F27+-+Herren+-+Landesklasse+-+Th%C3%BCringen%3A+Landesklasse+Staffel+1",
+    ])
+    def test_name_aus_jeder_linkform(self, web, href):
+        staffel = _staffel(anzeigename=_staffel().slug)
+        web({staffel.url: f'<a href="https://www.fussball.de/{href}" class="icon-star"></a>'})
+
+        assert fussball_de._mit_anzeigename(staffel).anzeigename == "Landesklasse Staffel 1"
+
     def test_ohne_favoritenlink_bleibt_slug(self, web):
         staffel = _staffel(anzeigename=_staffel().slug)
         web({staffel.url: "<html></html>"})
