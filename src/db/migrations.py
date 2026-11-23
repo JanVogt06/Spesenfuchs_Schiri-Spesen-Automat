@@ -939,6 +939,42 @@ def _migration_017_beobachtungen(conn: sqlite3.Connection) -> None:
     """)
 
 
+def _migration_018_nofv_saetze(conn: sqlite3.Connection) -> None:
+    """
+    Traegt den Pflichtspielen der NOFV-Spielklassen ihren Satz nach.
+
+    Bis hierher hat der Rechner jedes Spiel oberhalb des TFV leer gelassen, und
+    so ist es auch eingefroren worden. Jetzt kennt er die Saetze der
+    Finanzordnung des NOFV (§9 Nr. 7) fuer Regionalliga und Oberliga.
+
+    Angefasst werden nur Zeilen OHNE Satz, die der Rechner als NOFV-Pflichtspiel
+    erkennt. Ein leeres Feld war nie ein abgerechneter Stand, den es zu
+    schuetzen gaelte - wer bisher abgerechnet hat, hat den Betrag von Hand
+    eingetragen.
+    """
+    from generator.spesen_calculator import SPESEN_NOFV, nofv_spielklasse
+
+    ergaenzt = 0
+
+    for row in conn.execute(
+        "SELECT id, spielklasse, mannschaftsart, staffel FROM matches WHERE sr_spesen IS NULL"
+    ).fetchall():
+        nofv = nofv_spielklasse(
+            row["spielklasse"] or "", row["mannschaftsart"] or "", row["staffel"] or ""
+        )
+        if not nofv:
+            continue
+
+        sr, sra = SPESEN_NOFV[nofv]
+        conn.execute(
+            "UPDATE matches SET sr_spesen = ?, sra_spesen = ? WHERE id = ?",
+            (sr, sra, row["id"]),
+        )
+        ergaenzt += 1
+
+    logger.info(f"NOFV-Saetze nachgetragen: {ergaenzt} Spiele")
+
+
 # (Version, Beschreibung, Funktion) - aufsteigend, Luecken sind nicht erlaubt.
 MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "baseline schema", _migration_001_baseline),
@@ -958,6 +994,7 @@ MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (15, "drop tfv rates from other associations matches", _migration_015_fremde_verbaende),
     (16, "thuringian league tables for cup and friendly rates", _migration_016_ligen),
     (17, "own observation grades per season", _migration_017_beobachtungen),
+    (18, "nofv rates for regionalliga and oberliga league matches", _migration_018_nofv_saetze),
 ]
 
 

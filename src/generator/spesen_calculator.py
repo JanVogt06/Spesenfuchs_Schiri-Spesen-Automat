@@ -1,6 +1,7 @@
 """
 Spesen Calculator - Berechnet SR/SRA-Spesen nach der TFV Spesenordnung
-(Stand 01.07.2025), §2.
+(Stand 01.07.2025), §2, und fuer die Pflichtspiele der NOFV-Spielklassen
+nach der Finanzordnung des NOFV, §9 Nr. 7.
 
 Der Rechner ist die EINZIGE Stelle, die entscheidet, ob es fuer ein Spiel
 einen Satz gibt. Frueher galt er nur fuer Punktspiele, waehrend Aufrufer
@@ -118,6 +119,99 @@ POKALSPIEL = "pokalspiel"
 FREUNDSCHAFTSSPIEL = "freundschaftsspiel"
 
 
+# ===== NOFV: Finanzordnung §9 Nr. 7 =====
+#
+# Fuer die NOFV-Spielklassen gilt nicht die TFV-Spesenordnung, sondern die
+# Finanzordnung des NOFV, und abgerechnet wird auf dessen eigener Quittung -
+# eine Seite je Schiedsrichter statt einer gemeinsamen.
+#
+# Bewusst nur die Pflichtspiel-Saetze. "Sonstige Spiele" haengen in der
+# Regionalliga von der Spielklasse des Gegners ab (Nr. 7.1 / 7.7), bei den
+# Frauen von der Ordnung des Landesverbandes (Nr. 7.3 / 7.9), und die Futsal-
+# Regionalliga (Nr. 7.6) nennt keinen Satz fuer Assistenten. Dort bleibt es wie
+# bisher leer.
+NOFV_HERREN_REGIONALLIGA = "herren-regionalliga"
+NOFV_HERREN_OBERLIGA = "herren-oberliga"
+NOFV_FRAUEN_REGIONALLIGA = "frauen-regionalliga"
+NOFV_A_JUNIOREN_REGIONALLIGA = "a-junioren-regionalliga"
+NOFV_BC_JUNIOREN_REGIONALLIGA = "bc-junioren-regionalliga"
+
+SPESEN_NOFV = {
+    NOFV_HERREN_REGIONALLIGA: (300.00, 150.00),      # Nr. 7.1 / 7.7
+    NOFV_HERREN_OBERLIGA: (100.00, 60.00),           # Nr. 7.2 / 7.8
+    NOFV_FRAUEN_REGIONALLIGA: (60.00, 40.00),        # Nr. 7.3 / 7.9
+    NOFV_A_JUNIOREN_REGIONALLIGA: (50.00, 35.00),    # Nr. 7.4 / 7.10
+    NOFV_BC_JUNIOREN_REGIONALLIGA: (40.00, 30.00),   # Nr. 7.5 / 7.11
+}
+
+# DFBnet fuehrt Aufstiegsspiele und Turniere unter derselben Spielklasse wie
+# den Ligabetrieb ("Regionalliga Nordost" / "Aufstiegsspiel zur NOFV-CJRL").
+# Keine regulaeren Pflichtspiele der Staffel - die Mannschaften spielen dort
+# noch gar nicht Regionalliga.
+STAFFELN_KEIN_NOFV_PFLICHTSPIEL = (
+    "aufstieg", "relegation", "entscheidung", "qualifikation",
+    "turnier", "futsal", "halle", "pokal", "freundschaft",
+)
+
+
+def nofv_spielklasse(spielklasse: str, mannschaftsart: str, staffel: str) -> Optional[str]:
+    """
+    Erkennt ein Pflichtspiel einer NOFV-Spielklasse mit festem Satz.
+
+    Einzige Stelle fuer diese Entscheidung: sie bestimmt den Satz UND das
+    Formular. Bewusst eine Einschlussliste - ein Spiel, das hier durchfaellt,
+    bekommt wie bisher keinen Satz und das TFV-Formular, ein falsch erkanntes
+    dagegen einen Betrag, der niemandem auffaellt.
+
+    Die Oberliga braucht "NOFV" in der Staffel: DFBnet normalisiert auch die
+    Oberligen anderer Regionalverbaende zur Spielklasse "Oberliga". Bei der
+    Regionalliga nennt schon die Spielklasse den Verband ("Regionalliga
+    Nordost").
+
+    Returns:
+        Schluessel in SPESEN_NOFV oder None.
+    """
+    if wettbewerbsart(spielklasse) != PUNKTSPIEL:
+        return None
+
+    klasse = (spielklasse or "").lower().strip()
+    art = (mannschaftsart or "").lower().strip()
+    st = (staffel or "").lower()
+
+    if any(wort in st or wort in klasse for wort in STAFFELN_KEIN_NOFV_PFLICHTSPIEL):
+        return None
+
+    if klasse == "oberliga":
+        if art == "herren" and "nofv" in st and "oberliga" in st:
+            return NOFV_HERREN_OBERLIGA
+        return None
+
+    if "regionalliga" not in klasse or "nordost" not in klasse or "regionalliga" not in st:
+        return None
+
+    # Exakter Vergleich statt Teilstring: "Herren Ü35" ist keine Regionalliga-
+    # Mannschaft, und "A-Juniorinnen" darf nicht als A-Junioren durchgehen.
+    if art == "herren":
+        return NOFV_HERREN_REGIONALLIGA
+    if art == "frauen":
+        return NOFV_FRAUEN_REGIONALLIGA
+    if art == "a-junioren":
+        return NOFV_A_JUNIOREN_REGIONALLIGA
+    if art in ("b-junioren", "c-junioren"):
+        return NOFV_BC_JUNIOREN_REGIONALLIGA
+
+    return None
+
+
+def ist_nofv_spiel(spiel_info: dict) -> bool:
+    """Ob fuer dieses Spiel die NOFV-Quittung statt des TFV-Formulars gilt."""
+    return nofv_spielklasse(
+        spiel_info.get("spielklasse") or "",
+        spiel_info.get("mannschaftsart") or "",
+        spiel_info.get("staffel") or "",
+    ) is not None
+
+
 def wettbewerbsart(spielklasse: str) -> str:
     """
     Ordnet eine DFBnet-Spielklasse einer der drei Wettbewerbsarten zu.
@@ -164,6 +258,13 @@ def calculate_spesen(spielklasse: str, mannschaftsart: str, staffel: str = "",
 
     spielklasse_lower = spielklasse.lower()
     mannschaftsart_lower = mannschaftsart.lower()
+
+    # NOFV-Pflichtspiele: Finanzordnung des NOFV, §9 Nr. 7. Vor dem Ausschluss
+    # ueberregionaler Spiele, der alles andere oberhalb des TFV leer laesst.
+    nofv = nofv_spielklasse(spielklasse, mannschaftsart, staffel)
+    if nofv:
+        logger.debug(f"NOFV-Pflichtspiel {nofv}: {SPESEN_NOFV[nofv]}")
+        return SPESEN_NOFV[nofv]
 
     # DFB/Überregionale Spiele ausschließen (nicht TFV-Spesenordnung)
     if _is_ueberregional(spielklasse_lower):
