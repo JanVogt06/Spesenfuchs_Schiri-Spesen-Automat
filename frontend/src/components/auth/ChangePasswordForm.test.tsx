@@ -170,4 +170,15 @@ describe('ChangePasswordForm - Anzeigen', () => {
         // Die Augen sind keine Absende-Knoepfe
         expect(apiPost).not.toHaveBeenCalled();
     });
+
+    it('beschriftet die Augen-Knoepfe fuer Screenreader', async () => {
+        render(<ChangePasswordForm/>);
+        const auge = screen.getByRole('button', {name: 'Aktuelles Passwort anzeigen'});
+        expect(auge).toHaveAttribute('aria-pressed', 'false');
+        expect(screen.getByRole('button', {name: 'Neues Passwort anzeigen'})).toBeInTheDocument();
+
+        await userEvent.click(auge);
+        expect(screen.getByRole('button', {name: 'Aktuelles Passwort verbergen'}))
+            .toHaveAttribute('aria-pressed', 'true');
+    });
 });

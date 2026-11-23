@@ -108,6 +108,8 @@ export function ChangePasswordForm() {
                             <button
                                 type="button"
                                 onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                                aria-label={showCurrentPassword ? 'Aktuelles Passwort verbergen' : 'Aktuelles Passwort anzeigen'}
+                                aria-pressed={showCurrentPassword}
                                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-muted-foreground"
                             >
                                 {showCurrentPassword ? (
@@ -137,6 +139,8 @@ export function ChangePasswordForm() {
                             <button
                                 type="button"
                                 onClick={() => setShowNewPassword(!showNewPassword)}
+                                aria-label={showNewPassword ? 'Neues Passwort verbergen' : 'Neues Passwort anzeigen'}
+                                aria-pressed={showNewPassword}
                                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-muted-foreground"
                             >
                                 {showNewPassword ? (
