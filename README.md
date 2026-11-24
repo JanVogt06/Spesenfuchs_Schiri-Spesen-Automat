@@ -27,9 +27,11 @@ FUSSBALL.DE; der Reiter *Ligen* zeigt sie. Lässt sich eine Mannschaft nicht
 zweifelsfrei zuordnen oder ist eine überregional spielende beteiligt, bleibt
 das Spesenfeld leer statt geraten.
 
-Die Oberfläche hat sieben Reiter: *Dashboard* mit der Übersicht, *Spesen* mit den
-Abrechnungen zum Herunterladen, *Saison*, *Ligen*, *Beobachtungen*, *Stammdaten*
-und *Fehler melden*.
+Die Oberfläche hat vier Hauptreiter: *Übersicht*, *Spiele* mit allen
+Ansetzungen – kommend und vergangen, durchsuchbar, je Spiel mit Abrechnung zum
+Herunterladen –, *Saison* und *Beobachtungen*. Hinter *Mehr* liegen *Ligen*,
+*Stammdaten*, *Einstellungen* und *Fehler melden*. Neben dem Knopf
+*Aktualisieren* oben rechts steht, wann zuletzt aus DFB.net gelesen wurde.
 
 Self-hosted: ein Container, eine `docker-compose.yml`, ein `data`-Ordner.
 
@@ -130,7 +132,7 @@ in einem ZIP stecken dürfen.
 ## Als App installieren
 
 Die Oberfläche lässt sich als App auf den Homescreen legen (PWA). Auf Android
-und in Chrome oder Edge am Rechner steht dafür auf dem Dashboard und in den
+und in Chrome oder Edge am Rechner steht dafür auf der Übersicht und in den
 *Einstellungen* ein Knopf „App installieren“. Auf dem iPhone lässt Apple keinen
 Installationsdialog zu; derselbe Knopf klappt dort die Handgriffe in Safari auf
 (*Teilen* → *Zum Home-Bildschirm*).
@@ -223,11 +225,11 @@ damit die Sperre nicht verrät, wer registriert ist. Die Zähler liegen in
 Lehnt DFBnet die gespeicherten Zugangsdaten ab, meist weil DFBnet ein neues
 Passwort verlangt hat, merkt sich die Anwendung das mit Datum. Bis neue
 Zugangsdaten gespeichert sind oder ein Abruf wieder durchkommt, steht auf jeder
-Seite ein roter Hinweis, und der Reiter *Einstellungen* trägt einen roten Punkt.
+Seite ein roter Hinweis, und *Mehr* sowie darin *Einstellungen* tragen einen roten Punkt.
 
 ## Fehler melden
 
-Der gleichnamige Reiter schickt einen Bericht per Mail. Ohne Postausgang ist
+Der gleichnamige Eintrag unter *Mehr* schickt einen Bericht per Mail. Ohne Postausgang ist
 das Formular sichtbar, sagt aber, dass nichts versendet werden kann — still
 verworfen wird kein Bericht.
 
