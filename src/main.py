@@ -48,8 +48,8 @@ def persist_matches(user_id: int, matches_data: List[dict], vollstaendig: bool =
     Args:
         vollstaendig: Ob der Scrape alle Ansetzungen erfasst hat. Nur dann darf
             aus "nicht im Ergebnis" auf "nicht mehr angesetzt" geschlossen
-            werden. Der Scraper ueberspringt einzelne Spiele stillschweigend,
-            wenn ein Modal auflaeuft; ohne diese Unterscheidung wuerden dem
+            werden. Der Scraper ueberspringt einzelne Spiele, deren Daten
+            sich nicht aufbereiten lassen; ohne diese Unterscheidung wuerden dem
             Nutzer voellig gueltige Ansetzungen als zurueckgezogen angezeigt.
 
     Returns:
@@ -399,14 +399,8 @@ def scrape_matches(
                 "unvollstaendiger Scrape"
             )
 
-        # Die Stammdaten liegen als weiterer Reiter in genau dem Tab, den
-        # navigate_to_schiriansetzung schon gekapert hat - sie kosten also
-        # keinen zweiten Login, nur zwei Klicks.
-        #
-        # Bewusst NACH den Spielen: der Tab startet auf "Meine Spiele", davor
-        # eingeschoben braeuchte es einen Rueckklick samt erneutem Warten auf
-        # die Spielliste, und jede Flakiness dort kostete den ganzen
-        # Spiele-Scrape.
+        # Stammdaten und Saisons kommen wie die Ansetzungen ueber die
+        # Schnittstelle der Ansetzungs-App, im selben angemeldeten Tab.
         #
         # Das eigene try/except, das nur warnt, ist tragend: persist_matches
         # laeuft erst nach dem with-Block. Eine Exception hier kaeme aus
@@ -418,29 +412,19 @@ def scrape_matches(
         try:
             melde(len(all_matches), erwartet, "Lese Stammdaten...")
 
-            scraper.open_referee_tab("coredata", "sria-coredata")
-            stammdaten = scraper.extract_stammdaten()
-
-            scraper.open_referee_tab(
-                "qualifications", "sria-qualifications-referee-qualifications-card"
-            )
-            stammdaten.update(scraper.extract_qmax())
+            stammdaten = scraper.lies_stammdaten()
 
         except Exception as e:
             logger.warning(f"Stammdaten konnten nicht gelesen werden: {e}")
 
-        # Und zum Schluss die Saisonzusammenfassung - wieder nur ein Reiter
-        # weiter im selben Tab. Auch sie mit eigenem try/except: sie laeuft
-        # ueber alle Saisons und ist damit der laengste Schritt, aber die
-        # Ansetzungen sind das Produkt und duerfen daran nicht scheitern.
+        # Und die Saisonzusammenfassung. Auch sie mit eigenem try/except: sie
+        # laeuft ueber alle Saisons, aber die Ansetzungen sind das Produkt
+        # und duerfen daran nicht scheitern.
         saisons = {}
 
         try:
             melde(len(all_matches), erwartet, "Lese Saisonzusammenfassung...")
 
-            scraper.open_referee_tab(
-                "matches-statistics", "sria-matches-statistics-officiated-games-card"
-            )
             # Abgeschlossene Saisons aendern sich nicht mehr - was vollstaendig
             # in der Datenbank steht, wird nicht noch einmal gelesen. Die
             # laufende Saison nimmt der Scraper selbst wieder aus der Liste.

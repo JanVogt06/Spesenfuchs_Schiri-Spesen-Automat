@@ -397,7 +397,7 @@ class FakeScraper:
         return False
 
     _SCHRITTE = {"open_dfbnet", "accept_cookies", "click_login", "login", "open_menu_if_needed",
-                 "navigate_to_schiriansetzung", "open_referee_tab"}
+                 "navigate_to_schiriansetzung"}
 
     def __getattr__(self, name):
         # Die reinen Navigationsschritte werden nur mitgeschrieben. Alles andere
@@ -415,13 +415,10 @@ class FakeScraper:
             progress_callback(1, len(self.spiele), "Spiel 1")
         return list(self.spiele)
 
-    def extract_stammdaten(self):
+    def lies_stammdaten(self):
         if self.stammdaten_fehler:
-            raise RuntimeError("Layout geaendert")
-        return dict(self.stammdaten)
-
-    def extract_qmax(self):
-        return {"qmax_sr": "Verbandsliga"}
+            raise RuntimeError("Schnittstelle geaendert")
+        return {**self.stammdaten, "qmax_sr": "Verbandsliga"}
 
     def scrape_saisons(self, progress_callback=None, ueberspringen=None):
         self.ueberspringen = ueberspringen

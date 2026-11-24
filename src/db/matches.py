@@ -186,9 +186,9 @@ def upsert_match(
                 ))
 
             # Erfasste Fahrtkosten werden hier bewusst NICHT angetastet, auch
-            # nicht fuer Rollen, die in diesem Scrape fehlen. Der Scraper gibt
-            # bei einem aufgelaufenen Modal eine kuerzere Liste zurueck, ohne
-            # dass sich an der Ansetzung etwas geaendert haette - ein Loeschen
+            # nicht fuer Rollen, die in diesem Scrape fehlen. Eine kuerzere
+            # Liste kann auch ein Lesefehler sein (frueher ein aufgelaufenes
+            # Modal), ohne dass sich an der Ansetzung etwas geaendert haette - ein Loeschen
             # wuerde dann Eingaben des Nutzers vernichten. Zu einer nicht mehr
             # besetzten Rolle gehoerende Werte werden stattdessen beim Lesen
             # ausgeblendet (siehe _rows_to_matches) und tauchen wieder auf,
@@ -207,11 +207,13 @@ def mark_missing_matches(user_id: int, seen_keys: List[str], now: Optional[str] 
     """
     Markiert kuenftige Ansetzungen, die im letzten Scrape nicht mehr auftauchten.
 
-    Wichtig ist die Einschraenkung auf kuenftige Spiele: die DFBnet-Ansetzung
-    ist ein rollierendes Fenster von rund 14 Tagen. Ein gespieltes Spiel faellt
-    zwangslaeufig irgendwann heraus - das ist Normalfall, keine Ruecknahme.
-    Ohne diese Bedingung wuerde jedes Spiel zwei Wochen nach dem Spieltag als
-    "fehlend" markiert und das Flag waere wertlos.
+    Wichtig ist die Einschraenkung auf kuenftige Spiele: der Abruf deckt nur
+    die laufende Saison ab (scraper/ansetzungen.zeitraum). Ein gespieltes
+    Spiel faellt zwangslaeufig irgendwann heraus - das ist Normalfall, keine
+    Ruecknahme. Ohne diese Bedingung wuerde jedes Spiel zum Saisonwechsel als
+    "fehlend" markiert und das Flag waere wertlos. (Bis November 2026 las der
+    Scraper die Liste "Meine Spiele" mit ihrem Fenster von rund 14 Tagen;
+    daher stammt die Regel.)
 
     Verschwindet dagegen ein Spiel, das noch bevorsteht, wurde die Ansetzung
     tatsaechlich zurueckgezogen oder umbesetzt.
