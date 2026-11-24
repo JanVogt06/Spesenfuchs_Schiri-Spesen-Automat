@@ -1,9 +1,14 @@
-import {useState} from 'react';
+import {useMemo, useState} from 'react';
 import type {MatchData} from '@/lib/matches';
 import {downloadMatchDocument, downloadMatchesAsZip, extractApiError} from '@/lib/matches';
 import {MatchCard} from '../matches/MatchCard';
 import {Button} from '@/components/ui/button';
-import {Calendar, Download} from 'lucide-react';
+import {Input} from '@/components/ui/input';
+import {heuteIso, nachMonat, passtZurSuche, teileSpiele} from '@/lib/spieleliste';
+import {cn} from '@/lib/utils';
+import {Calendar, Download, Search} from 'lucide-react';
+
+type Ansicht = 'kommend' | 'vergangen';
 
 interface MatchListProps {
     matches: MatchData[];
@@ -19,6 +24,23 @@ export function MatchList({matches, onReload}: MatchListProps) {
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [isBulkDownloading, setIsBulkDownloading] = useState(false);
     const [bulkError, setBulkError] = useState('');
+    const [suche, setSuche] = useState('');
+
+    const heute = heuteIso();
+    const {kommend, vergangen} = useMemo(
+        () => teileSpiele(matches.filter((m) => passtZurSuche(m, suche)), heute),
+        [matches, suche, heute],
+    );
+    // Bis zur ersten Wahl: ohne kommende Ansetzung gleich die vergangenen Spiele
+    const [gewaehlteAnsicht, setAnsicht] = useState<Ansicht | null>(null);
+    const gibtKommende = useMemo(() => teileSpiele(matches, heute).kommend.length > 0, [matches, heute]);
+    const ansicht: Ansicht = gewaehlteAnsicht ?? (gibtKommende ? 'kommend' : 'vergangen');
+    const sichtbar = ansicht === 'kommend' ? kommend : vergangen;
+    const gruppen = useMemo(() => nachMonat(sichtbar), [sichtbar]);
+
+    // "Spiel 3" als Ersatztitel haengt an der Stelle in der ganzen Liste,
+    // nicht an der in der gefilterten
+    const position = useMemo(() => new Map(matches.map((m, i) => [m._id, i])), [matches]);
 
     const handleDownload = async (match: MatchData, fileFormat: 'docx' | 'pdf') => {
         // 'docx' heißt "die bearbeitbare Datei" - bei NOFV-Spielen eine Excel-Mappe
@@ -73,8 +95,47 @@ export function MatchList({matches, onReload}: MatchListProps) {
         );
     }
 
+    const reiter: {wert: Ansicht; label: string; anzahl: number}[] = [
+        {wert: 'kommend', label: 'Kommend', anzahl: kommend.length},
+        {wert: 'vergangen', label: 'Vergangen', anzahl: vergangen.length},
+    ];
+
     return (
         <div className="space-y-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div role="group" aria-label="Zeitraum" className="inline-flex self-start rounded-lg bg-muted p-1">
+                    {reiter.map((eintrag) => (
+                        <button
+                            key={eintrag.wert}
+                            type="button"
+                            aria-pressed={ansicht === eintrag.wert}
+                            onClick={() => setAnsicht(eintrag.wert)}
+                            className={cn(
+                                'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                                ansicht === eintrag.wert
+                                    ? 'bg-card text-foreground shadow-sm'
+                                    : 'text-muted-foreground hover:text-foreground'
+                            )}
+                        >
+                            {eintrag.label}
+                            <span className="ml-1.5 text-xs tabular-nums opacity-70">{eintrag.anzahl}</span>
+                        </button>
+                    ))}
+                </div>
+
+                <div className="relative sm:w-80">
+                    <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"/>
+                    <Input
+                        type="search"
+                        value={suche}
+                        onChange={(e) => setSuche(e.target.value)}
+                        placeholder="Verein, Spielklasse oder Spielstätte"
+                        aria-label="Spiele durchsuchen"
+                        className="pl-9"
+                    />
+                </div>
+            </div>
+
             {selectedIds.length > 0 && (
                 <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/30 px-3 py-2">
                     <span className="text-sm">
@@ -98,20 +159,38 @@ export function MatchList({matches, onReload}: MatchListProps) {
                 </p>
             )}
 
-            {matches.map((match, index) => (
-                    <MatchCard
-                        key={match._id}
-                        match={match}
-                        index={index}
-                        onDownload={(fileFormat) => handleDownload(match, fileFormat)}
-                        laufendeFormate={
-                            (['docx', 'pdf'] as const).filter(
-                                f => laufendeDownloads.includes(`${match._id}:${f}`))
-                        }
-                        selected={selectedIds.includes(match._id)}
-                        onToggleSelected={() => toggleSelected(match._id)}
-                        onSaved={onReload}
-                    />
+            {gruppen.length === 0 ? (
+                <p className="rounded-lg border border-dashed px-3 py-10 text-center text-sm text-muted-foreground">
+                    {suche.trim()
+                        ? `Keine ${ansicht === 'kommend' ? 'kommenden' : 'vergangenen'} Spiele zu „${suche.trim()}“.`
+                        : ansicht === 'kommend'
+                            ? 'Zurzeit steht keine kommende Ansetzung in deinem DFBnet-Konto.'
+                            : 'Noch keine vergangenen Spiele.'}
+                </p>
+            ) : gruppen.map((gruppe) => (
+                <section key={gruppe.schluessel} aria-label={gruppe.titel} className="space-y-3">
+                    <h2 className="flex items-baseline gap-2 pt-2 text-sm font-semibold">
+                        {gruppe.titel}
+                        <span className="text-xs font-normal text-muted-foreground">
+                            {gruppe.spiele.length} {gruppe.spiele.length === 1 ? 'Spiel' : 'Spiele'}
+                        </span>
+                    </h2>
+                    {gruppe.spiele.map((match) => (
+                        <MatchCard
+                            key={match._id}
+                            match={match}
+                            index={position.get(match._id) ?? 0}
+                            onDownload={(fileFormat) => handleDownload(match, fileFormat)}
+                            laufendeFormate={
+                                (['docx', 'pdf'] as const).filter(
+                                    f => laufendeDownloads.includes(`${match._id}:${f}`))
+                            }
+                            selected={selectedIds.includes(match._id)}
+                            onToggleSelected={() => toggleSelected(match._id)}
+                            onSaved={onReload}
+                        />
+                    ))}
+                </section>
             ))}
         </div>
     );

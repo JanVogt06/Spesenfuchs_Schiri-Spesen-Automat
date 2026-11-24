@@ -9,23 +9,12 @@ import {AktualisierenButton} from '@/components/layout/AktualisierenButton';
 import {InstallBanner} from '@/components/pwa/InstallHinweis';
 import {useScrapeRun} from '@/hooks/useScrapeRun';
 import {getAllMatches, type MatchData} from '@/lib/matches';
+import {anstoss, heuteIso} from '@/lib/spieleliste';
 import {getSaisons, getSaison, type SaisonDetails} from '@/lib/saison';
 import {
     AlertCircle, Loader2, Calendar, Trophy, SquareStack,
     ArrowRight, MapPin,
 } from 'lucide-react';
-
-/** Heute als ISO-Datum - die Spiele tragen ihr Datum ebenfalls als "YYYY-MM-DD" */
-function heuteIso(): string {
-    const jetzt = new Date();
-    return `${jetzt.getFullYear()}-${String(jetzt.getMonth() + 1).padStart(2, '0')}-${String(jetzt.getDate()).padStart(2, '0')}`;
-}
-
-/** Anstosszeit als "HH:MM" zum Sortieren - zwei Spiele am selben Tag */
-function anstoss(match: MatchData): string {
-    const treffer = /(\d{1,2}):(\d{2})/.exec(match.spiel_info?.anpfiff || '');
-    return treffer ? `${treffer[1].padStart(2, '0')}:${treffer[2]}` : '99:99';
-}
 
 function formatDatum(iso?: string): string {
     if (!iso) return '';
