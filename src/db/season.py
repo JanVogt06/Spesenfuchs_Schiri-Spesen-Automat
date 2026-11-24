@@ -1,22 +1,22 @@
 """
-Datenbankzugriff fuer geleitete Spiele und die Saisonbilanz.
+Database access for refereed matches and the season balance.
 
-Quelle ist der DFBnet-Reiter "Spiele & Statistiken" - nicht zu verwechseln mit
-`db/matches.py`: dort stehen die Ansetzungen, an denen die vom Nutzer
-eingetragenen Fahrtkosten haengen, hier die bereits geleiteten Spiele mit
-Ergebnis und Kartenstatistik.
+The source is the DFBnet tab "Spiele & Statistiken" - not to be confused with
+`db/matches.py`: there the assignments are kept, to which the travel costs
+entered by the user are attached; here the already refereed matches with
+result and card statistics.
 
-Geschrieben wird saisonweise und ersetzend: `replace_saison` raeumt eine
-Saison vollstaendig ab und schreibt sie neu. Das ist hier erlaubt und noetig,
-anders als bei den Ansetzungen:
+Writing is done season by season and replacing: `replace_saison` clears a
+season completely and writes it anew. That is allowed and necessary here,
+unlike with the assignments:
 
-- An diesen Zeilen haengt nichts, was der Nutzer selbst eingegeben hat.
-- DFBnet korrigiert Ergebnisse und Kartenzahlen nachtraeglich.
-- Die laufende Saison waechst mit jedem Spieltag, und Lehrabende sowie
-  Leistungspruefungen aendern sich laufend.
+- Nothing on these rows was entered by the user themselves.
+- DFBnet corrects results and card counts retroactively.
+- The current season grows with every matchday, and training evenings (Lehrabende) as well as
+    performance tests (Leistungspruefungen) keep changing.
 
-Ein Merge wie in matches.py waere hier also falsch: er wuerde eine von DFBnet
-zurueckgenommene Korrektur fuer immer festhalten.
+A merge as in matches.py would therefore be wrong here: it would hold on forever to a correction
+withdrawn by DFBnet.
 """
 import sqlite3
 from datetime import datetime, UTC
@@ -30,19 +30,19 @@ logger = setup_logger("db_season")
 
 def build_saison_match_key(datum: str, heim: str, gast: str, uhrzeit: str) -> str:
     """
-    Kanonische Identitaet eines geleiteten Spiels innerhalb einer Saison.
+    Canonical identity of a refereed match within a season.
 
-    Die Anstosszeit gehoert hier - anders als beim Schluessel der Ansetzungen -
-    dazu: diese Tabelle listet abgeschlossene Spiele, eine Verlegung ist darin
-    kein zweiter Eintrag derselben Partie mehr, sondern taucht nur mit ihrem
-    tatsaechlichen Termin auf. Zwei Begegnungen derselben Vereine am selben Tag
-    (Turniere, Nachholspiele) blieben ohne die Zeit dagegen nicht trennbar.
+    The kick-off time is part of it here - unlike with the key of the assignments -:
+    this table lists completed matches, a rescheduling in it
+    is no longer a second entry of the same fixture but appears only with its
+    actual date. Two meetings of the same clubs on the same day
+    (tournaments, postponed matches) would not be separable without the time, however.
     """
     return f"{datum}|{uhrzeit}|{(heim or '').strip()}|{(gast or '').strip()}"
 
 
 def _als_zahl(wert) -> Optional[int]:
-    """DFBnet schreibt '-' fuer 'nichts erfasst'; daraus wird NULL."""
+    """DFBnet writes '-' for 'nothing recorded'; this becomes NULL."""
     try:
         return int(str(wert).strip())
     except (TypeError, ValueError):
@@ -60,26 +60,26 @@ def replace_saison(
     scraped_at: Optional[str] = None,
 ) -> int:
     """
-    Ersetzt eine komplette Saison eines Users.
+    Replaces a complete season of a user.
 
-    Laeuft in einer Transaktion: entweder steht die Saison danach vollstaendig
-    neu in der Datenbank, oder unveraendert wie vorher. Ein Abbruch mitten im
-    Schreiben wuerde sonst eine halbe Saison hinterlassen, die von einer
-    vollstaendigen nicht zu unterscheiden waere.
+    Runs in one transaction: either the season is completely
+    new in the database afterwards, or unchanged as before. An abort in the middle of
+    writing would otherwise leave half a season behind, which could not be told apart
+    from a complete one.
 
     Args:
-        spiele: Dicts vom Scraper (datum, uhrzeit, liga, heim, gast, ergebnis,
-                karten, gespann, eigene_rolle)
-        einsaetze: Zeilen der Einsatz-Tabelle (rolle, geleitet,
-                   zurueckgegeben, nicht_angetreten)
-        lehrgaenge: lehrabend, lehrabend_online, leistungspruefung
-        erwartet: von DFBnet gemeldete Trefferzahl (Default: Anzahl der
-                  uebergebenen Spiele)
-        vollstaendig: Ob die Saison komplett gelesen wurde. Nur dann wird sie
-                      bei kuenftigen Laeufen uebersprungen.
+            spiele: Dicts from the scraper (datum, uhrzeit, liga, heim, gast, ergebnis,
+                            karten, gespann, eigene_rolle)
+            einsaetze: Rows of the assignment table (rolle, geleitet,
+                                  zurueckgegeben, nicht_angetreten)
+            lehrgaenge: lehrabend, lehrabend_online, leistungspruefung
+            erwartet: Number of hits reported by DFBnet (default: number of
+                                matches passed in)
+            vollstaendig: Whether the season was read completely. Only then is it
+                                        skipped in future runs.
 
     Returns:
-        Anzahl geschriebener Spiele.
+            Number of matches written.
     """
     scraped_at = scraped_at or datetime.now(UTC).isoformat()
     conn = get_connection()
@@ -87,9 +87,9 @@ def replace_saison(
     try:
         conn.execute("BEGIN")
 
-        # Kinder zuerst: ON DELETE CASCADE greift nur, wenn foreign_keys an
-        # ist - das ist es zwar (database.get_connection), aber explizit
-        # loeschen kostet nichts und macht die Absicht sichtbar.
+        # Children first: ON DELETE CASCADE only works if foreign_keys is on
+        # - which it is (database.get_connection), but deleting
+        # explicitly costs nothing and makes the intent visible.
         conn.execute("""
             DELETE FROM season_match_officials
             WHERE season_match_id IN (
@@ -137,8 +137,8 @@ def replace_saison(
             ))
 
             if not cursor.lastrowid or cursor.rowcount == 0:
-                # Zwei Zeilen mit demselben Schluessel in einer Lieferung -
-                # sollte nicht vorkommen, darf den Lauf aber nicht kippen.
+                # Two rows with the same key in one delivery -
+                # should not happen, but must not tip over the run.
                 logger.warning(f"[User {user_id}] {saison}: doppeltes Spiel uebersprungen")
                 continue
 
@@ -216,17 +216,17 @@ def replace_saison(
 
 def get_komplette_saisons(user_id: int) -> set:
     """
-    Saisons, die vollstaendig gespeichert sind und nicht neu gelesen werden
-    muessen.
+    Seasons that are completely stored and do not need to be
+    read again.
 
-    Vollstaendig heisst: der Lauf hat sie als vollstaendig gemeldet, es liegen
-    genau so viele Spiele vor wie DFBnet damals Treffer gemeldet hat, UND eine
-    Einsatzbilanz ist da. Faellt nur eines davon aus, wird die Saison als Ganzes
-    neu gelesen - eine halb ergaenzte Saison waere schlimmer als eine neu
-    geholte.
+    Complete means: the run reported them as complete, exactly as many matches are present
+    as DFBnet reported hits back then, AND a
+    duty balance is there. If only one of these is missing, the season is read again as a whole
+    - a half-filled season would be worse than a freshly
+    fetched one.
 
-    Die laufende Saison filtert der Aufrufer heraus; sie steht hier mit drin,
-    weil diese Funktion nichts darueber weiss, welche das gerade ist.
+    The caller filters out the current season; it is included here
+    because this function knows nothing about which one that currently is.
     """
     conn = get_connection()
 
@@ -251,7 +251,7 @@ def get_komplette_saisons(user_id: int) -> set:
 
 
 def count_saison_spiele(user_id: int, saison: str) -> int:
-    """Wie viele geleitete Spiele zu einer Saison eines Users gespeichert sind."""
+    """How many refereed matches are stored for a season of a user."""
     conn = get_connection()
 
     try:
@@ -265,16 +265,16 @@ def count_saison_spiele(user_id: int, saison: str) -> int:
 
 def get_saisons(user_id: int) -> List[Dict]:
     """
-    Alle gespeicherten Saisons eines Users, neueste zuerst.
+    All stored seasons of a user, newest first.
 
-    Die Liste wird aus BEIDEN Quellen gebildet. Eine Saison ohne ein einziges
-    geleitetes Spiel ist kein Sonderfall, sondern der Normalzustand am
-    Saisonanfang: die Lehrabende stehen dann schon in season_education,
-    waehrend season_matches noch leer ist. Wer die Liste nur aus den Spielen
-    ableitet, blendet genau diese Saison komplett aus.
+    The list is formed from BOTH sources. A season without a single
+    refereed match is not a special case but the normal state at the
+    start of a season: the training evenings are then already in season_education,
+    while season_matches is still empty. Anyone who derives the list only from the matches
+    hides exactly this season completely.
 
-    Sortiert wird ueber das Anfangsjahr im Namen ("26/27" -> 26) und nicht
-    ueber das juengste Spiel: das gibt es bei einer leeren Saison nicht.
+    Sorting is by the start year in the name ("26/27" -> 26) and not
+    by the most recent match: there is none for an empty season.
     """
     conn = get_connection()
 
@@ -302,11 +302,11 @@ def get_saisons(user_id: int) -> List[Dict]:
 
 def get_saison(user_id: int, saison: str) -> Optional[Dict]:
     """
-    Eine Saison mit allen Spielen, der Einsatzbilanz und den Lehrgaengen.
+    One season with all matches, the duty balance and the courses (Lehrgaenge).
 
-    Gibt None zurueck, wenn zu dieser Saison GAR NICHTS gespeichert ist - eine
-    Saison ganz ohne Spiele, aber mit Lehrabenden, kommt dagegen mit leerer
-    Spielliste zurueck.
+    Returns None if NOTHING at all is stored for this season - a
+    season without matches but with training evenings, by contrast, comes back with an empty
+    match list.
     """
     conn = get_connection()
 
@@ -351,8 +351,8 @@ def get_saison(user_id: int, saison: str) -> Optional[Dict]:
             WHERE user_id = ? AND saison = ?
         """, (user_id, saison)).fetchone()
 
-        # Erst hier auf "gibt es nicht" entscheiden: eine Saison ohne Spiele,
-        # aber mit Lehrabenden, ist am Saisonanfang der Normalfall.
+        # Only here decide on "does not exist": a season without matches,
+        # but with training evenings, is the normal case at the start of a season.
         if not spiele and not einsaetze and not lehrgaenge:
             return None
 
@@ -367,7 +367,7 @@ def get_saison(user_id: int, saison: str) -> Optional[Dict]:
 
 
 def get_eigene_rollen(user_id: int) -> List[Dict]:
-    """Datum, Teams und eigene Rolle aller geleiteten Spiele - zum Zuordnen anderer Quellen."""
+    """Date, teams and own role of all refereed matches - for matching other sources."""
     conn = get_connection()
     try:
         rows = conn.execute(
@@ -380,13 +380,13 @@ def get_eigene_rollen(user_id: int) -> List[Dict]:
 
 def delete_saisons(user_id: int) -> int:
     """
-    Loescht alle Saisondaten eines Users.
+    Deletes all season data of a user.
 
-    Wird beim Wechsel des DFBnet-Kontos aufgerufen - die gespeicherten Spiele
-    gehoeren dann einer anderen Person.
+    Called when the DFBnet account is changed - the stored matches
+    then belong to another person.
 
     Returns:
-        Anzahl geloeschter Spiele.
+            Number of matches deleted.
     """
     conn = get_connection()
 

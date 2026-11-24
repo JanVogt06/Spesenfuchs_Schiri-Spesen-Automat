@@ -1,14 +1,14 @@
 """
-Sperre nach wiederholt falschem Passwort.
+Lock after repeatedly wrong passwords.
 
-Nach MAX_FEHLVERSUCHE falschen Logins hintereinander ist das Konto
-SPERRDAUER_MINUTEN lang gesperrt; ein richtiger Login setzt den Zaehler
-zurueck. Liegt der letzte Fehlversuch laenger als die Sperrdauer zurueck,
-beginnt die Zaehlung von vorn - wer sich einmal im Monat vertippt, wird nie
-gesperrt.
+After MAX_FEHLVERSUCHE wrong logins in a row the account is
+locked for SPERRDAUER_MINUTEN; a correct login resets the counter.
+If the last failed attempt lies further back than the lock duration,
+counting starts over - anyone who mistypes once a month is never
+locked.
 
-Der Zustand liegt in der Datenbank und nicht im Speicher, damit ein
-Neustart des Containers die Sperre nicht aufhebt.
+The state lives in the database and not in memory, so that a
+restart of the container does not lift the lock.
 """
 from datetime import datetime, timedelta, UTC
 from typing import Optional
@@ -20,12 +20,12 @@ SPERRDAUER_MINUTEN = 15
 
 
 def _schluessel(email: str) -> str:
-    """Gross-/Kleinschreibung und Leerzeichen duerfen die Sperre nicht umgehen."""
+    """Case and whitespace must not circumvent the lock."""
     return email.strip().lower()
 
 
 def gesperrt_bis(email: str, jetzt: Optional[datetime] = None) -> Optional[datetime]:
-    """Zeitpunkt, bis zu dem die Adresse gesperrt ist - oder None."""
+    """Point in time until which the address is locked - or None."""
     jetzt = jetzt or datetime.now(UTC)
     conn = get_connection()
 
@@ -45,19 +45,19 @@ def gesperrt_bis(email: str, jetzt: Optional[datetime] = None) -> Optional[datet
 
 def fehlversuch_merken(email: str, jetzt: Optional[datetime] = None) -> int:
     """
-    Zaehlt einen Fehlversuch.
+    Counts a failed attempt.
 
     Returns:
-        Wie viele Versuche bis zur Sperre noch bleiben. 0 heisst: dieser
-        Fehlversuch hat die Sperre ausgeloest.
+            How many attempts remain until the lock. 0 means: this
+            failed attempt triggered the lock.
     """
     jetzt = jetzt or datetime.now(UTC)
     schluessel = _schluessel(email)
     conn = get_connection()
 
     try:
-        # IMMEDIATE: zwei gleichzeitige Fehlversuche duerfen nicht beide den
-        # alten Zaehlerstand lesen und so einen Versuch verschlucken.
+        # IMMEDIATE: two simultaneous failed attempts must not both read the
+        # old counter value and so swallow an attempt.
         conn.execute("BEGIN IMMEDIATE")
         row = conn.execute(
             "SELECT fehlversuche, letzter_fehlversuch FROM login_sperren WHERE email = ?",
@@ -74,7 +74,7 @@ def fehlversuch_merken(email: str, jetzt: Optional[datetime] = None) -> int:
         sperre = None
         if anzahl >= MAX_FEHLVERSUCHE:
             sperre = (jetzt + timedelta(minutes=SPERRDAUER_MINUTEN)).isoformat()
-            anzahl = 0  # nach Ablauf der Sperre gibt es wieder volle Versuche
+            anzahl = 0  # after the lock expires there are full attempts again
 
         conn.execute("""
             INSERT INTO login_sperren (email, fehlversuche, letzter_fehlversuch, gesperrt_bis)
@@ -95,7 +95,7 @@ def fehlversuch_merken(email: str, jetzt: Optional[datetime] = None) -> int:
 
 
 def fehlversuche_loeschen(email: str) -> None:
-    """Nach einem erfolgreichen Login."""
+    """After a successful login."""
     conn = get_connection()
 
     try:

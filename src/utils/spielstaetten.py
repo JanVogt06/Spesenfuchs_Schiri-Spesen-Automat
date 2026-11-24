@@ -1,16 +1,16 @@
 """
-Die Spielstaetten, an denen man selbst schon im Einsatz war.
+The venues (Spielstaetten) where the user has already been on duty.
 
-Zwei Quellen, beide nur mit Spielen, die vorbei sind:
+Two sources, both only with matches that are over:
 
-- die eigenen Ansetzungen (ohne die zurueckgezogenen), mit der Koordinate
-  aus DFBnet, wo vorhanden;
-- die Spielberichte aller gelesenen Saisons, ohne ausgefallene Spiele.
+- the user's own assignments (excluding withdrawn ones), with the coordinate
+    from DFBnet where available;
+- the match reports of all read seasons, excluding cancelled matches.
 
-Ein Spiel, das in beiden steht (gleiche DFBnet-ID), zaehlt einmal. Plaetze
-werden ueber Name und Postleitzahl zusammengefasst - ein Kunstrasen und ein
-Rasenplatz desselben Vereins bleiben so zwei Punkte, derselbe Platz aus zwei
-Quellen wird einer. Kuenftige Spiele kommen nie auf die Karte.
+A match that appears in both (same DFBnet ID) counts once. Pitches
+are merged by name and postal code - an artificial-turf pitch and a
+grass pitch of the same club remain two points, the same pitch from two
+sources becomes one. Future matches never appear on the map.
 """
 import re
 from datetime import date

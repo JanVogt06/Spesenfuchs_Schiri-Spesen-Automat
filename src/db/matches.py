@@ -1,10 +1,10 @@
 """
-Datenbankzugriff fuer Spiele, Unparteiische und deren Fahrtkosten.
+Database access for matches, officials and their travel costs.
 
-Die Spiele lagen frueher nur als spesen_data.json in den Session-Ordnern. Hier
-werden sie gelesen und geschrieben - in genau der Struktur, die der Scraper
-liefert und der Generator erwartet ('spiel_info', 'schiedsrichter',
-'spielstaette'), damit an beiden Enden nichts umgebaut werden muss.
+The matches used to exist only as spesen_data.json in the session folders. Here
+they are read and written - in exactly the structure that the scraper
+delivers and the generator expects ('spiel_info', 'schiedsrichter',
+'spielstaette'), so that nothing has to be rebuilt at either end.
 """
 import sqlite3
 from datetime import datetime, UTC
@@ -15,49 +15,49 @@ from utils.logger import setup_logger
 
 logger = setup_logger("db_matches")
 
-# Reihenfolge der Rollen im Formular. Die Vorlage hat genau drei Spalten;
-# weitere Unparteiische (Turniertage mit mehreren SR) werden gespeichert,
-# aber nicht ins Dokument uebernommen.
+# Order of the roles in the form. The template has exactly three columns;
+# further officials (tournament days with several SR) are stored
+# but not carried over into the document.
 FORM_ROLES = [("SR", 0, "sr"), ("SRA 1", 0, "sra1"), ("SRA 2", 0, "sra2")]
 
-# Felder, die beim erneuten Scrapen nur uebernommen werden, wenn der Scraper
-# tatsaechlich einen Wert geliefert hat. Er gibt bei Teilfehlern leere Strings
-# zurueck - ein blindes Ueberschreiben wuerde gute Daten vernichten.
+# Fields that are only taken over on a re-scrape if the scraper
+# actually delivered a value. On partial failures it returns empty strings
+# - blind overwriting would destroy good data.
 _MERGE_FIELDS = [
     "heim_team", "gast_team", "anpfiff", "mannschaftsart", "spielklasse",
     "staffel", "spieltag", "staette_name", "staette_adresse", "staette_platz_typ",
-    # Zahlen: NULLIF(x, '') laesst sie durch, COALESCE behaelt bei NULL den alten Wert
+    # Numbers: NULLIF(x, '') lets them through, COALESCE keeps the old value on NULL
     "staette_lat", "staette_lon",
 ]
 
-# Spalten, die erst eine spaetere Migration anlegt (024) - siehe upsert_match
+# Columns that only a later migration creates (024) - see upsert_match
 _NUR_MIT_WERT = ["staette_lat", "staette_lon"]
 
 
 def build_match_key(spiel_info: Dict, spielstaette: Dict, datum: str) -> str:
     """
-    Baut die kanonische Identitaet eines Spiels.
+    Builds the canonical identity of a match.
 
-    Seit November 2026 bringt jedes gelesene Spiel seine DFBnet-ID mit
-    (Spalte dfb_spiel_id), und die ist dann seine Identitaet - siehe
-    _schreibe_mit_id. Dieser Schluessel bleibt fuer Zeilen ohne ID, fuer das
-    Uebernehmen solcher Zeilen und fuer die Eindeutigkeit je Nutzer.
+    Since November 2026 every read match brings its DFBnet ID with it
+    (column dfb_spiel_id), and that is then its identity - see
+    _schreibe_mit_id. This key remains for rows without an ID, for
+    taking over such rows and for uniqueness per user.
 
-    Mannschaftsart und Spielklasse gehoeren dazu, weil dieselben zwei Vereine
-    am selben Tag zwei verschiedene Ansetzungen haben koennen - etwa ein
-    Hallenturnier mit G-Junioren um 09:00 und C-Junioren um 14:00. Ohne sie
-    faenden beide in einer Zeile zusammen und eine der beiden Abrechnungen
-    waere weder sichtbar noch abrufbar.
+    Team type and Spielklasse (league level) are part of it because the same two clubs
+    can have two different assignments on the same day - for example an
+    indoor tournament with G-Junioren at 09:00 and C-Junioren at 14:00. Without them
+    both would collapse into one row and one of the two settlements
+    would be neither visible nor retrievable.
 
-    Die Anstosszeit gehoert bewusst NICHT dazu: in den echten Daten sind 19 von
-    20 Mehrfachvorkommen blosse Verlegungen derselben Ansetzung (gleiche
-    Mannschaftsart und Spielklasse, Anpfiff um 30 bis 120 Minuten verschoben).
-    Die sollen zusammenfallen, sonst stuende jede Verlegung doppelt in der
-    Liste und die eingetragenen Kilometer haengten an der veralteten Zeile.
+    The kick-off time is deliberately NOT part of it: in the real data 19 of
+    20 multiple occurrences are mere reschedulings of the same assignment (same
+    team type and Spielklasse, kick-off shifted by 30 to 120 minutes).
+    They should coincide, otherwise every rescheduling would appear twice in the
+    list and the entered kilometres would hang on the outdated row.
 
-    Turnier-Ansetzungen haben keine Teams (dafuer mehrere Unparteiische in der
-    Rolle SR). Fuer sie treten Spielstaette und Anpfiff an die Stelle der
-    Teams, sonst wuerden zwei Turniere am selben Tag zu einer Zeile kollabieren.
+    Tournament assignments have no teams (instead several officials in the
+    role SR). For them venue and kick-off take the place of the
+    teams, otherwise two tournaments on the same day would collapse into one row.
     """
     heim = (spiel_info.get("heim_team") or "").strip()
     gast = (spiel_info.get("gast_team") or "").strip()
@@ -74,7 +74,7 @@ def build_match_key(spiel_info: Dict, spielstaette: Dict, datum: str) -> str:
 
 
 def _expense_prefix(rolle: str, seq: int) -> Optional[str]:
-    """Rolle -> Praefix der Formularfelder (sr/sra1/sra2), oder None."""
+    """Role -> prefix of the form fields (sr/sra1/sra2), or None."""
     for form_rolle, form_seq, prefix in FORM_ROLES:
         if rolle == form_rolle and seq == form_seq:
             return prefix
@@ -82,9 +82,9 @@ def _expense_prefix(rolle: str, seq: int) -> Optional[str]:
 
 
 def _merge_sets(quelle: str, values: Dict) -> str:
-    # Nur nicht-leere Werte uebernehmen; '' bedeutet "Scraper hat nichts
-    # geliefert", nicht "Feld ist jetzt leer". Felder, die gar nicht
-    # mitkommen (siehe _NUR_MIT_WERT), bleiben ganz aussen vor.
+    # Only take over non-empty values; '' means "scraper delivered
+    # nothing", not "field is now empty". Fields that do not come along at all
+    # (see _NUR_MIT_WERT) stay entirely out of it.
     return ",\n                ".join(
         f"{field} = COALESCE(NULLIF({quelle}{field}, ''), matches.{field})"
         for field in _MERGE_FIELDS if field in values
@@ -92,7 +92,7 @@ def _merge_sets(quelle: str, values: Dict) -> str:
 
 
 def _schreibe_ohne_id(conn: sqlite3.Connection, values: Dict) -> int:
-    """Alter Weg ohne DFBnet-ID: das Spiel ist, was denselben match_key hat."""
+    """Old way without a DFBnet ID: the match is whatever has the same match_key."""
     columns = ", ".join(values)
     placeholders = ", ".join(f":{name}" for name in values)
 
@@ -106,8 +106,8 @@ def _schreibe_ohne_id(conn: sqlite3.Connection, values: Dict) -> int:
             missing_since = NULL
     """, values)
 
-    # Nicht lastrowid verwenden: nach ON CONFLICT DO UPDATE zeigt es nicht
-    # zuverlaessig auf die aktualisierte Zeile.
+    # Do not use lastrowid: after ON CONFLICT DO UPDATE it does not
+    # reliably point to the updated row.
     return conn.execute(
         "SELECT id FROM matches WHERE user_id = ? AND match_key = ?",
         (values["user_id"], values["match_key"]),
@@ -117,10 +117,10 @@ def _schreibe_ohne_id(conn: sqlite3.Connection, values: Dict) -> int:
 def _freier_key(conn: sqlite3.Connection, user_id: int, match_key: str,
                 dfb_spiel_id: str, eigene_id: Optional[int]) -> str:
     """
-    Der match_key fuer ein Spiel mit ID. Gehoert der Schluessel schon einer
-    anderen Zeile - ein anderes DFBnet-Spiel mit denselben Teams, Datum und
-    Klasse, oder eine Altlast nach einer Verlegung -, wird die ID angehaengt.
-    Die Eindeutigkeit (user_id, match_key) bleibt so erhalten.
+    The match_key for a match with an ID. If the key already belongs to
+    another row - another DFBnet match with the same teams, date and
+    class, or a legacy row after a rescheduling - the ID is appended.
+    The uniqueness (user_id, match_key) is thus preserved.
     """
     belegt = conn.execute(
         "SELECT 1 FROM matches WHERE user_id = ? AND match_key = ? AND id IS NOT ?",
@@ -131,10 +131,10 @@ def _freier_key(conn: sqlite3.Connection, user_id: int, match_key: str,
 
 def _schreibe_mit_id(conn: sqlite3.Connection, values: Dict, dfb_spiel_id: str) -> int:
     """
-    Die DFBnet-ID ist die Identitaet des Spiels. Gesucht wird erst nach ihr,
-    dann nach einer Zeile aus der Zeit vor den IDs mit demselben match_key -
-    die bekommt die ID und ist ab dann dieses Spiel. Eine Verlegung, auch auf
-    einen anderen Tag, bleibt so in derselben Zeile samt Fahrtkosten.
+    The DFBnet ID is the identity of the match. It is searched for first,
+    then for a row from the time before the IDs with the same match_key -
+    that one gets the ID and from then on is this match. A rescheduling, even to
+    another day, thus stays in the same row including travel costs.
     """
     user_id = values["user_id"]
 
@@ -179,24 +179,24 @@ def upsert_match(
     conn: Optional[sqlite3.Connection] = None,
 ) -> int:
     """
-    Legt ein Spiel an oder aktualisiert es und ersetzt die Unparteiischen.
+    Creates a match or updates it and replaces the officials.
 
-    Zwei Dinge werden bewusst NICHT ueberschrieben, wenn das Spiel schon
-    existiert:
+    Two things are deliberately NOT overwritten if the match already
+    exists:
 
-    - die eingefrorenen Spesensaetze und der km-Satz. Sie gelten ab dem ersten
-      Scrape, damit eine spaetere Aenderung der Spesenordnung keine bereits
-      abgegebene Abrechnung rueckwirkend umschreibt.
-    - leere Felder aus einem Teilfehler des Scrapers (siehe _MERGE_FIELDS).
+    - the frozen expense rates and the km rate. They apply from the first
+        scrape on, so that a later change of the expense regulations does not rewrite a settlement
+        that has already been submitted retroactively.
+    - empty fields from a partial failure of the scraper (see _MERGE_FIELDS).
 
-    Die erfassten Fahrtkosten haengen an (match_id, rolle, seq) in einer
-    eigenen Tabelle und ueberleben das Ersetzen der Unparteiischen.
+    The recorded travel costs hang on (match_id, rolle, seq) in a
+    table of their own and survive the replacement of the officials.
 
-    Bringt das Spiel eine DFBnet-ID mit (spiel_info['dfb_spiel_id']), ist sie
-    die Identitaet; sonst der match_key (siehe _schreibe_mit_id).
+    If the match brings a DFBnet ID (spiel_info['dfb_spiel_id']), it is
+    the identity; otherwise the match_key (see _schreibe_mit_id).
 
     Returns:
-        Die ID des Spiels.
+            The ID of the match.
     """
     own_conn = conn is None
     conn = conn or get_connection()
@@ -231,9 +231,9 @@ def upsert_match(
         "scraped_at": scraped_at,
     }
 
-    # Spalten juengerer Migrationen nur schreiben, wenn es einen Wert gibt.
-    # Migration 006 legt mit genau dieser Funktion Spiele aus Altdaten an -
-    # gegen ein Schema, in dem es die Spalten noch nicht gibt.
+    # Write columns of newer migrations only if there is a value.
+    # Migration 006 creates matches from legacy data with exactly this function -
+    # against a schema in which these columns do not exist yet.
     for spalte in _NUR_MIT_WERT:
         if values[spalte] is None:
             del values[spalte]
@@ -246,8 +246,8 @@ def upsert_match(
         else:
             match_id = _schreibe_ohne_id(conn, values)
 
-        # Schnappschuss der Unparteiischen ersetzen - aber nur, wenn der
-        # Scrape welche geliefert hat. Sonst bliebe das Dokument namenlos.
+        # Replace the snapshot of the officials - but only if the
+        # scrape delivered some. Otherwise the document would be nameless.
         if schiedsrichter:
             conn.execute("DELETE FROM match_officials WHERE match_id = ?", (match_id,))
 
@@ -265,7 +265,7 @@ def upsert_match(
                     "strasse": person.get("strasse") or "",
                     "plz_ort": person.get("plz_ort") or "",
                 }
-                # ist_selbst hat den Standard 0; wie oben nur schreiben, wenn es zaehlt
+                # ist_selbst defaults to 0; as above, only write if it matters
                 if person.get("selbst"):
                     zeile["ist_selbst"] = 1
                 conn.execute(
@@ -274,14 +274,14 @@ def upsert_match(
                     zeile,
                 )
 
-            # Erfasste Fahrtkosten werden hier bewusst NICHT angetastet, auch
-            # nicht fuer Rollen, die in diesem Scrape fehlen. Eine kuerzere
-            # Liste kann auch ein Lesefehler sein (frueher ein aufgelaufenes
-            # Modal), ohne dass sich an der Ansetzung etwas geaendert haette - ein Loeschen
-            # wuerde dann Eingaben des Nutzers vernichten. Zu einer nicht mehr
-            # besetzten Rolle gehoerende Werte werden stattdessen beim Lesen
-            # ausgeblendet (siehe _rows_to_matches) und tauchen wieder auf,
-            # wenn die Rolle zurueckkommt.
+            # Recorded travel costs are deliberately NOT touched here, not even
+            # for roles missing from this scrape. A shorter
+            # list can also be a read error (formerly an accumulated
+            # modal) without anything having changed in the assignment - deleting would then
+            # destroy the user's entries. Values belonging to a role that is no longer
+            # occupied are instead hidden when reading
+            # (see _rows_to_matches) and reappear
+            # when the role comes back.
 
         if own_conn:
             conn.commit()
@@ -295,37 +295,37 @@ def upsert_match(
 def mark_missing_matches(user_id: int, seen_keys: List[str], now: Optional[str] = None,
                          seen_ids: Iterable[int] = ()) -> int:
     """
-    Markiert kuenftige Ansetzungen, die im letzten Scrape nicht mehr auftauchten.
+    Marks future assignments that no longer appeared in the last scrape.
 
-    Wichtig ist die Einschraenkung auf kuenftige Spiele: der Abruf deckt nur
-    die laufende Saison ab (scraper/ansetzungen.zeitraum). Ein gespieltes
-    Spiel faellt zwangslaeufig irgendwann heraus - das ist Normalfall, keine
-    Ruecknahme. Ohne diese Bedingung wuerde jedes Spiel zum Saisonwechsel als
-    "fehlend" markiert und das Flag waere wertlos. (Bis November 2026 las der
-    Scraper die Liste "Meine Spiele" mit ihrem Fenster von rund 14 Tagen;
-    daher stammt die Regel.)
+    The restriction to future matches is important: the fetch covers only
+    the current season (scraper/ansetzungen.zeitraum). A played
+    match inevitably drops out at some point - that is normal, not
+    a withdrawal. Without this condition every match would be marked
+    "missing" at the season change and the flag would be worthless. (Until November 2026 the
+    scraper read the "Meine Spiele" list with its window of about 14 days;
+    that is where the rule comes from.)
 
-    Verschwindet dagegen ein Spiel, das noch bevorsteht, wurde die Ansetzung
-    tatsaechlich zurueckgezogen oder umbesetzt.
+    If, by contrast, a match that is still upcoming disappears, the assignment was
+    actually withdrawn or re-staffed.
 
-    Geloescht wird trotzdem nichts, damit eingetragene Kilometer nicht
-    mitverschwinden. Taucht das Spiel wieder auf, raeumt upsert_match die
-    Markierung weg.
+    Nothing is deleted anyway, so that entered kilometres do not
+    disappear with it. If the match reappears, upsert_match clears the
+    marker.
 
     Args:
-        seen_keys: match_keys aus dem Scrape (alter Weg)
-        seen_ids: Zeilen-IDs, die upsert_match geliefert hat. Seit Spiele mit
-            DFBnet-ID auch bei geaendertem Schluessel in ihrer Zeile bleiben,
-            ist das der verlaessliche Weg.
+            seen_keys: match_keys from the scrape (old way)
+            seen_ids: row IDs that upsert_match returned. Since matches with a
+                    DFBnet ID stay in their row even when the key changes,
+                    this is the reliable way.
 
     Returns:
-        Anzahl neu markierter Spiele.
+            Number of newly marked matches.
     """
     seen_keys = list(seen_keys or [])
     seen_ids = [int(i) for i in seen_ids or []]
     if not seen_keys and not seen_ids:
-        # Leerer Scrape: nichts markieren. Ein Login-Fehler oder eine
-        # spielfreie Woche darf nicht die ganze Historie entwerten.
+        # Empty scrape: mark nothing. A login error or a week
+        # without matches must not devalue the whole history.
         return 0
 
     now = now or datetime.now(UTC).isoformat()
@@ -350,7 +350,7 @@ def mark_missing_matches(user_id: int, seen_keys: List[str], now: Optional[str] 
 
 
 def _rows_to_matches(match_rows, official_rows, expense_rows) -> List[Dict]:
-    """Baut aus den drei Tabellen die Struktur, die Scraper und Generator sprechen."""
+    """Builds from the three tables the structure that scraper and generator speak."""
     officials_by_match: Dict[int, List[Dict]] = {}
     for row in official_rows:
         officials_by_match.setdefault(row["match_id"], []).append(dict(row))
@@ -367,13 +367,13 @@ def _rows_to_matches(match_rows, official_rows, expense_rows) -> List[Dict]:
             key=lambda o: (o["rolle"], o["seq"]),
         )
 
-        # Flaches Dict fuer den Generator: sr_km, sra1_oevm, ...
+        # Flat dict for the generator: sr_km, sra1_oevm, ...
         #
-        # Nur Rollen, die aktuell auch besetzt sind. Erfasste Werte zu einer
-        # zurueckgezogenen Assistenz bleiben in der Datenbank stehen (ein
-        # Scrape darf keine Nutzereingaben vernichten), gehoeren aber weder in
-        # die Anzeige noch ins Dokument. Kommt die Rolle zurueck, ist der Wert
-        # wieder da.
+        # Only roles that are currently occupied. Recorded values for a
+        # withdrawn assistant stay in the database (a
+        # scrape must not destroy user input), but belong neither in
+        # the display nor in the document. If the role comes back, the value is
+        # there again.
         besetzte_rollen = {(o["rolle"], o["seq"]) for o in officials if o.get("name")}
 
         flat_expenses: Dict[str, Optional[float]] = {}
@@ -385,9 +385,9 @@ def _rows_to_matches(match_rows, official_rows, expense_rows) -> List[Dict]:
                 flat_expenses[f"{prefix}_km"] = entry["km"]
                 flat_expenses[f"{prefix}_oevm"] = entry["oevm"]
 
-        # Die eigene Zeile im Gespann, wie die Ansetzung sie markiert hat.
-        # Steht bewusst nicht in "schiedsrichter": das Frontend zeigt jedes
-        # Feld einer Person an.
+        # The user's own row in the crew, as the assignment marked it.
+        # Deliberately not in "schiedsrichter": the frontend displays every
+        # field of a person.
         selbst = next(({"rolle": o["rolle"], "seq": o["seq"]} for o in officials if o.get("ist_selbst")), None)
 
         matches.append({
@@ -426,7 +426,7 @@ def _rows_to_matches(match_rows, official_rows, expense_rows) -> List[Dict]:
 
 
 def get_matches_for_user(user_id: int, include_missing: bool = True) -> List[Dict]:
-    """Alle Spiele eines Users, neueste zuerst, inklusive Unparteiischer und Spesen."""
+    """All matches of a user, newest first, including officials and expenses."""
     conn = get_connection()
 
     try:
@@ -456,7 +456,7 @@ def get_matches_for_user(user_id: int, include_missing: bool = True) -> List[Dic
 
 
 def get_match(match_id: int) -> Optional[Dict]:
-    """Ein einzelnes Spiel samt Unparteiischen und Spesen, oder None."""
+    """A single match including officials and expenses, or None."""
     conn = get_connection()
 
     try:
@@ -478,13 +478,13 @@ def get_match(match_id: int) -> Optional[Dict]:
 
 def set_official_expenses(match_id: int, expenses: Dict[str, Optional[float]]) -> None:
     """
-    Speichert Fahrtkosten und OeVM fuer ein Spiel.
+    Stores travel costs and public transport (OeVM) for a match.
 
     Args:
-        expenses: Flaches Dict aus dem Formular, z.B. {'sr_km': 42.0,
-                  'sra1_oevm': 7.5}. Nur uebergebene Schluessel werden
-                  angefasst - ein Teil-Update darf die anderen Rollen nicht
-                  auf NULL setzen. None als Wert loescht den Eintrag.
+            expenses: Flat dict from the form, e.g. {'sr_km': 42.0,
+                                'sra1_oevm': 7.5}. Only passed keys are
+                                touched - a partial update must not set the other roles
+                                to NULL. None as a value deletes the entry.
     """
     conn = get_connection()
     now = datetime.now(UTC).isoformat()
@@ -526,10 +526,10 @@ def set_official_expenses(match_id: int, expenses: Dict[str, Optional[float]]) -
 
 def count_distinct_matches() -> int:
     """
-    Anzahl verschiedener Spiele ueber alle User - fuer die Zahl auf der
-    Startseite. Ein Spiel, das drei Unparteiische aus der Nutzerbasis leiten,
-    liegt dreimal in der Tabelle und zaehlt hier trotzdem einmal: der
-    match_key ist userunabhaengig.
+    Number of distinct matches across all users - for the number on the
+    start page. A match refereed by three officials from the user base
+    lies in the table three times and still counts once here: the
+    match_key is user-independent.
     """
     conn = get_connection()
 
@@ -542,20 +542,20 @@ def count_distinct_matches() -> int:
 
 def ergaenze_offene_saetze() -> int:
     """
-    Traegt Spesensaetze nach, die beim Scrapen noch nicht zu ermitteln waren.
+    Fills in expense rates that could not yet be determined while scraping.
 
-    Bei Pokal- und Freundschaftsspielen im Herrenbereich haengt der Satz an der
-    Spielklasse der beteiligten Vereine. Die steht in den Ligatabellen, und die
-    werden erst naechtlich gefuellt - ein Spiel, das im Juli angesetzt wurde,
-    hatte zu diesem Zeitpunkt vielleicht noch keine Tabelle zum Nachschlagen.
-    Ein Aufstieg oder Abstieg kann die Antwort ebenfalls erst spaeter liefern.
+    For cup and friendly matches in the men's (Herren) category the rate depends on the
+    Spielklasse of the participating clubs. That is in the league tables, and those
+    are only filled nightly - a match assigned in July
+    may not yet have had a table to look up at that point.
+    A promotion or relegation may likewise only deliver the answer later.
 
-    Angefasst werden nur Zeilen OHNE Satz. Ein einmal eingefrorener Wert bleibt,
-    wie er ist - er kann in einer bereits abgegebenen Abrechnung stehen. Diese
-    Funktion fuellt Luecken, sie korrigiert nicht.
+    Only rows WITHOUT a rate are touched. A value frozen once stays
+    as it is - it may appear in a settlement that has already been submitted. This
+    function fills gaps, it does not correct.
 
     Returns:
-        Zahl der ergaenzten Spiele.
+            Number of matches filled in.
     """
     from generator.spesen_calculator import calculate_spesen
 
@@ -598,20 +598,20 @@ def ergaenze_offene_saetze() -> int:
 
 def setze_spielnummern(user_id: int, eintraege: Iterable[Dict]) -> int:
     """
-    Traegt die Spielkennung (z.B. "659000082") bei den Spielen eines Nutzers ein.
+    Enters the match identifier (e.g. "659000082") for a user's matches.
 
-    Die Ansetzungs-Schnittstelle kennt sie nicht; sie kommt aus dem
-    Einsatzplan der Spielberichte. Dort tragen nur vergangene Spiele mit
-    Bericht einen Link und damit die DFBnet-ID - kuenftige werden ueber Tag,
-    Mannschaften und Anstoss zugeordnet, nach derselben Regel wie die
-    Berichte in der Spieleliste (db.spielberichte.Zuordnung).
+    The assignment interface does not know it; it comes from the
+    duty roster of the match reports. There only past matches with a
+    report carry a link and thus the DFBnet ID - future ones are matched via day,
+    teams and kick-off, by the same rule as the
+    reports in the match list (db.spielberichte.Zuordnung).
 
     Args:
-        eintraege: je {"spielkennung", "dfb_spiel_id" (oder None), "datum",
-            "uhrzeit", "heim", "gast"}
+            eintraege: each {"spielkennung", "dfb_spiel_id" (or None), "datum",
+                    "uhrzeit", "heim", "gast"}
 
     Returns:
-        Anzahl Spiele, deren Spielkennung neu gesetzt oder geaendert wurde.
+            Number of matches whose Spielkennung was newly set or changed.
     """
     from db.spielberichte import Zuordnung
 
@@ -637,7 +637,7 @@ def setze_spielnummern(user_id: int, eintraege: Iterable[Dict]) -> int:
             if zeile is None and eintrag.get("datum") and eintrag.get("heim"):
                 zeile = zuordnung.finde(eintrag["datum"], eintrag["heim"],
                                         eintrag.get("gast") or "", eintrag.get("uhrzeit") or "")
-                # Eine Zeile mit anderer ID ist ein anderes Spiel
+                # A row with a different ID is a different match
                 if zeile and zeile["dfb_spiel_id"] and eintrag.get("dfb_spiel_id") \
                         and zeile["dfb_spiel_id"] != eintrag["dfb_spiel_id"]:
                     zeile = None

@@ -1,15 +1,15 @@
 """
-Datenbankzugriff fuer die Spielberichte und ihre angehaengten Dokumente.
+Database access for the match reports (Spielberichte) and their attached documents.
 
-Anders als bei den Saisons wird hier nicht saisonweise ersetzt, sondern je
-Bericht geschrieben: ein Lauf liest nur Berichte, die neu sind oder noch
-nachgetragen werden koennten (Sonderberichte kommen oft Tage spaeter). Was
-DFBnet bei einem Bericht nicht mehr fuehrt - ein geloeschtes Dokument -,
-verschwindet auch hier.
+Unlike with the seasons, nothing is replaced season by season here; instead each
+report is written: a run only reads reports that are new or could still
+be supplemented (special reports often arrive days later). What
+DFBnet no longer keeps for a report - a deleted document -
+disappears here as well.
 
-Die Dateien liegen unter DATA_DIR/spielberichte/<user_id>/<dfb_spiel_id>/.
-Der Dateiname auf der Platte besteht nur aus DFBnet-IDs; der echte Name steht
-in der Datenbank und wird erst beim Download wieder angelegt.
+The files live under DATA_DIR/spielberichte/<user_id>/<dfb_spiel_id>/.
+The file name on disk consists only of DFBnet IDs; the real name is kept
+in the database and is only recreated on download.
 """
 import json
 import re
@@ -32,7 +32,7 @@ def _benutzer_ordner(user_id: int) -> Path:
 
 
 def _dateipfad(user_id: int, dfb_spiel_id: str, dfb_dokument_id: str, dateiname: str) -> Path:
-    """Pfad einer Dokumentdatei - nur aus IDs und einer bereinigten Endung."""
+    """Path of a document file - only from IDs and a sanitized extension."""
     endung = Path(dateiname or "").suffix.lstrip(".")
     endung = _SICHER.sub("", endung)[:5].lower() or "bin"
     return (
@@ -43,11 +43,11 @@ def _dateipfad(user_id: int, dfb_spiel_id: str, dfb_dokument_id: str, dateiname:
 
 
 def normalisiere_team(name: str) -> str:
-    """Fuer den Abgleich: ohne weiche Trennstriche, Satzzeichen und Gross/Klein."""
+    """For matching: without soft hyphens, punctuation and case."""
     return re.sub(r"[\W_]+", "", (name or "").replace("­", "")).casefold()
 
 
-# ------------------------------------------------------------------ Schreiben
+# ------------------------------------------------------------------ Writing
 
 def speichere_bericht(
     user_id: int,
@@ -58,17 +58,17 @@ def speichere_bericht(
     scraped_at: Optional[str] = None,
 ) -> int:
     """
-    Schreibt einen Bericht samt Dokumenten.
+    Writes a report including its documents.
 
     Args:
-        zeile: die Einsatzplan-Zeile (dfb_spiel_id, datum, uhrzeit, gruppe,
-               nummer, heim, gast, ergebnis)
-        daten: der aufbereitete Bericht (scraper.spielberichte.aufbereiten)
-        dateien: neu geladene Dokumente, dfb_dokument_id -> Inhalt. Dokumente,
-                 die schon gespeichert sind, fehlen hier und bleiben stehen.
+            zeile: the duty-roster row (dfb_spiel_id, datum, uhrzeit, gruppe,
+                          nummer, heim, gast, ergebnis)
+            daten: the processed report (scraper.spielberichte.aufbereiten)
+            dateien: newly loaded documents, dfb_dokument_id -> content. Documents
+                              that are already stored are missing here and stay in place.
 
     Returns:
-        id des Berichts.
+            id of the report.
     """
     scraped_at = scraped_at or datetime.now(UTC).isoformat()
     kosten = daten.get("kosten") or {}
@@ -139,8 +139,8 @@ def speichere_bericht(
             if dok_id in vorhanden and dok_id not in dateien:
                 continue
             if dok_id not in dateien:
-                # Weder gespeichert noch geladen (Download fehlgeschlagen) -
-                # der naechste Lauf versucht es wieder.
+                # Neither stored nor loaded (download failed) -
+                # the next run tries again.
                 continue
 
             pfad = _dateipfad(user_id, dfb_spiel_id, dok_id, dokument.get("dateiname"))
@@ -218,7 +218,7 @@ def setze_saison(user_id: int, saison: str, anzahl: int, fertig: bool,
 
 
 def delete_spielberichte(user_id: int) -> int:
-    """Loescht alle Berichte und Dokumente eines Users (Wechsel des DFBnet-Kontos)."""
+    """Deletes all reports and documents of a user (change of the DFBnet account)."""
     conn = get_connection()
     try:
         conn.execute("BEGIN")
@@ -241,7 +241,7 @@ def delete_spielberichte(user_id: int) -> int:
     return cursor.rowcount
 
 
-# -------------------------------------------------------------------- Lesen
+# -------------------------------------------------------------------- Reading
 
 def get_fertige_saisons(user_id: int) -> Set[str]:
     conn = get_connection()
@@ -255,7 +255,7 @@ def get_fertige_saisons(user_id: int) -> Set[str]:
 
 
 def get_gespeicherte(user_id: int) -> Dict[str, str]:
-    """dfb_spiel_id -> scraped_at aller gespeicherten Berichte."""
+    """dfb_spiel_id -> scraped_at of all stored reports."""
     conn = get_connection()
     try:
         rows = conn.execute(
@@ -267,7 +267,7 @@ def get_gespeicherte(user_id: int) -> Dict[str, str]:
 
 
 def get_dokument_ids(user_id: int) -> Set[str]:
-    """IDs der Dokumente, deren Datei schon auf der Platte liegt."""
+    """IDs of the documents whose file is already on disk."""
     conn = get_connection()
     try:
         rows = conn.execute("""
@@ -284,8 +284,8 @@ def get_dokument_ids(user_id: int) -> Set[str]:
 
 def get_index(user_id: int) -> List[Dict]:
     """
-    Die Kopfzeilen aller Berichte eines Users - fuer die Zuordnung zu Saison-
-    und Spesenspielen, ohne die grossen JSON-Spalten zu laden.
+    The header rows of all reports of a user - for matching to season
+    and expense matches, without loading the large JSON columns.
     """
     conn = get_connection()
     try:
@@ -304,8 +304,8 @@ def get_index(user_id: int) -> List[Dict]:
 
 def get_spielorte(user_id: int) -> List[Dict]:
     """
-    Spielstaette und Ausgang je Bericht - fuer die Karte der besuchten Plaetze.
-    Liest aus dem JSON nur die beiden Teile, die dafuer zaehlen.
+    Venue and outcome per report - for the map of the visited venues.
+    Reads from the JSON only the two parts that matter for it.
     """
     conn = get_connection()
     try:
@@ -330,21 +330,21 @@ def get_spielorte(user_id: int) -> List[Dict]:
             "heim": row["heim"],
             "gast": row["gast"],
             "spielstaette": daten.get("spielstaette") or {},
-            # Ausgefallen: eine Wertung, aber kein Endstand
+            # Cancelled: a ruling (Wertung), but no final score
             "ausgefallen": bool(ergebnis.get("wertung")) and not ergebnis.get("endstand"),
         })
     return orte
 
 
-# Was in den DFBnet-Modulen mal am Mannschaftsnamen steht und mal nicht:
-# Altersklasse ("U19", "U18/U19"), Mannschaftsnummer ("2.", "II", "1") und
-# Rechtsform ("e.V."). Der Spielbericht schreibt "SG Dynamo Dresden", die
-# Saisonliste "SG Dynamo Dresden U19"; "Hertha BSC II" ist "Hertha BSC U23".
+# What in the DFBnet modules sometimes appears in the team name and sometimes not:
+# age group ("U19", "U18/U19"), team number ("2.", "II", "1") and
+# legal form ("e.V."). The match report writes "SG Dynamo Dresden", the
+# season list "SG Dynamo Dresden U19"; "Hertha BSC II" is "Hertha BSC U23".
 _ZUSATZ = re.compile(r"^(u\d{1,2}|i{1,3}|iv|\d{1,2}|e|v|ev)$")
 
 
 def team_kern(name: str) -> str:
-    """Der Vereinsname ohne Altersklasse, Mannschaftsnummer und Rechtsform."""
+    """The club name without age group, team number and legal form."""
     text = (name or "").replace("\u00ad", "").casefold()
     woerter = [w for w in re.split(r"[\W_]+", text) if w and not _ZUSATZ.match(w)]
     return "".join(woerter)
@@ -352,9 +352,9 @@ def team_kern(name: str) -> str:
 
 def _gleiches_team(a: str, b: str) -> bool:
     """
-    Gleicher Kern, oder der eine steckt im anderen ("Arminia Bielefeld" in
-    "DSC Arminia Bielefeld"). Zu kurze Kerne zaehlen nicht - sonst passte
-    "SV" auf jeden Sportverein.
+    Same core, or one is contained in the other ("Arminia Bielefeld" in
+    "DSC Arminia Bielefeld"). Cores that are too short do not count - otherwise "SV"
+    would match every sports club.
     """
     ka, kb = team_kern(a), team_kern(b)
     if not ka or not kb:
@@ -366,22 +366,22 @@ def _gleiches_team(a: str, b: str) -> bool:
 
 
 def uhrzeit_aus(text: str) -> str:
-    """'So., 22.11.2026 13:30' / '13:30' -> '13:30', sonst ''."""
+    """'So., 22.11.2026 13:30' / '13:30' -> '13:30', otherwise ''."""
     treffer = re.search(r"(\d{1,2}):(\d{2})", text or "")
     return f"{int(treffer.group(1)):02d}:{treffer.group(2)}" if treffer else ""
 
 
 class Zuordnung:
     """
-    Findet zu einem Spiel (Datum, Heim, Gast, Anstoss) den passenden Bericht.
+    Finds the matching report for a match (date, home, away, kick-off).
 
-    Die Namen der Mannschaften sind in den DFBnet-Modulen nicht gleich
-    geschrieben (siehe team_kern). Zugeordnet wird deshalb, wenn am selben Tag
-    beide Mannschaften passen - oder eine passt UND die Anstosszeit stimmt.
+    The team names are not written identically in the DFBnet modules
+    (see team_kern). A match is therefore made when on the same day
+    both teams fit - or one fits AND the kick-off time agrees.
 
-    Bewusst NICHT: "der einzige Bericht an diesem Tag". Das ordnete einem
-    zurueckgezogenen Spiel den Bericht des Spiels zu, das man an dem Tag
-    stattdessen gepfiffen hat.
+    Deliberately NOT: "the only report on that day". That would assign to a
+    withdrawn match the report of the match that was refereed that day
+    instead.
     """
 
     def __init__(self, index: Iterable[Dict]):
@@ -399,7 +399,7 @@ class Zuordnung:
 
         beide = [k for k in kandidaten if _gleiches_team(k["heim"], heim) and _gleiches_team(k["gast"], gast)]
         if beide:
-            # Bei zwei Treffern (Hin- und Rueckspiel eines Turniertags) entscheidet die Zeit
+            # With two hits (first and second leg of a tournament day) the time decides
             return next((k for k in beide if k in zur_zeit), beide[0])
 
         eine = [k for k in zur_zeit if _gleiches_team(k["heim"], heim) or _gleiches_team(k["gast"], gast)]
@@ -407,7 +407,7 @@ class Zuordnung:
 
 
 def kurzinfo(eintrag: Optional[Dict]) -> Optional[Dict]:
-    """Was die Listen je Spiel vom Bericht brauchen."""
+    """What the lists need from the report for each match."""
     if not eintrag:
         return None
     return {
@@ -443,7 +443,7 @@ def get_bericht(user_id: int, bericht_id: int) -> Optional[Dict]:
 
 
 def get_dokument(user_id: int, bericht_id: int, dokument_id: int) -> Optional[Dict]:
-    """Ein Dokument samt absolutem Pfad - nur, wenn es dem User gehoert."""
+    """A document including its absolute path - only if it belongs to the user."""
     conn = get_connection()
     try:
         row = conn.execute("""

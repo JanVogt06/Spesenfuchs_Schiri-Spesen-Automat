@@ -1,6 +1,6 @@
 """
-Encryption Modul - Verschluesselung fuer DFB-Credentials
-Nutzt Fernet (symmetrische Verschluesselung)
+Encryption module - encryption for DFB credentials
+Uses Fernet (symmetric encryption)
 """
 import os
 from cryptography.fernet import Fernet
@@ -8,10 +8,10 @@ from cryptography.fernet import Fernet
 
 def get_encryption_key() -> bytes:
     """
-    Holt Encryption Key aus .env.
+    Reads the encryption key from .env.
 
     Returns:
-        Encryption Key als bytes
+        Encryption key as bytes
     """
     key = os.getenv("ENCRYPTION_KEY")
     if not key:
@@ -24,13 +24,13 @@ def get_encryption_key() -> bytes:
 
 def encrypt_credential(plaintext: str) -> str:
     """
-    Verschluesselt einen String (z.B. Passwort).
+    Encrypts a string (e.g. a password).
 
     Args:
-        plaintext: Klartext
+        plaintext: Plain text
 
     Returns:
-        Verschluesselter String (base64)
+        Encrypted string (base64)
     """
     if not plaintext:
         return ""
@@ -44,13 +44,13 @@ def encrypt_credential(plaintext: str) -> str:
 
 def decrypt_credential(encrypted: str) -> str:
     """
-    Entschluesselt einen String.
+    Decrypts a string.
 
     Args:
-        encrypted: Verschluesselter String (base64)
+        encrypted: Encrypted string (base64)
 
     Returns:
-        Klartext
+        Plain text
     """
     if not encrypted:
         return ""

@@ -1,10 +1,10 @@
 """
-Datenbankzugriff fuer die eigenen Beobachtungen (Noten) eines Schiedsrichters.
+Database access for a referee's own observations (Beobachtungen, grades).
 
-Geschrieben wird je (quelle, saison) ersetzend - wie bei den geleiteten
-Spielen in season.py. An den Zeilen haengt nichts, was der Nutzer selbst
-eingibt, und neue Beobachtungen der laufenden Saison werden nach und nach
-freigegeben.
+Writing replaces per (quelle, saison) - as with the refereed
+matches in season.py. Nothing on the rows is entered by the user themselves, and
+new observations of the current season are released
+gradually.
 """
 from datetime import date, datetime, UTC
 from typing import Dict, List, Optional, Set
@@ -15,10 +15,10 @@ from utils.saison_utils import saison_start_jahr
 
 logger = setup_logger("db_beobachtungen")
 
-# Wie lange nach Saisonende eine Saison noch nachgelesen wird. Beobachtungen
-# der letzten Spieltage werden oft erst im Juli freigegeben; wer die Saison
-# am 1. Juli liest und dann nie wieder, verpasst sie.
-_NACHLAUF_BIS_MONAT = 8  # gelesen ab dem 1. August gilt die Saison als fertig
+# How long after the end of a season it is still re-read. Observations
+# of the last matchdays are often only released in July; whoever reads the season
+# on 1 July and never again misses them.
+_NACHLAUF_BIS_MONAT = 8  # read from 1 August on, the season counts as finished
 
 
 def replace_beobachtungs_saison(
@@ -29,11 +29,11 @@ def replace_beobachtungs_saison(
     scraped_at: Optional[str] = None,
 ) -> int:
     """
-    Ersetzt die Beobachtungen einer Saison aus einer Quelle - in einer
-    Transaktion, damit nie eine halbe Saison stehen bleibt.
+    Replaces the observations of a season from one source - in one
+    transaction, so that never half a season is left behind.
 
     Returns:
-        Anzahl geschriebener Beobachtungen.
+            Number of observations written.
     """
     scraped_at = scraped_at or datetime.now(UTC).isoformat()
     conn = get_connection()
@@ -106,11 +106,11 @@ def get_fertige_beobachtungs_saisons(
     user_id: int, quelle: str, heute: Optional[date] = None
 ) -> Set[str]:
     """
-    Saisons, die nicht mehr gelesen werden muessen.
+    Seasons that no longer need to be read.
 
-    Fertig ist eine Saison, wenn sie gelesen wurde, als sie schon laenger
-    vorbei war (ab dem 1. August nach ihrem Ende). Die laufende Saison und die
-    gerade beendete sind damit nie fertig.
+    A season is finished if it was read when it was already over for longer
+    (from 1 August after its end). The current season and the
+    one that has just ended are therefore never finished.
     """
     heute = heute or date.today()
     conn = get_connection()
@@ -139,8 +139,8 @@ def get_fertige_beobachtungs_saisons(
 
 def get_beobachtungen(user_id: int) -> Dict:
     """
-    Alles, was der Reiter braucht: welche Saisons je Quelle gelesen sind und
-    alle eigenen Beobachtungen, neueste zuerst.
+    Everything the tab needs: which seasons have been read per source and
+    all own observations, newest first.
     """
     conn = get_connection()
 
@@ -168,7 +168,7 @@ def get_beobachtungen(user_id: int) -> Dict:
 
 
 def delete_beobachtungen(user_id: int) -> int:
-    """Loescht alle Beobachtungen eines Users (Wechsel des DFBnet-Kontos)."""
+    """Deletes all observations of a user (change of the DFBnet account)."""
     conn = get_connection()
 
     try:

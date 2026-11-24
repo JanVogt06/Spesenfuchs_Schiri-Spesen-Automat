@@ -1,10 +1,10 @@
 """
-Match Utilities - Gemeinsame Funktionen für Match-Daten-Verarbeitung
+Match utilities - shared functions for match data processing
 
-Diese Funktionen werden von mehreren Modulen verwendet:
-- main_api.py (API Endpoints)
-- docx_generator.py (Dokument-Generierung)
-- Weitere Module bei Bedarf
+These functions are used by several modules:
+- main_api.py (API endpoints)
+- docx_generator.py (document generation)
+- more modules as needed
 """
 import re
 from typing import Tuple
@@ -14,18 +14,18 @@ from generator.spesen_calculator import ist_nofv_spiel
 
 def generate_filename_from_match(match: dict) -> str:
     """
-    Generiert einen eindeutigen Dateinamen für ein Match-Dokument.
+    Generates a unique file name for a match document.
 
-    WICHTIG: Diese Funktion ist die EINZIGE Quelle für Dateinamen-Generierung!
-    Änderungen hier wirken sich auf alle Module aus.
+    IMPORTANT: This function is the ONLY source for file name generation!
+    Changes here affect all modules.
 
     Args:
-        match: Match-Dictionary mit spiel_info
+            match: Match dictionary with spiel_info
 
     Returns:
-        Dateiname im Format: Spesen_{heim}_vs_{gast}_{datum}.docx - bei
-        NOFV-Pflichtspielen mit .xlsx, denn deren Quittung ist eine Excel-Mappe
-        mit einem Blatt je Schiedsrichter.
+            File name in the format: Spesen_{heim}_vs_{gast}_{datum}.docx - for
+            NOFV mandatory (Pflicht) matches with .xlsx, because their receipt is an Excel workbook
+            with one sheet per referee.
 
     Example:
         >>> match = {'spiel_info': {'heim_team': 'FC Bayern', 'gast_team': 'BVB', 'anpfiff': 'Samstag · 08.11.2025 · 13:00 Uhr'}}
@@ -35,10 +35,10 @@ def generate_filename_from_match(match: dict) -> str:
     spiel_info = match.get('spiel_info', {})
     heim = spiel_info.get('heim_team') or ''
     gast = spiel_info.get('gast_team') or ''
-    # Die Spalte darf NULL sein - ein None wuerde re.search abstuerzen lassen
+    # The column may be NULL - a None would make re.search crash
     anpfiff = spiel_info.get('anpfiff') or ''
 
-    # Extrahiere Datum im Format "08.11.2025"
+    # Extract the date in the format "08.11.2025"
     datum_match = re.search(r'(\d{2}\.\d{2}\.\d{4})', anpfiff)
     if datum_match:
         datum_display = datum_match.group(1)
@@ -46,13 +46,13 @@ def generate_filename_from_match(match: dict) -> str:
     else:
         datum_clean = "01-01-2000"
 
-    # Bereinige Team-Namen (Slash kann Probleme im Dateisystem machen)
+    # Clean up team names (slash can cause problems in the file system)
     heim_clean = heim.replace('/', '-')
     gast_clean = gast.replace('/', '-')
 
-    # Turnier-Ansetzungen haben keine Teams. Ohne die Anstosszeit hiessen alle
-    # Turniere eines Tages gleich - im Sammel-ZIP landeten dann zwei Eintraege
-    # unter demselben Namen.
+    # Tournament assignments have no teams. Without the kick-off time all
+    # tournaments of one day would have the same name - in the bulk ZIP two entries would then
+    # end up under the same name.
     endung = "xlsx" if ist_nofv_spiel(spiel_info) else "docx"
 
     if not heim.strip() or not gast.strip():
@@ -65,14 +65,14 @@ def generate_filename_from_match(match: dict) -> str:
 
 def parse_anpfiff(anpfiff_str: str) -> Tuple[str, str]:
     """
-    Parsed einen Anpfiff-String in Datum und Uhrzeit.
+    Parses a kick-off (Anpfiff) string into date and time.
 
     Args:
-        anpfiff_str: String im Format "Wochentag · DD.MM.YYYY · HH:MM Uhr"
-                     z.B. "Samstag · 08.11.2025 · 13:00 Uhr"
+            anpfiff_str: String in the format "weekday · DD.MM.YYYY · HH:MM Uhr"
+                                      e.g. "Samstag · 08.11.2025 · 13:00 Uhr"
 
     Returns:
-        Tuple (datum, uhrzeit)
+            Tuple (datum, uhrzeit)
         - datum: "08.11.2025"
         - uhrzeit: "13:00"
 
@@ -94,14 +94,14 @@ def parse_anpfiff(anpfiff_str: str) -> Tuple[str, str]:
 
 def extract_iso_date_from_anpfiff(anpfiff: str) -> str:
     """
-    Extrahiert ISO-Datum aus Anpfiff-String für Sortierung/Vergleiche.
+    Extracts the ISO date from a kick-off string for sorting/comparison.
 
     Args:
-        anpfiff: String im Format "Wochentag · DD.MM.YYYY · HH:MM Uhr"
+            anpfiff: String in the format "weekday · DD.MM.YYYY · HH:MM Uhr"
 
     Returns:
-        ISO-Datum im Format "YYYY-MM-DD" für korrekte Sortierung
-        Bei Parsing-Fehler: "1900-01-01"
+            ISO date in the format "YYYY-MM-DD" for correct sorting
+            On parsing error: "1900-01-01"
 
     Example:
         >>> extract_iso_date_from_anpfiff("Samstag · 08.11.2025 · 13:00 Uhr")
@@ -117,20 +117,20 @@ def extract_iso_date_from_anpfiff(anpfiff: str) -> str:
 
 def sanitize_team_name(team_name: str) -> str:
     """
-    Bereinigt Team-Namen für Dateinamen und Anzeige.
+    Cleans up team names for file names and display.
 
-    Entfernt/ersetzt Zeichen die in Dateisystemen problematisch sind.
+    Removes/replaces characters that are problematic in file systems.
 
     Args:
-        team_name: Originaler Team-Name
+            team_name: Original team name
 
     Returns:
-        Bereinigter Team-Name
+            Cleaned team name
     """
     if not team_name:
         return "Unbekannt"
 
-    # Zeichen die in Dateinamen problematisch sind
+    # Characters that are problematic in file names
     replacements = {
         '/': '-',
         '\\': '-',
@@ -147,24 +147,24 @@ def sanitize_team_name(team_name: str) -> str:
     for old, new in replacements.items():
         result = result.replace(old, new)
 
-    # Bleibt nach dem Bereinigen nichts uebrig, gilt dasselbe wie fuer leer
+    # If nothing remains after cleaning, the same applies as for empty
     return result.strip() or "Unbekannt"
 
 
 def parse_saison_datum(text: str) -> Tuple[str, str]:
     """
-    Parsed die Datumsspalte aus der Tabelle der geleiteten Spiele.
+    Parses the date column from the table of refereed matches.
 
-    Dort steht das Jahr zweistellig ("20.09.26, 15:00"), anders als im
-    Anpfiff-String der Ansetzungen ("... · 08.11.2025 · ..."). Deshalb ein
-    eigener Parser statt extract_iso_date_from_anpfiff: dessen regulaerer
-    Ausdruck verlangt vier Stellen und faende hier gar nichts.
+    There the year is two-digit ("20.09.26, 15:00"), unlike in the
+    kick-off string of the assignments ("... · 08.11.2025 · ..."). Hence a
+    separate parser instead of extract_iso_date_from_anpfiff: its regular
+    expression requires four digits and would find nothing here.
 
     Args:
-        text: z.B. "20.09.26, 15:00"
+            text: e.g. "20.09.26, 15:00"
 
     Returns:
-        Tuple (iso_datum, uhrzeit), bei Parsing-Fehler ("1900-01-01", "")
+            Tuple (iso_date, time), on parsing error ("1900-01-01", "")
 
     Example:
         >>> parse_saison_datum("20.09.26, 15:00")
@@ -179,7 +179,7 @@ def parse_saison_datum(text: str) -> Tuple[str, str]:
 
     tag, monat, jahr = treffer.groups()
 
-    # DFBnet fuehrt die Spieltabelle nur fuer laufende und vergangene Saisons.
-    # Ein zweistelliges Jahr ist hier also immer 20xx - der Verband gibt es
-    # seit 1900 nicht als Alternative her.
+    # DFBnet keeps the match table only for current and past seasons.
+    # A two-digit year here is therefore always 20xx - the association does not offer
+    # 1900 as an alternative.
     return f"20{jahr}-{monat}-{tag}", uhrzeit

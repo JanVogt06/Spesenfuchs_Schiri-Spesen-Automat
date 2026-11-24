@@ -1,5 +1,5 @@
 """
-Error Handling - Einheitliche Error-Responses
+Error handling - uniform error responses
 """
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -8,14 +8,14 @@ from typing import Optional
 
 class APIError(HTTPException):
     """
-    Standardisierte API Error Response.
+    Standardized API error response.
 
-    Alle Errors haben dieses Format:
+    All errors have this format:
     {
         "error": {
             "code": "ERROR_CODE",
-            "message": "Benutzerfreundliche Nachricht",
-            "details": "Technische Details (optional)"
+            "message": "User-friendly message",
+            "details": "Technical details (optional)"
         }
     }
     """
@@ -44,10 +44,10 @@ class APIError(HTTPException):
         super().__init__(status_code=status_code, detail=detail)
 
 
-# ===== Vordefinierte Error-Typen =====
+# ===== Predefined error types =====
 
 class AuthenticationError(APIError):
-    """401 - Nicht angemeldet oder Token ungültig"""
+    """401 - Not logged in or token invalid"""
 
     def __init__(self, message: str = "Nicht angemeldet", details: Optional[str] = None):
         super().__init__(
@@ -59,7 +59,7 @@ class AuthenticationError(APIError):
 
 
 class AuthorizationError(APIError):
-    """403 - Keine Berechtigung"""
+    """403 - No permission"""
 
     def __init__(self, message: str = "Zugriff verweigert", details: Optional[str] = None):
         super().__init__(
@@ -71,7 +71,7 @@ class AuthorizationError(APIError):
 
 
 class NotFoundError(APIError):
-    """404 - Ressource nicht gefunden"""
+    """404 - Resource not found"""
 
     def __init__(self, message: str = "Nicht gefunden", details: Optional[str] = None):
         super().__init__(
@@ -83,7 +83,7 @@ class NotFoundError(APIError):
 
 
 class ValidationError(APIError):
-    """400 - Ungültige Eingabe"""
+    """400 - Invalid input"""
 
     def __init__(self, message: str = "Ungültige Eingabe", details: Optional[str] = None):
         super().__init__(
@@ -95,7 +95,7 @@ class ValidationError(APIError):
 
 
 class ConflictError(APIError):
-    """409 - Konflikt (z.B. Email bereits vorhanden)"""
+    """409 - Conflict (e.g. email already exists)"""
 
     def __init__(self, message: str = "Ressource existiert bereits", details: Optional[str] = None):
         super().__init__(
@@ -107,7 +107,7 @@ class ConflictError(APIError):
 
 
 class LoginGesperrtError(APIError):
-    """429 - Zu viele falsche Passwoerter hintereinander"""
+    """429 - Too many wrong passwords in a row"""
 
     def __init__(self, minuten: int):
         einheit = "Minute" if minuten == 1 else "Minuten"
@@ -119,7 +119,7 @@ class LoginGesperrtError(APIError):
 
 
 class ServerError(APIError):
-    """500 - Interner Server-Fehler"""
+    """500 - Internal server error"""
 
     def __init__(self, message: str = "Interner Server-Fehler", details: Optional[str] = None):
         super().__init__(
@@ -131,7 +131,7 @@ class ServerError(APIError):
 
 
 class CredentialsMissingError(APIError):
-    """400 - DFB-Credentials nicht gespeichert"""
+    """400 - DFB credentials not stored"""
 
     def __init__(self):
         super().__init__(
@@ -142,7 +142,7 @@ class CredentialsMissingError(APIError):
         )
 
 class DFBCredentialsInvalidError(APIError):
-    """401 - DFB-Credentials sind ungültig"""
+    """401 - DFB credentials are invalid"""
 
     def __init__(self, details: Optional[str] = None):
         super().__init__(
@@ -152,10 +152,10 @@ class DFBCredentialsInvalidError(APIError):
             details=details or "Bitte prüfe Benutzername und Passwort in den Einstellungen"
         )
 
-# ===== Global Exception Handler =====
+# ===== Global exception handlers =====
 
 async def api_error_handler(request: Request, exc: APIError) -> JSONResponse:
-    """Handler für unsere standardisierten APIError Exceptions"""
+    """Handler for our standardized APIError exceptions"""
     return JSONResponse(
         status_code=exc.status_code,
         content=exc.detail
@@ -164,15 +164,15 @@ async def api_error_handler(request: Request, exc: APIError) -> JSONResponse:
 
 async def generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """
-    Fallback für unerwartete Exceptions.
-    Verhindert dass Stacktraces ans Frontend geschickt werden.
+    Fallback for unexpected exceptions.
+    Prevents stack traces from being sent to the frontend.
     """
-    # Log den echten Error (für Debugging)
+    # Log the real error (for debugging)
     import logging
     logger = logging.getLogger("api")
     logger.error(f"Unerwarteter Fehler: {exc}", exc_info=True)
 
-    # Gib generischen Error zurück (keine technischen Details!)
+    # Return a generic error (no technical details!)
     return JSONResponse(
         status_code=500,
         content={

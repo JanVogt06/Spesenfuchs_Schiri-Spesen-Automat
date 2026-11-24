@@ -1,12 +1,12 @@
 """
-Bausteine fuer Auswertungen ueber die eigenen Spiele: wer man im Gespann
-war, und Koordinaten zu Adressen mit einem Zeitbudget.
+Building blocks for analyses of the user's own matches: which role one held
+in the crew, and coordinates for addresses with a time budget.
 
-Die Auswertungen (Statistik, Karte der Spielstaetten) laufen ueber Dutzende
-Spiele. Adresssuche und Routenplaner sind oeffentliche Dienste mit einer
-Anfrage je Sekunde - ein erster Aufruf darf deshalb nicht alles auf einmal
-fragen. Er nimmt, was im Zwischenspeicher liegt, fragt bis zu einer Frist
-nach und meldet den Rest als "offen"; das Frontend ruft dann noch einmal.
+The analyses (statistics, map of venues) run over dozens of
+matches. The address search and the route planner are public services with one
+request per second - a first call must therefore not ask for everything at once. It takes
+what is in the cache, queries until a deadline,
+and reports the rest as "offen" (open); the frontend then calls again.
 """
 import re
 import time
@@ -16,7 +16,7 @@ from utils.geocoder import GeocoderNichtErreichbar, geocode, geocode_bekannt
 
 Punkt = Tuple[float, float]
 
-# So lange darf ein Aufruf neue Anfragen beginnen
+# For this long a call may start new requests
 STANDARD_FRIST_SEKUNDEN = 8.0
 
 
@@ -26,12 +26,12 @@ def _namensteile(name: str) -> frozenset:
 
 def eigene_person(match: Dict, name_vorname: str = "") -> Optional[Dict]:
     """
-    Die eigene Person im Gespann eines Spiels: {"rolle", "seq", ...Personenfelder}.
+    The user's own person in the crew of a match: {"rolle", "seq", ...person fields}.
 
-    Erst ueber die Markierung aus der Ansetzung (match["selbst"]), fuer
-    Spiele aus der Zeit davor ueber den Namen aus den Stammdaten ("Muster,
-    Max" ist "Max Muster"). Passt der Name auf mehr als eine Person, bleibt
-    es offen - lieber keine Rolle als eine falsche.
+    First via the marker from the assignment (match["selbst"]), for
+    matches from before that via the name from the master data (Stammdaten) ("Muster,
+    Max" is "Max Muster"). If the name fits more than one person, it stays
+    open - better no role than a wrong one.
     """
     gespann = match.get("schiedsrichter") or []
     mit_seq = []
@@ -56,7 +56,7 @@ def eigene_person(match: Dict, name_vorname: str = "") -> Optional[Dict]:
 
 
 def wohnadresse(person: Dict) -> Tuple[str, str]:
-    """(Adresse, Ort) einer Person fuer die Adresssuche; leer ohne Ort."""
+    """(Address, town) of a person for the address search; empty without a town."""
     strasse = (person.get("strasse") or "").strip()
     plz_ort = (person.get("plz_ort") or "").strip()
     if not plz_ort:
@@ -65,7 +65,7 @@ def wohnadresse(person: Dict) -> Tuple[str, str]:
 
 
 class Ortsuche:
-    """Adressen -> Koordinaten, neue Anfragen nur bis zur Frist."""
+    """Addresses -> coordinates, new requests only until the deadline."""
 
     def __init__(self, frist: Optional[float] = None):
         self.frist = frist if frist is not None else time.monotonic() + STANDARD_FRIST_SEKUNDEN
@@ -74,7 +74,7 @@ class Ortsuche:
         self._bekannt: Dict[Tuple[str, Optional[str]], Optional[Dict]] = {}
 
     def treffer(self, adresse: str, ort: Optional[str] = None) -> Optional[Dict]:
-        """{"lat", "lon", "genauigkeit"} oder None - unbekannt oder (noch) nicht gefragt."""
+        """{"lat", "lon", "genauigkeit"} or None - unknown or not (yet) queried."""
         schluessel = (adresse, ort)
         if not adresse or not adresse.strip():
             return None

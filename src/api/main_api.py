@@ -1,5 +1,5 @@
 """
-FastAPI Backend fuer Spesenfuchs
+FastAPI backend for Spesenfuchs
 """
 import os
 import sys
@@ -27,7 +27,7 @@ src_path = Path(__file__).parent.parent
 if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
-# .env laden, bevor Module importiert werden, die Secrets beim Import lesen
+# Load .env before importing modules that read secrets at import time
 from core import config
 from core.config import load_environment
 
@@ -91,31 +91,31 @@ from core.errors import (
 
 logger = setup_logger("api")
 
-# Wichtig fuer multiprocessing auf Windows
+# Important for multiprocessing on Windows
 multiprocessing.freeze_support()
 
 
-# ===== Lifespan Context Manager (ersetzt deprecated on_event) =====
+# ===== Lifespan context manager (replaces deprecated on_event) =====
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Lifespan Context Manager für Startup/Shutdown Events.
-    Ersetzt die deprecated @app.on_event Decorator.
+    Lifespan context manager for startup/shutdown events.
+    Replaces the deprecated @app.on_event decorators.
     """
     # === STARTUP ===
     init_database()
     logger.info("Datenbank initialisiert")
 
-    # Laeufe, die der letzte Prozess nicht beenden konnte (Neustart, Absturz),
-    # abschliessen - sonst pollt das Frontend ewig auf einen toten Lauf
+    # Finish runs that the last process could not complete (restart, crash),
+    # otherwise the frontend keeps polling a dead run forever
     fail_stale_runs()
 
-    # Scheduler starten
+    # Start the scheduler
     scheduler = get_scheduler()
     scheduler.start()
     logger.info("Automatischer Session-Scheduler gestartet")
 
-    yield  # App läuft hier
+    yield  # app runs here
 
     # === SHUTDOWN ===
     scheduler = get_scheduler()
@@ -125,33 +125,33 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Spesenfuchs API", lifespan=lifespan)
 
-# Exception Handlers registrieren
+# Register exception handlers
 app.add_exception_handler(APIError, api_error_handler)
 app.add_exception_handler(Exception, generic_exception_handler)
 
-# CORS Middleware
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://spesen-generator.jan-vogt.dev",
-        "http://localhost:5173",  # Für lokale Entwicklung
+        "http://localhost:5173",  # for local development
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ===== Frontend Static Files (für Docker Production) =====
+# ===== Frontend static files (for Docker production) =====
 FRONTEND_DIR = Path(os.getenv("FRONTEND_DIR", "./frontend/dist"))
 
 if FRONTEND_DIR.exists():
-    # Statische Assets (CSS, JS, Bilder)
+    # Static assets (CSS, JS, images)
     app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIR / "assets")), name="assets")
     logger.info(f"Frontend wird ausgeliefert von: {FRONTEND_DIR}")
 else:
     logger.warning(f"Frontend-Verzeichnis nicht gefunden: {FRONTEND_DIR}")
 
-# Nach dem /assets Mount hinzufügen:
+# Add after the /assets mount:
 @app.get("/appicon.png")
 async def serve_favicon():
     """Serve App Icon"""
@@ -160,52 +160,52 @@ async def serve_favicon():
         return FileResponse(str(icon_path), media_type="image/png")
     raise HTTPException(status_code=404, detail="Icon not found")
 
-# Vorlagenpfad und Generator fuer den Download-Pfad. Der Generator haelt keinen
-# Zustand und braucht kein Ausgabeverzeichnis - er liefert Bytes.
+# Template path and generator for the download path. The generator keeps no
+# state and needs no output directory - it returns bytes.
 TEMPLATE_PATH = src_path / "data" / "Spesenabrechnung_Vorlage.docx"
 document_generator = SpesenGenerator(TEMPLATE_PATH)
 
-# NOFV-Pflichtspiele haben ein eigenes Formular: eine Excel-Mappe mit einer
-# Quittung je Schiedsrichter, als PDF drei Seiten.
+# NOFV mandatory (Pflicht) matches have their own form: an Excel workbook with
+# one receipt per referee, three pages as a PDF.
 NOFV_TEMPLATE_PATH = src_path / "data" / "SR-Reisekostenabrechnung_NOFV.xlsx"
 nofv_generator = NofvGenerator(NOFV_TEMPLATE_PATH)
 
-# Jede PDF-Konvertierung startet einen eigenen LibreOffice-Prozess mit 150-300 MB.
-# Ohne Begrenzung legen ein paar gleichzeitige Downloads den Container lahm.
+# Every PDF conversion starts its own LibreOffice process of 150-300 MB.
+# Without a limit, a few concurrent downloads bring the container to a halt.
 PDF_MAX_CONCURRENCY = int(os.getenv("PDF_MAX_CONCURRENCY", "2"))
 _pdf_semaphore = asyncio.Semaphore(PDF_MAX_CONCURRENCY)
 
-# Obergrenze fuer eine Sammel-ZIP. Reines DOCX kostet ~25 ms pro Dokument,
-# die PDF-Konvertierung dominiert mit ein paar Sekunden pro Aufruf.
+# Upper limit for a bulk ZIP. Plain DOCX costs ~25 ms per document,
+# the PDF conversion dominates with a few seconds per call.
 MAX_BULK_DOWNLOAD = int(os.getenv("MAX_BULK_DOWNLOAD", "50"))
 
 app.include_router(auth_router)
 
-# Laufende Hintergrund-Tasks (siehe trigger_scheduler)
+# Running background tasks (see trigger_scheduler)
 _hintergrund_tasks: set = set()
 
 
 # ===== Request/Response Models =====
 
 class GenerateRequest(BaseModel):
-    """Request für Spesen-Generierung"""
-    pass  # Credentials werden aus User-Profil geladen
+    """Request for expense generation"""
+    pass  # Credentials are loaded from the user profile
 
 
 # ===== Helper Functions =====
 
 def _add_spesen_to_match(match: dict) -> dict:
     """
-    Fügt berechnete Spesen-Informationen zu einem Match hinzu.
+    Adds computed expense information to a match.
 
-    Berechnet SR- und SRA-Spesen basierend auf Spielklasse und Mannschaftsart
-    und fügt sie als _spesen Objekt zum Match hinzu.
+    Computes referee (SR) and assistant referee (SRA) expenses based on the Spielklasse (league level)
+    and team type and adds them to the match as a _spesen object.
 
     Args:
-        match: Match-Dictionary mit spiel_info und schiedsrichter
+            match: Match dictionary with spiel_info and schiedsrichter
 
     Returns:
-        Match mit hinzugefügtem _spesen Objekt
+            Match with the added _spesen object
     """
     spiel_info = match.get('spiel_info', {})
     schiedsrichter = match.get('schiedsrichter', [])
@@ -214,10 +214,10 @@ def _add_spesen_to_match(match: dict) -> dict:
     mannschaftsart = spiel_info.get('mannschaftsart', '')
     art = wettbewerbsart(spielklasse)
 
-    # Stammt das Spiel aus der Datenbank, sind die Saetze dort beim ersten
-    # Scrape eingefroren worden. Die Anzeige muss dasselbe zeigen wie das
-    # spaeter erzeugte Dokument - sonst weicht die Karte von der Abrechnung ab,
-    # sobald sich die Spesenordnung aendert.
+    # If the match comes from the database, the rates were frozen there at the
+    # first scrape. The display must show the same as the document generated
+    # later - otherwise the card deviates from the settlement as soon as the
+    # expense regulations change.
     if 'sr_spesen' in match or 'sra_spesen' in match:
         sr_spesen, sra_spesen = match.get('sr_spesen'), match.get('sra_spesen')
     else:
@@ -236,9 +236,9 @@ def _add_spesen_to_match(match: dict) -> dict:
         'hinweis': None,
     }
 
-    # Ohne Satz gehoert ein Grund dazu, sonst steht der Schiedsrichter vor einem
-    # leeren Feld und weiss nicht, ob die Anwendung etwas uebersehen hat oder ob
-    # es hier nichts zu rechnen gibt.
+    # Without a rate a reason belongs with it, otherwise the referee faces an
+    # empty field and does not know whether the application overlooked something
+    # or whether there is nothing to calculate here.
     if sr_spesen is None:
         if art == POKALSPIEL:
             spesen_info['hinweis'] = (
@@ -260,17 +260,17 @@ def _add_spesen_to_match(match: dict) -> dict:
     return match
 
 
-# ===== Scrape-Prozess =====
+# ===== Scrape process =====
 
 def run_scrape_process(dfb_username: str, dfb_password: str, user_id: int, run_id: int):
     """
-    Fuehrt den Scrape in einem eigenen Prozess aus.
+    Runs the scrape in its own process.
 
-    Der eigene Prozess ist noetig, weil Playwright nicht im asyncio-Loop der
-    API laufen kann. Der Fortschritt wandert ueber die Tabelle scrape_runs
-    zurueck - frueher war das eine metadata.json im Session-Ordner.
+    The separate process is needed because Playwright cannot run inside the
+    API's asyncio loop. Progress flows back through the scrape_runs table -
+    it used to be a metadata.json in the session folder.
 
-    Dokumente werden hier nicht mehr erzeugt: sie entstehen beim Download.
+    Documents are no longer generated here: they are created on download.
     """
     from utils.logger import setup_logger
     from core.errors import DFBCredentialsInvalidError
@@ -314,8 +314,8 @@ def run_scrape_process(dfb_username: str, dfb_password: str, user_id: int, run_i
                           "und Passwort in den Einstellungen.",
             finished=True,
         )
-        # Erst nach dem Lauf: scheitert dieser Schreibzugriff, soll der Lauf
-        # trotzdem als fehlgeschlagen dastehen.
+        # Only after the run: if this write fails, the run should
+        # still show up as failed.
         dfb_login_abgelehnt(user_id)
 
     except Exception as e:
@@ -336,10 +336,10 @@ async def generate_spesen(
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Startet einen neuen Abruf der Ansetzungen.
+    Starts a new fetch of the assignments (Ansetzungen).
 
-    Es entsteht kein Ordner und keine Datei mehr - nur eine Zeile in
-    scrape_runs, die das Frontend pollt, und danach Spiele in der Datenbank.
+    No folder and no file is created any more - only a row in
+    scrape_runs, which the frontend polls, and afterwards matches in the database.
     """
     user_id = current_user['id']
     logger.info(f"[User {user_id}] startet Abruf")
@@ -354,20 +354,20 @@ async def generate_spesen(
     dfb_username = decrypt_credential(dfb_creds['dfb_username_encrypted'])
     dfb_password = decrypt_credential(dfb_creds['dfb_password_encrypted'])
 
-    # Laeufe, deren Prozess gestorben ist, vorher abraeumen - sonst haengt
-    # der Poll des Frontends am alten Lauf fest
+    # Clean up runs whose process has died beforehand - otherwise the
+    # frontend poll stays stuck on the old run
     fail_stale_runs()
 
-    # Ein zweiter Lauf desselben Users waere ein zweiter Playwright-Prozess mit
-    # demselben DFBnet-Login, und der Poll wuesste nicht mehr, welchen Lauf er
-    # anzeigt. Doppelklick oder eine Kollision mit dem naechtlichen Job.
+    # A second run for the same user would be a second Playwright process with
+    # the same DFBnet login, and the poll would no longer know which run it is
+    # showing. Double click or a collision with the nightly job.
     if has_active_run(user_id):
         raise APIError(409, "RUN_ALREADY_ACTIVE",
                        "Es läuft bereits ein Abruf. Bitte warte, bis er fertig ist.")
 
     run_id = start_run(user_id)
 
-    # Credentials werden direkt als Parameter uebergeben (nicht ueber ENV!)
+    # Credentials are passed directly as a parameter (not via ENV!)
     process = multiprocessing.Process(
         target=run_scrape_process,
         args=(dfb_username, dfb_password, user_id, run_id),
@@ -385,14 +385,14 @@ async def generate_spesen(
 @app.get("/api/scrape/status")
 async def get_scrape_status(current_user: dict = Depends(get_current_user)):
     """
-    Aktueller Stand des juengsten Scrape-Laufs. Ersetzt den Poll auf die
-    Session-Metadaten.
+    Current state of the most recent scrape run. Replaces the poll on the
+    session metadata.
 
-    error_code traegt weiterhin DFB_CREDENTIALS_INVALID, damit das Frontend
-    den User wie bisher in die Einstellungen schicken kann.
+    error_code still carries DFB_CREDENTIALS_INVALID so that the frontend
+    can send the user to the settings as before.
     """
-    # Abgestuerzte Laeufe abraeumen, damit der Poll nicht ewig auf
-    # "scraping" stehen bleibt
+    # Clean up crashed runs so the poll does not stay on
+    # "scraping" forever
     fail_stale_runs()
 
     run = get_latest_run(current_user['id'])
@@ -418,12 +418,12 @@ async def get_scrape_status(current_user: dict = Depends(get_current_user)):
 @app.get("/api/matches")
 async def get_all_user_matches(current_user: dict = Depends(get_current_user)):
     """
-    Alle Spiele des Users, direkt aus der Datenbank.
+    All matches of the user, straight from the database.
 
-    Frueher wurden dafuer bei jedem Aufruf saemtliche Session-Ordner des Users
-    eingelesen und die Spiele ueber (Heim, Gast, Datum) dedupliziert - bei
-    knapp 3000 Ordnern der teuerste Endpunkt der Anwendung. Die Deduplizierung
-    passiert jetzt schon beim Scrapen ueber den match_key.
+    It used to read all of the user's session folders on every call
+    and deduplicate the matches by (home, away, date) - with
+    almost 3000 folders the most expensive endpoint of the application. The
+    deduplication now already happens during scraping via the match_key.
     """
     matches = get_matches_for_user(current_user['id'])
     zuordnung = Zuordnung(get_index(current_user['id']))
@@ -431,7 +431,7 @@ async def get_all_user_matches(current_user: dict = Depends(get_current_user)):
     for match in matches:
         _decorate_match(match)
         info = match.get('spiel_info') or {}
-        # Ein zurueckgezogenes Spiel hat man nicht gepfiffen - es hat keinen Bericht
+        # A withdrawn match was not refereed - it has no report
         match['_spielbericht'] = None if match.get('missing_since') else kurzinfo(zuordnung.finde(
             match.get('datum') or '', info.get('heim_team') or '', info.get('gast_team') or '',
             info.get('anpfiff') or '',
@@ -441,7 +441,7 @@ async def get_all_user_matches(current_user: dict = Depends(get_current_user)):
 
 
 def _decorate_match(match: dict) -> dict:
-    """Ergaenzt ein Spiel um die Felder, die das Frontend erwartet."""
+    """Adds the fields the frontend expects to a match."""
     match['_id'] = match['id']
     match['_datum'] = match['datum']
     match['_filename'] = generate_filename_from_match(match)
@@ -452,7 +452,7 @@ def _decorate_match(match: dict) -> dict:
 
 
 class MatchExpensesRequest(BaseModel):
-    """Fahrtkosten und OeVM eines Spiels"""
+    """Travel costs and public transport (OeVM) of a match"""
     match_id: int
     sr_km: Optional[float] = None
     sr_oevm: Optional[float] = None
@@ -468,19 +468,19 @@ async def save_match_expenses(
         current_user: dict = Depends(get_current_user)
 ):
     """
-    Speichert Fahrtkosten (km) und OeVM fuer ein Spiel.
+    Stores travel costs (km) and public transport (OeVM) for a match.
 
-    Frueher wurde hier das Dokument sofort neu geschrieben - synchron im
-    async-Handler, inklusive LibreOffice-Aufruf. Das entfaellt: Dokumente
-    entstehen erst beim Download und tragen den Wert dann automatisch.
+    It used to rewrite the document immediately here - synchronously in the
+    async handler, including the LibreOffice call. That is gone: documents
+    are only created on download and then pick up the value automatically.
     """
     user_id = current_user['id']
     match = _owned_match(request.match_id, user_id)
 
-    # Nur die Felder anfassen, die der Client wirklich geschickt hat. Wuerden
-    # fehlende Felder aus den Pydantic-Defaults als None aufgefuellt, loeschte
-    # ein Teil-Update die Werte der anderen Rollen mit. Ein ausdruecklich als
-    # null gesendetes Feld leert den Eintrag dagegen weiterhin.
+    # Only touch the fields the client actually sent. If missing fields were
+    # filled in as None from the Pydantic defaults, a partial update would also
+    # wipe the values of the other roles. A field explicitly sent as
+    # null, however, still clears the entry.
     expense_keys = ['sr_km', 'sr_oevm', 'sra1_km', 'sra1_oevm', 'sra2_km', 'sra2_oevm']
     expenses = {}
     for key in expense_keys:
@@ -502,12 +502,12 @@ async def save_match_expenses(
     }
 
 
-# ===== Karte: Anschriften der Angesetzten und der Spielort =====
+# ===== Map: addresses of the assigned officials and the venue =====
 
-# Kachel-Quelle der Karte. Voreinstellung ist der Standard-Stil von
-# OpenStreetMap; wer eigene Kacheln ausliefert, setzt beides passend. Die
-# Angabe geht an den Browser, nicht an den Server - die Karte laedt die
-# Kacheln selbst.
+# Tile source of the map. The default is the standard style of
+# OpenStreetMap; anyone serving their own tiles sets both to match. The
+# value goes to the browser, not to the server - the map loads the
+# tiles itself.
 MAP_TILE_URL = os.getenv(
     "MAP_TILE_URL",
     "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
@@ -519,7 +519,7 @@ MAP_TILE_ATTRIBUTION = os.getenv(
 
 
 def _geo_eintraege(match: dict) -> List[dict]:
-    """Die Anschriften eines Spiels in der Reihenfolge, in der sie auf die Karte sollen."""
+    """The addresses of a match in the order in which they should go on the map."""
     eintraege = []
 
     spielstaette = match.get("spielstaette") or {}
@@ -533,8 +533,8 @@ def _geo_eintraege(match: dict) -> List[dict]:
         })
 
     for person in match.get("schiedsrichter") or []:
-        # Nur besetzte Rollen mit verwertbarer Anschrift. Eine blosse
-        # Strasse ohne Ort waere in ganz Deutschland mehrdeutig.
+        # Only occupied roles with a usable address. A bare
+        # street without a town would be ambiguous across all of Germany.
         if not person.get("name") or not person.get("plz_ort"):
             continue
 
@@ -553,12 +553,12 @@ def _geo_eintraege(match: dict) -> List[dict]:
 
 def _build_geo(match: dict) -> dict:
     """
-    Loest die Anschriften eines Spiels zu Koordinaten auf.
+    Resolves the addresses of a match to coordinates.
 
-    Zwei Personen unter derselben Anschrift (Familie im selben Gespann ist
-    keine Seltenheit) wuerden als zwei Pins uebereinander liegen und einander
-    verdecken. Sie werden deshalb zu einem Punkt zusammengefasst, der beide
-    Rollen nennt.
+    Two people at the same address (family on the same crew is
+    not unusual) would lie on top of each other as two pins and hide
+    each other. They are therefore merged into one point that names both
+    roles.
     """
     punkte: List[dict] = []
     ohne_treffer: List[dict] = []
@@ -580,8 +580,8 @@ def _build_geo(match: dict) -> dict:
             })
             continue
 
-        # Auf etwa elf Meter runden: naeher beieinander sind zwei Pins auf
-        # keinem sinnvollen Zoom noch zu unterscheiden.
+        # Round to about eleven metres: closer together, two pins cannot be
+        # told apart at any sensible zoom.
         schluessel = (round(treffer["lat"], 4), round(treffer["lon"], 4))
         vorhanden = nach_koordinate.get(schluessel)
 
@@ -611,11 +611,11 @@ def _build_geo(match: dict) -> dict:
 @app.get("/api/matches/{match_id}/geo")
 async def get_match_geo(match_id: int, current_user: dict = Depends(get_current_user)):
     """
-    Die Anschriften eines Spiels als Koordinaten fuer die Karte.
+    The addresses of a match as coordinates for the map.
 
-    Laeuft im Threadpool: der erste Aufruf zu einem Spiel fragt bis zu vier
-    Adressen beim Geocoder nach, und der haelt einen Mindestabstand zwischen
-    den Anfragen ein. Ab dem zweiten Aufruf kommt alles aus der Datenbank.
+    Runs in the thread pool: the first call for a match asks the geocoder for up to four
+    addresses, and it keeps a minimum gap between
+    requests. From the second call on everything comes from the database.
     """
     match = _owned_match(match_id, current_user['id'])
     return await run_in_threadpool(_build_geo, match)
@@ -624,9 +624,9 @@ async def get_match_geo(match_id: int, current_user: dict = Depends(get_current_
 @app.get("/api/matches/{match_id}/fahrten")
 async def get_match_fahrten(match_id: int, current_user: dict = Depends(get_current_user)):
     """
-    Kilometer-Vorschlaege fuer ein Spiel: jede Person allein und als
-    Fahrgemeinschaft. Wie die Karte im Threadpool - der erste Aufruf fragt
-    Adresssuche und Routenplaner, danach kommt alles aus der Datenbank.
+    Kilometre suggestions for a match: each person alone and as a
+    carpool. Like the map, in the thread pool - the first call queries
+    the address search and the route planner, afterwards everything comes from the database.
     """
     match = _owned_match(match_id, current_user['id'])
     return await run_in_threadpool(vorschlaege_fuer_spiel, match)
@@ -635,11 +635,11 @@ async def get_match_fahrten(match_id: int, current_user: dict = Depends(get_curr
 @app.get("/api/statistik")
 async def get_statistik(saison: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     """
-    Spesen und Fahrtkosten der eigenen vergangenen Spiele einer Saison.
+    Expenses and travel costs of the user's own past matches of a season.
 
-    Geschaetzte Fahrtkosten brauchen Adresssuche und Routenplaner. Was
-    innerhalb weniger Sekunden nicht nachzuschlagen war, meldet "offen" -
-    das Frontend fragt dann noch einmal und bekommt den Rest.
+    Estimated travel costs need the address search and the route planner. Whatever
+    could not be looked up within a few seconds is reported as "offen" (open) -
+    the frontend then asks again and gets the rest.
     """
     return await run_in_threadpool(statistik, current_user['id'], saison)
 
@@ -647,21 +647,21 @@ async def get_statistik(saison: Optional[str] = None, current_user: dict = Depen
 @app.get("/api/spielstaetten")
 async def get_spielstaetten(current_user: dict = Depends(get_current_user)):
     """
-    Die Plaetze, an denen man schon im Einsatz war, fuer die Karte im Reiter
-    Saison. Wie die Statistik: was nicht schnell nachzuschlagen war, steht in
-    "offen", und das Frontend fragt noch einmal.
+    The venues where the user has already been on duty, for the map in the
+    Saison tab. Like the statistics: whatever could not be looked up quickly is in
+    "offen" (open), and the frontend asks again.
     """
     daten = await run_in_threadpool(besuchte_spielstaetten, current_user['id'])
     return {**daten, "kacheln": {"url": MAP_TILE_URL, "attribution": MAP_TILE_ATTRIBUTION}}
 
 
-# ===== Download-Endpunkte: Dokumente entstehen bei jedem Abruf neu =====
+# ===== Download endpoints: documents are created anew on every request =====
 
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
-# "docx" ist der historische Name fuer "die bearbeitbare Datei" - bei
-# NOFV-Spielen ist das eine Excel-Mappe. Beide Namen meinen dasselbe.
+# "docx" is the historical name for "the editable file" - for
+# NOFV matches this is an Excel workbook. Both names mean the same thing.
 BEARBEITBARE_FORMATE = ("docx", "xlsx")
 
 
@@ -676,13 +676,13 @@ def _pdf_name(filename: str) -> str:
 
 def _content_disposition(filename: str) -> Dict[str, str]:
     """
-    Baut den Content-Disposition-Header fuer einen Dateinamen.
+    Builds the Content-Disposition header for a file name.
 
-    Vereinsnamen enthalten Umlaute und Sonderzeichen ("FSV Preußen"), HTTP-Header
-    sind aber auf latin-1 begrenzt - ein roher UTF-8-Name kommt verstuemmelt an
-    oder laesst den Response beim Kodieren scheitern. Also ASCII-Variante als
-    Rueckfallebene plus filename* nach RFC 5987, das jeder aktuelle Browser
-    bevorzugt.
+    Club names contain umlauts and special characters ("FSV Preußen"), but HTTP headers
+    are limited to latin-1 - a raw UTF-8 name arrives garbled
+    or makes the response fail while encoding. So an ASCII variant as the
+    fallback plus filename* per RFC 5987, which every current browser
+    prefers.
     """
     ascii_name = unicodedata.normalize("NFKD", filename).encode("ascii", "ignore").decode("ascii")
     ascii_name = ascii_name.replace('"', "") or "Spesenabrechnung"
@@ -692,14 +692,14 @@ def _content_disposition(filename: str) -> Dict[str, str]:
 
 
 def _owned_match(match_id: int, user_id: int) -> dict:
-    """Laedt ein Spiel und stellt sicher, dass es dem User gehoert."""
+    """Loads a match and makes sure it belongs to the user."""
     match = get_match(match_id)
 
     if not match:
         raise NotFoundError("Spiel nicht gefunden")
 
-    # Wie ein fehlendes Spiel behandeln: ein 403 verriete, dass es die ID gibt.
-    # Spielberichte halten es genauso.
+    # Treat it like a missing match: a 403 would reveal that the ID exists.
+    # Match reports do the same.
     if match['user_id'] != user_id:
         raise NotFoundError("Spiel nicht gefunden")
 
@@ -708,8 +708,8 @@ def _owned_match(match_id: int, user_id: int) -> dict:
 
 def _render_dokument(match: dict) -> tuple:
     """
-    Rendert ein Spiel zu (Dateiname, Bytes) - DOCX fuer das TFV-Formular,
-    XLSX fuer die NOFV-Quittung. Welches, verraet die Endung des Dateinamens.
+    Renders a match to (file name, bytes) - DOCX for the TFV form,
+    XLSX for the NOFV receipt. The file name extension tells which.
     """
     filename = generate_filename_from_match(match)
 
@@ -723,12 +723,12 @@ def _render_dokument(match: dict) -> tuple:
 
 async def _render_pdfs(documents: List[tuple]) -> List[Optional[bytes]]:
     """
-    Konvertiert gerenderte DOCX/XLSX zu PDF.
+    Converts rendered DOCX/XLSX to PDF.
 
-    Zwei Dinge sind hier wesentlich: die Konvertierung laeuft in einem Thread,
-    weil sie sekundenlang blockiert und sonst den kompletten Event-Loop
-    anhaelt, und sie laeuft nur begrenzt nebenlaeufig, weil jeder Aufruf einen
-    eigenen LibreOffice-Prozess startet.
+    Two things are essential here: the conversion runs in a thread,
+    because it blocks for seconds and would otherwise halt the entire event loop,
+    and it runs only with limited concurrency, because every call starts a
+    separate LibreOffice process.
     """
     async with _pdf_semaphore:
         return await run_in_threadpool(convert_docx_bytes_to_pdf, documents)
@@ -741,8 +741,8 @@ async def download_match_document(
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Erzeugt die Abrechnung eines Spiels und liefert sie aus - ohne dass
-    jemals eine Datei auf der Platte entsteht.
+    Generates the settlement of a match and delivers it - without
+    a file ever being created on disk.
     """
     if file_format not in (*BEARBEITBARE_FORMATE, "pdf"):
         raise APIError(400, "INVALID_FORMAT", "Format muss docx, xlsx oder pdf sein")
@@ -778,7 +778,7 @@ async def download_match_document(
 
 
 class BulkDownloadRequest(BaseModel):
-    """Auswahl fuer den Sammel-Download"""
+    """Selection for the bulk download"""
     match_ids: List[int]
     file_format: str = "both"
 
@@ -789,9 +789,9 @@ async def download_matches_as_zip(
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Packt die ausgewaehlten Spiele in ein ZIP - im Speicher, ohne Zwischenablage
-    auf der Platte. Loest den alten Session-ZIP-Download ab, der immer "alles
-    aus diesem Lauf" war und nie PDFs enthielt.
+    Packs the selected matches into a ZIP - in memory, without an intermediate
+    file on disk. Replaces the old session ZIP download, which was always "everything
+    from this run" and never contained PDFs.
     """
     if request.file_format not in ("docx", "pdf", "both"):
         raise APIError(400, "INVALID_FORMAT", "Format muss docx, pdf oder both sein")
@@ -812,9 +812,9 @@ async def download_matches_as_zip(
     if request.file_format in ("pdf", "both"):
         pdfs = await _render_pdfs(documents)
 
-        # Auch ein TEILWEISER Ausfall ist ein Fehler. Frueher wurden fehlende
-        # PDFs einfach uebersprungen und der User bekam ein HTTP 200 mit einem
-        # unvollstaendigen Archiv, ohne es zu merken.
+        # A PARTIAL failure is also an error. Missing PDFs used to be
+        # skipped silently and the user got an HTTP 200 with an
+        # incomplete archive without noticing.
         fehlend = sum(1 for pdf in pdfs if pdf is None)
         if fehlend:
             raise APIError(503, "PDF_CONVERSION_FAILED",
@@ -823,9 +823,9 @@ async def download_matches_as_zip(
                            "Dokumente herunterladen.")
 
     buffer = BytesIO()
-    # Gleiche Dateinamen sind moeglich (zwei Turniere am selben Tag), deshalb
-    # bekommt jeder Eintrag notfalls einen Zusatz - sonst laegen im Archiv zwei
-    # Dateien gleichen Namens.
+    # Identical file names are possible (two tournaments on the same day), so
+    # every entry gets a suffix if necessary - otherwise the archive would
+    # contain two files of the same name.
     vergeben: Dict[str, int] = {}
 
     def eindeutig(name: str) -> str:
@@ -849,7 +849,7 @@ async def download_matches_as_zip(
     zip_name = f"Spesen_{datetime.now().strftime('%Y-%m-%d')}.zip"
 
     for match, (filename, _) in zip(matches, documents):
-        # Wie beim Einzel-Download: wer nur PDFs holt, hat die PDF bekommen
+        # As with the single download: whoever only fetches PDFs got the PDF
         name = _pdf_name(filename) if request.file_format == "pdf" else filename
         log_download(user_id, name, request.file_format, match_id=match['id'])
 
@@ -863,13 +863,13 @@ async def download_matches_as_zip(
 @app.post("/api/scheduler/trigger")
 async def trigger_scheduler_now(current_user: dict = Depends(get_current_user)):
     """
-    Startet den naechtlichen Abruf sofort (fuer Testzwecke).
+    Starts the nightly fetch immediately (for test purposes).
 
-    ACHTUNG: betrifft ALLE User - der Lauf entschluesselt die DFBnet-Zugangs-
-    daten jedes Kontos und meldet sich damit an. Es gibt in diesem Projekt
-    keine Rollen, also war der Endpunkt fuer jeden registrierten Nutzer offen.
-    Er ist deshalb standardmaessig abgeschaltet und muss ueber die Umgebung
-    freigegeben werden.
+    WARNING: affects ALL users - the run decrypts the DFBnet credentials
+    of every account and logs in with them. This project has
+    no roles, so the endpoint was open to every registered user.
+    It is therefore disabled by default and must be enabled via the
+    environment.
     """
     if os.getenv("ALLOW_SCHEDULER_TRIGGER", "").lower() not in ("1", "true", "yes"):
         raise APIError(403, "TRIGGER_DISABLED",
@@ -880,8 +880,8 @@ async def trigger_scheduler_now(current_user: dict = Depends(get_current_user)):
 
     scheduler = get_scheduler()
     task = asyncio.create_task(scheduler.scrape_all_users())
-    # asyncio haelt nur eine schwache Referenz - ohne diese hier koennte der
-    # Garbage Collector den Lauf mittendrin abraeumen.
+    # asyncio keeps only a weak reference - without this one the
+    # garbage collector could clean up the run midway.
     _hintergrund_tasks.add(task)
     task.add_done_callback(_hintergrund_tasks.discard)
 
@@ -894,13 +894,13 @@ async def trigger_scheduler_now(current_user: dict = Depends(get_current_user)):
 
 @app.get("/api/scheduler/status")
 async def get_scheduler_status(current_user: dict = Depends(get_current_user)):
-    """Status des naechtlichen Abrufs"""
+    """Status of the nightly fetch"""
     return get_scheduler().get_status()
 
 
 @app.get("/api/health")
 async def health_check():
-    """Health Check Endpoint"""
+    """Health check endpoint"""
     return {
         "status": "online",
         "service": "Spesenfuchs API",
@@ -912,13 +912,13 @@ async def health_check():
 @app.get("/api/stats/public")
 async def get_public_stats():
     """
-    Oeffentliche Statistik fuer die Landingpage (kein Login noetig).
+    Public statistics for the landing page (no login required).
 
-    Gezaehlt werden jetzt verschiedene SPIELE, nicht Dateien auf der Platte.
-    Die alte Zahl war die Anzahl aller je geschriebenen DOCX - durch die
-    naechtlichen Laeufe lag dieselbe Abrechnung dort rund 19-mal. Ein Spiel,
-    das mehrere Unparteiische aus der Nutzerbasis leiten, zaehlt ebenfalls
-    nur einmal: der match_key ist userunabhaengig.
+    Now counts distinct MATCHES, not files on disk.
+    The old number was the count of all DOCX ever written - because of the
+    nightly runs the same settlement was in there about 19 times. A match
+    refereed by several officials from the user base also counts
+    only once: the match_key is user-independent.
     """
     try:
         count = count_distinct_matches()
@@ -932,15 +932,15 @@ async def get_public_stats():
 @app.get("/api/stammdaten")
 async def get_own_stammdaten(current_user: dict = Depends(get_current_user)):
     """
-    Die eigenen Stammdaten des angemeldeten Users aus DFBnet.
+    The logged-in user's own master data (Stammdaten) from DFBnet.
 
-    Vor dem ersten Abruf kommt bewusst 200 mit null zurueck und kein 404 oder
-    401: der Interceptor im Frontend wirft den Nutzer bei jedem 401 hart auf
-    die Login-Seite, und "noch nichts abgerufen" ist ein Leerzustand, kein
-    Fehler.
+    Before the first fetch this deliberately returns 200 with null and not a 404 or
+    401: the interceptor in the frontend throws the user hard onto
+    the login page on every 401, and "nothing fetched yet" is an empty state, not an
+    error.
 
-    Ein Scoping-Check wie _owned_match braucht es nicht - der Schluessel der
-    Tabelle IST die user_id.
+    A scoping check like _owned_match is not needed - the table's key
+    IS the user_id.
     """
     return get_stammdaten(current_user['id'])
 
@@ -948,10 +948,10 @@ async def get_own_stammdaten(current_user: dict = Depends(get_current_user)):
 @app.get("/api/saison")
 async def get_own_saisons(current_user: dict = Depends(get_current_user)):
     """
-    Die Saisons, zu denen geleitete Spiele gespeichert sind - neueste zuerst.
+    The seasons for which refereed matches are stored - newest first.
 
-    Vor dem ersten Abruf eine leere Liste, kein Fehler: der Reiter zeigt dann
-    seinen Leerzustand.
+    An empty list before the first fetch, not an error: the tab then shows
+    its empty state.
     """
     return get_saisons(current_user['id'])
 
@@ -959,11 +959,11 @@ async def get_own_saisons(current_user: dict = Depends(get_current_user)):
 @app.get("/api/saison/{saison:path}")
 async def get_own_saison(saison: str, current_user: dict = Depends(get_current_user)):
     """
-    Eine Saison mit allen geleiteten Spielen, Einsatzbilanz und Lehrgaengen.
+    One season with all refereed matches, assignment balance and courses (Lehrgaenge).
 
-    Der Pfadparameter ist als :path deklariert, weil Saisonnamen bei DFBnet
-    einen Schraegstrich enthalten ("26/27"). Ohne das endete die Route hinter
-    der 26 und der Rest waere ein eigenes Pfadsegment.
+    The path parameter is declared as :path because season names at DFBnet
+    contain a slash ("26/27"). Without that the route would end after
+    the 26 and the rest would be a path segment of its own.
     """
     daten = get_saison(current_user['id'], saison)
 
@@ -979,15 +979,15 @@ async def get_own_saison(saison: str, current_user: dict = Depends(get_current_u
     return daten
 
 
-# Erlaubte Werte fuer das Log. Was das Frontend sonst schickt, wird "direkt" -
-# in die Tabelle kommt kein freier Text von aussen.
+# Allowed values for the log. Whatever else the frontend sends becomes "direkt" -
+# no free text from outside goes into the table.
 _BERICHT_QUELLEN = {"saison", "spesen"}
 _DOKUMENT_AKTIONEN = {"oeffnen": "dokument_oeffnen", "laden": "dokument_laden"}
 
 
 def _log_spielbericht(user_id: int, bericht_id: int, aktion: str, quelle: str = "direkt",
                       dokument_id: Optional[int] = None) -> None:
-    """Ein Fehler im Log darf den Bericht nicht verhindern - nur protokollieren."""
+    """An error in the log must not prevent the report - just log it."""
     try:
         log_spielbericht(user_id, bericht_id, aktion, quelle, dokument_id)
     except Exception as e:
@@ -1001,11 +1001,11 @@ async def get_own_spielbericht(
     current_user: dict = Depends(get_current_user),
 ):
     """
-    Ein Spielbericht mit Spielverlauf, Aufstellungen, Gespann-Kosten und der
-    Liste der angehaengten Dokumente.
+    A match report (Spielbericht) with match progression, line-ups, crew costs and the
+    list of attached documents.
 
-    Gescoped ueber die user_id in der Abfrage - ein fremder Bericht ist
-    schlicht "nicht gefunden".
+    Scoped via the user_id in the query - someone else's report is
+    simply "not found".
     """
     bericht = get_bericht(current_user['id'], bericht_id)
 
@@ -1024,7 +1024,7 @@ async def download_spielbericht_dokument(
     aktion: Optional[str] = None,
     current_user: dict = Depends(get_current_user),
 ):
-    """Ein an den Spielbericht angehaengtes Dokument (Sonderbericht, Spesendokument, ...)."""
+    """A document attached to the match report (special report, expense document, ...)."""
     dokument = get_dokument(current_user['id'], bericht_id, dokument_id)
 
     if not dokument or not dokument['absolut'].is_file():
@@ -1045,13 +1045,13 @@ async def download_spielbericht_dokument(
 @app.get("/api/beobachtungen")
 async def get_own_beobachtungen(current_user: dict = Depends(get_current_user)):
     """
-    Die eigenen Beobachtungen aus Schiri-Beobachtung und Schiri-Portal.
+    The user's own observations (Beobachtungen) from Schiri-Beobachtung and Schiri-Portal.
 
-    Die Schnitte rechnet das Frontend: es braucht die Einzelnoten ohnehin
-    fuer die aufklappbare Liste, und je Saison sind es eine Handvoll Zeilen.
+    The frontend computes the averages: it needs the individual grades anyway
+    for the expandable list, and per season it is a handful of rows.
 
-    schiedsrichter_seit kommt mit, weil der Reiter die Herren-Saisons ab
-    diesem Datum zeigt - auch die ohne eine einzige Beobachtung.
+    schiedsrichter_seit (referee since) is included because the tab shows the men's (Herren) seasons from
+    this date on - including those without a single observation.
     """
     stammdaten = get_stammdaten(current_user['id']) or {}
     daten = get_beobachtungen(current_user['id'])
@@ -1062,11 +1062,11 @@ async def get_own_beobachtungen(current_user: dict = Depends(get_current_user)):
 @app.get("/api/ligen")
 async def get_ligen(current_user: dict = Depends(get_current_user)):
     """
-    Die abgeglichenen Ligatabellen, hoechste Spielklasse zuerst.
+    The reconciled league tables, highest Spielklasse (league level) first.
 
-    Dieselben Daten, aus denen die Spesen der Pokal- und Freundschaftsspiele
-    entstehen - wer einen Satz nachvollziehen will, sieht hier die Grundlage.
-    Nicht nach Nutzer getrennt: eine Ligatabelle ist fuer alle dieselbe.
+    The same data from which the expenses of cup and friendly matches
+    are derived - anyone who wants to trace a rate sees the basis here.
+    Not separated by user: a league table is the same for everyone.
     """
     staffeln = alle_staffeln()
 
@@ -1079,16 +1079,16 @@ async def get_ligen(current_user: dict = Depends(get_current_user)):
 @app.get("/api/bugreport/status")
 async def get_bug_report_status(current_user: dict = Depends(get_current_user)):
     """
-    Ob auf diesem Server ueberhaupt Post verschickt werden kann.
+    Whether mail can be sent from this server at all.
 
-    Das Formular fragt vorher: ohne Postausgang soll es gar nicht erst zum
-    Absenden einladen, sondern sagen, was fehlt.
+    The form asks beforehand: without an outbox it should not even
+    invite submission, but say what is missing.
     """
     return {"verfuegbar": ist_konfiguriert(), "empfaenger": empfaenger()}
 
 
 class BugReportRequest(BaseModel):
-    """Ein Fehlerbericht aus dem gleichnamigen Reiter."""
+    """An error report from the tab of the same name."""
     titel: str
     beschreibung: str
     bereich: str = ""
@@ -1101,11 +1101,11 @@ async def post_bug_report(
     current_user: dict = Depends(get_current_user),
 ):
     """
-    Schickt einen Fehlerbericht an die hinterlegte Adresse.
+    Sends an error report to the stored address.
 
-    Absender ist der angemeldete Nutzer - seine Adresse wird aus der Datenbank
-    genommen und nicht aus dem Formular, sonst liesse sich ueber dieses
-    Formular in fremdem Namen schreiben.
+    The sender is the logged-in user - their address is taken from the database
+    and not from the form, otherwise this form could be used
+    to write in someone else's name.
     """
     titel = request.titel.strip()
     beschreibung = request.beschreibung.strip()
@@ -1127,7 +1127,7 @@ async def post_bug_report(
 # ===== Frontend Routes =====
 @app.get("/")
 async def root():
-    """Serve Frontend Root"""
+    """Serve frontend root"""
     if not FRONTEND_DIR.exists():
         raise HTTPException(status_code=404, detail="Frontend not available")
 
@@ -1140,12 +1140,12 @@ async def root():
 
 def _wurzel_datei(full_path: str) -> Optional[FileResponse]:
     """
-    Eine Datei direkt in FRONTEND_DIR, sonst None. Unterverzeichnisse und
-    Pfade, die aus dem Verzeichnis herausfuehren, zaehlen nicht.
+    A file directly in FRONTEND_DIR, otherwise None. Subdirectories and
+    paths leading out of the directory do not count.
 
-    Die Anfrage waehlt nur einen Namen aus der Liste der vorhandenen Dateien;
-    der ausgelieferte Pfad stammt immer aus dem Verzeichnis selbst. Damit
-    kann kein '..' oder kodierter Schraegstrich den Pfad bauen.
+    The request only selects a name from the list of existing files;
+    the served path always comes from the directory itself. That way
+    no '..' or encoded slash can build the path.
     """
     wurzeldateien = {
         eintrag.name: eintrag
@@ -1159,8 +1159,8 @@ def _wurzel_datei(full_path: str) -> Optional[FileResponse]:
     media_type = "application/manifest+json" if kandidat.suffix == ".webmanifest" else None
     headers = {}
     if kandidat.name in ("sw.js", "manifest.webmanifest"):
-        # Ohne das haelt Cloudflare oder der Browser einen alten Worker fest,
-        # und ein Update erreicht die installierte App nicht mehr.
+        # Without this Cloudflare or the browser holds on to an old worker,
+        # and an update no longer reaches the installed app.
         headers["Cache-Control"] = "no-cache"
     return FileResponse(str(kandidat), media_type=media_type, headers=headers)
 
@@ -1168,25 +1168,25 @@ def _wurzel_datei(full_path: str) -> Optional[FileResponse]:
 @app.get("/{full_path:path}")
 async def serve_frontend(full_path: str):
     """
-    Catch-All Route für Frontend (React Router).
-    Liefert index.html für alle nicht-API Routen.
+    Catch-all route for the frontend (React Router).
+    Serves index.html for all non-API routes.
     """
-    # API-Routen überspringen
+    # Skip API routes
     if full_path.startswith("api/"):
         raise HTTPException(status_code=404, detail="API endpoint not found")
 
-    # Wenn Frontend nicht verfügbar, 404
+    # If the frontend is not available, 404
     if not FRONTEND_DIR.exists():
         raise HTTPException(status_code=404, detail="Frontend not available")
 
-    # Dateien aus frontend/public landen direkt im dist-Wurzelverzeichnis.
-    # Manifest und Service Worker muessen dort liegen: der Worker kontrolliert
-    # nur Adressen unterhalb seines eigenen Pfads.
+    # Files from frontend/public land directly in the dist root directory.
+    # Manifest and service worker must live there: the worker only controls
+    # addresses below its own path.
     datei = _wurzel_datei(full_path)
     if datei is not None:
         return datei
 
-    # index.html ausliefern (für React Router)
+    # Serve index.html (for React Router)
     index_path = FRONTEND_DIR / "index.html"
 
     if index_path.exists():

@@ -1,5 +1,5 @@
 """
-Authentication Endpoints - Register und Login mit JWT + DFB-Credentials
+Authentication endpoints - register and login with JWT + DFB credentials
 """
 import math
 from datetime import datetime, UTC
@@ -42,27 +42,28 @@ logger = setup_logger("auth")
 
 router = APIRouter(prefix="/api/auth", tags=["authentication"])
 
-# Gilt fuer Registrierung und Passwortwechsel gleichermassen. Das Frontend
-# prueft dasselbe, aber wer die API direkt aufruft, umginge es sonst.
+# Applies equally to registration and password change. The frontend
+# checks the same thing, but anyone calling the API directly would
+# otherwise bypass it.
 MIN_PASSWORT_LAENGE = 8
 
 
 # ===== Request/Response Models =====
 
 class RegisterRequest(BaseModel):
-    """Register-Anfrage"""
+    """Register request"""
     email: EmailStr
     password: str
 
 
 class LoginRequest(BaseModel):
-    """Login-Anfrage"""
+    """Login request"""
     email: EmailStr
     password: str
 
 
 class AuthResponse(BaseModel):
-    """Auth-Antwort mit Token"""
+    """Auth response with token"""
     access_token: str
     token_type: str = "bearer"
     user_id: int
@@ -70,33 +71,33 @@ class AuthResponse(BaseModel):
 
 
 class UserInfo(BaseModel):
-    """User-Informationen"""
+    """User information"""
     user_id: int
     email: str
     has_dfb_credentials: bool
-    # Seit wann DFBnet die gespeicherten Zugangsdaten ablehnt (ISO, UTC)
+    # Since when DFBnet has been rejecting the stored credentials (ISO, UTC)
     dfb_login_abgelehnt_seit: Optional[str] = None
 
 
 class DFBCredentialsRequest(BaseModel):
-    """DFB-Credentials Anfrage"""
+    """DFB credentials request"""
     dfb_username: str
     dfb_password: str
 
 
 class DFBCredentialsResponse(BaseModel):
-    """DFB-Credentials Antwort"""
+    """DFB credentials response"""
     success: bool
     message: str
 
 class ChangePasswordRequest(BaseModel):
-    """Passwort-Ändern-Anfrage"""
+    """Change-password request"""
     current_password: str
     new_password: str
 
 
 class ChangePasswordResponse(BaseModel):
-    """Passwort-Ändern-Antwort"""
+    """Change-password response"""
     success: bool
     message: str
 
@@ -105,14 +106,15 @@ class ChangePasswordResponse(BaseModel):
 
 async def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
     """
-    Extrahiert User aus JWT Token.
+    Extracts the user from the JWT token.
 
-    Wird als Dependency verwendet: current_user = Depends(get_current_user)
+    
+    Used as a dependency: current_user = Depends(get_current_user)
     """
     if not authorization:
         raise AuthenticationError("Token fehlt")
 
-    # Token aus "Bearer TOKEN" extrahieren
+    # Extract the token from "Bearer TOKEN"
     try:
         scheme, token = authorization.split()
         if scheme.lower() != "bearer":
@@ -120,12 +122,12 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
     except ValueError:
         raise AuthenticationError("Ungültiges Token-Format")
 
-    # Token dekodieren
+    # Decode the token
     user_id = decode_access_token(token)
     if not user_id:
         raise AuthenticationError("Token ungültig oder abgelaufen")
 
-    # User aus DB holen
+    # Load the user from the DB
     user = get_user_by_id(user_id)
     if not user:
         raise AuthenticationError("User nicht gefunden")
@@ -138,18 +140,18 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
 @router.post("/register", response_model=AuthResponse, status_code=201)
 async def register(request: RegisterRequest):
     """
-    Registriert neuen User und gibt Token zurueck.
+    Registers a new user and returns a token.
 
-    - Prueft ob Email schon existiert
-    - Hasht Passwort sicher
-    - Erstellt User in DB
-    - Gibt JWT Token zurueck
+    - Checks whether the email already exists
+    - Hashes the password securely
+    - Creates the user in the DB
+    - Returns a JWT token
     """
     if len(request.password) < MIN_PASSWORT_LAENGE:
         raise ValidationError(f"Passwort muss mindestens {MIN_PASSWORT_LAENGE} Zeichen lang sein")
 
-    # Klein geschrieben gespeichert; get_user_by_email vergleicht ohnehin
-    # ohne Ruecksicht auf Gross-/Kleinschreibung.
+    # Stored in lower case; get_user_by_email compares case-insensitively
+    # anyway.
     email = request.email.strip().lower()
 
     if get_user_by_email(email):
@@ -169,11 +171,11 @@ async def register(request: RegisterRequest):
 @router.post("/login", response_model=AuthResponse)
 async def login(request: LoginRequest):
     """
-    Login mit Email und Passwort, gibt Token zurueck.
+    Login with email and password, returns a token.
 
-    Nach MAX_FEHLVERSUCHE falschen Passwoertern hintereinander ist die
-    Adresse SPERRDAUER_MINUTEN lang gesperrt - auch fuer das richtige
-    Passwort, sonst liesse sich waehrend der Sperre weiter raten.
+    After MAX_FEHLVERSUCHE wrong passwords in a row the address is locked
+    for SPERRDAUER_MINUTEN - also for the correct password, otherwise
+    guessing could continue during the lock.
     """
     if bis := gesperrt_bis(request.email):
         minuten = math.ceil((bis - datetime.now(UTC)).total_seconds() / 60)
@@ -181,8 +183,8 @@ async def login(request: LoginRequest):
 
     user = get_user_by_email(request.email)
 
-    # Unbekannte Adresse und falsches Passwort zaehlen gleich, damit weder
-    # Meldung noch Sperre verraten, ob es ein Konto gibt.
+    # An unknown address and a wrong password count the same, so that
+    # neither the message nor the lock reveals whether an account exists.
     if not user or not verify_password(request.password, user['password_hash']):
         verbleibend = fehlversuch_merken(request.email)
 
@@ -201,10 +203,10 @@ async def login(request: LoginRequest):
 
     fehlversuche_loeschen(request.email)
 
-    # Erstelle Token
+    # Create token
     token = create_access_token(user['id'])
 
-    # Login protokollieren (best-effort, darf den Login nie blockieren)
+    # Record the login (best effort, must never block the login)
     try:
         log_login(user['id'])
     except Exception:
@@ -220,10 +222,10 @@ async def login(request: LoginRequest):
 @router.get("/me", response_model=UserInfo)
 async def get_me(current_user: dict = Depends(get_current_user)):
     """
-    Gibt Informationen ueber aktuell eingeloggten User zurueck.
-    Benoetigt Token im Authorization Header.
+    Returns information about the currently logged-in user.
+    Requires a token in the Authorization header.
     """
-    # Pruefe ob User DFB-Credentials gespeichert hat
+    # Check whether the user has stored DFB credentials
     dfb_creds = get_dfb_credentials(current_user['id'])
 
     return UserInfo(
@@ -240,44 +242,44 @@ async def save_dfb_credentials(
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Speichert DFB-Credentials verschluesselt fuer den User.
+    Stores the DFB credentials encrypted for the user.
 
-    Diese Credentials werden automatisch beim Generieren verwendet,
-    sodass der User sie nicht jedes Mal eingeben muss.
+    These credentials are used automatically when generating,
+    so the user does not have to enter them every time.
     """
     user_id = current_user['id']
 
-    # Validierung
+    # Validation
     if not request.dfb_username or not request.dfb_password:
         raise ValidationError("DFB Username und Passwort müssen angegeben werden")
 
-    # Verschluesseln
+    # Encrypt
     encrypted_username = encrypt_credential(request.dfb_username)
     encrypted_password = encrypt_credential(request.dfb_password)
 
-    # Gehoert der neue Zugang noch zum selben DFBnet-Konto? Muss VOR dem
-    # Ueberschreiben geprueft werden.
+    # Does the new login still belong to the same DFBnet account? Must be
+    # checked BEFORE overwriting.
     try:
         bisher = get_dfb_credentials(user_id)
         gleiches_konto = bool(bisher) and decrypt_credential(
             bisher['dfb_username_encrypted']
         ) == request.dfb_username
     except Exception:
-        # Laesst sich der alte Benutzername nicht mehr entschluesseln, wird im
-        # Zweifel geloescht: lieber ein leerer Reiter als fremde Personendaten.
+        # If the old username can no longer be decrypted, delete when in doubt:
+        # better an empty tab than someone else's personal data.
         gleiches_konto = False
 
-    # In DB speichern
+    # Save to DB
     update_dfb_credentials(user_id, encrypted_username, encrypted_password)
 
-    # Die gespeicherten Stammdaten gehoeren zum bisherigen DFBnet-Konto. Zeigt
-    # jemand die App auf ein anderes Konto, stuenden dort bis zum naechsten
-    # erfolgreichen Abruf Name, Anschrift und Geburtsdatum einer anderen
-    # Person - also weg damit.
+    # The stored master data belongs to the previous DFBnet account. If
+    # someone points the app at another account, the name, address and date
+    # of birth of another person would show there until the next successful
+    # fetch - so remove them.
     #
-    # Ein reiner Passwortwechsel laesst sie dagegen stehen. DFBnet erzwingt den
-    # regelmaessig; wuerde er die Stammdaten mitnehmen, waere der Reiter danach
-    # jedes Mal bis zum naechsten Nachtlauf leer.
+    # A pure password change, by contrast, leaves them in place. DFBnet
+    # enforces one regularly; if it took the master data with it, the tab
+    # would be empty every time until the next nightly run.
     if not gleiches_konto:
         delete_stammdaten(user_id)
         delete_saisons(user_id)
@@ -293,7 +295,7 @@ async def save_dfb_credentials(
 @router.get("/dfb-credentials/status")
 async def check_dfb_credentials(current_user: dict = Depends(get_current_user)):
     """
-    Prueft ob User DFB-Credentials gespeichert hat.
+    Checks whether the user has stored DFB credentials.
     """
     user_id = current_user['id']
     dfb_creds = get_dfb_credentials(user_id)
@@ -310,33 +312,33 @@ async def change_password(
         current_user: dict = Depends(get_current_user)
 ):
     """
-    Ändert das Passwort des eingeloggten Users.
+    Changes the password of the logged-in user.
 
-    - Prüft ob aktuelles Passwort korrekt ist
-    - Validiert neues Passwort (Mindestlänge)
-    - Hasht und speichert neues Passwort
+    - Checks whether the current password is correct
+    - Validates the new password (minimum length)
+    - Hashes and stores the new password
     """
     user_id = current_user['id']
 
-    # Hole User mit Passwort-Hash aus DB
+    # Load the user with the password hash from the DB
     user = get_user_by_id(user_id)
     if not user:
         raise AuthenticationError("User nicht gefunden")
 
-    # Prüfe aktuelles Passwort. Bewusst kein 401: das Frontend wertet jeden
-    # 401 ausserhalb des Logins als abgelaufene Sitzung und meldet ab - wer
-    # sich hier vertippt, stuende sonst unvermittelt auf der Login-Seite.
+    # Check the current password. Deliberately not a 401: the frontend treats every
+    # 401 outside the login as an expired session and logs out - anyone
+    # mistyping here would otherwise suddenly land on the login page.
     if not verify_password(request.current_password, user['password_hash']):
         raise ValidationError("Aktuelles Passwort ist falsch")
 
-    # Validiere neues Passwort
+    # Validate the new password
     if len(request.new_password) < MIN_PASSWORT_LAENGE:
         raise ValidationError(f"Neues Passwort muss mindestens {MIN_PASSWORT_LAENGE} Zeichen lang sein")
 
     if request.current_password == request.new_password:
         raise ValidationError("Neues Passwort muss sich vom aktuellen unterscheiden")
 
-    # Hash neues Passwort
+    # Hash the new password
     new_password_hash = hash_password(request.new_password)
 
     # Update in DB

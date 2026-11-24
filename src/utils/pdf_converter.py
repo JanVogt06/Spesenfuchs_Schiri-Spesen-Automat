@@ -1,7 +1,7 @@
 """
-PDF-Konvertierung fuer generierte DOCX- und XLSX-Dokumente via LibreOffice
-headless. LibreOffice waehlt den Exportfilter nach Dateityp, also koennen
-TFV-Formulare (DOCX) und NOFV-Quittungen (XLSX) im selben Aufruf laufen.
+PDF conversion for generated DOCX and XLSX documents via LibreOffice
+headless. LibreOffice picks the export filter by file type, so
+TFV forms (DOCX) and NOFV receipts (XLSX) can run in the same call.
 """
 import shutil
 import subprocess
@@ -13,12 +13,12 @@ from utils.logger import setup_logger
 
 logger = setup_logger("pdf_converter")
 
-# Obergrenze fuer einen soffice-Aufruf. 120s pro Dokument waeren bei einem
-# Sammel-Download von 50 Spielen ueber anderthalb Stunden - so lange darf ein
-# haengender LibreOffice keinen der wenigen PDF-Plaetze blockieren.
+# Upper limit for one soffice call. 120s per document would be over an hour and a half for a
+# bulk download of 50 matches - a hanging LibreOffice
+# must not block any of the few PDF slots for that long.
 MAX_CONVERT_SECONDS = 300
 
-# Reihenfolge: zuerst PATH-Kommandos, dann bekannte macOS-Installationspfade
+# Order: PATH commands first, then known macOS install paths
 _SOFFICE_CANDIDATES = [
     "soffice",
     "libreoffice",
@@ -42,31 +42,31 @@ def _find_soffice() -> str:
 
 def convert_docx_bytes_to_pdf(documents: List[Tuple[str, bytes]]) -> List[Optional[bytes]]:
     """
-    Konvertiert im Speicher erzeugte DOCX-Dokumente zu PDF, ohne dass Aufrufer
-    mit Dateien hantieren muessen.
+    Converts DOCX documents generated in memory to PDF without callers
+    having to deal with files.
 
-    LibreOffice liest und schreibt nur Dateien, also laufen die Dokumente durch
-    ein temporaeres Verzeichnis, das danach restlos verschwindet - es bleibt
-    nichts von den Downloads auf der Platte zurueck.
+    LibreOffice only reads and writes files, so the documents run through
+    a temporary directory that disappears completely afterwards - nothing
+    of the downloads is left on disk.
 
-    Alle Dokumente werden in EINEM soffice-Aufruf konvertiert. Der Kaltstart
-    dominiert die Laufzeit (~2s), die einzelne Datei kostet danach kaum noch
-    etwas - ein Aufruf pro Dokument waere um ein Vielfaches teurer.
+    All documents are converted in ONE soffice call. The cold start
+    dominates the runtime (~2s), the individual file then costs hardly
+    anything - one call per document would be many times more expensive.
 
-    Achtung: der Aufruf blockiert fuer Sekunden. Aus einem async-Handler
-    gehoert er in einen Thread, sonst steht der Event-Loop still.
+    Note: the call blocks for seconds. From an async handler
+    it belongs in a thread, otherwise the event loop stands still.
 
     Args:
-        documents: Liste von (Dateiname mit .docx- oder .xlsx-Endung, Bytes)
+            documents: List of (file name with .docx or .xlsx extension, bytes)
 
     Returns:
-        Liste in derselben Reihenfolge wie die Eingabe; None, wo die
-        Konvertierung fehlschlug.
+            List in the same order as the input; None where the
+            conversion failed.
 
-        Bewusst eine Liste und keine Abbildung ueber den Dateinamen: zwei
-        Spiele koennen denselben Namen erzeugen (Turnier-Ansetzungen haben
-        keine Teams), und dann ueberschriebe eins das andere still - beide
-        bekaemen dieselbe PDF.
+            Deliberately a list and not a mapping by file name: two
+            matches can produce the same name (tournament assignments have
+            no teams), and then one would silently overwrite the other - both
+            would get the same PDF.
     """
     if not documents:
         return []
@@ -76,8 +76,8 @@ def convert_docx_bytes_to_pdf(documents: List[Tuple[str, bytes]]) -> List[Option
     try:
         paths = []
         for index, (filename, content) in enumerate(documents):
-            # Eindeutiger Name im Arbeitsverzeichnis, unabhaengig davon, wie
-            # der Aufrufer die Datei spaeter nennt
+            # Unique name in the working directory, regardless of how
+            # the caller names the file later
             path = work_dir / f"{index:04d}{Path(filename).suffix or '.docx'}"
             path.write_bytes(content)
             paths.append(path)
@@ -85,9 +85,9 @@ def convert_docx_bytes_to_pdf(documents: List[Tuple[str, bytes]]) -> List[Option
         try:
             convert_docx_files_to_pdf(paths)
         except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as fehler:
-            # Haengendes oder fehlendes LibreOffice: wie eine gescheiterte
-            # Konvertierung behandeln. Der Download meldet dann 503 mit
-            # verstaendlicher Meldung statt eines allgemeinen 500.
+            # Hanging or missing LibreOffice: treat like a failed
+            # conversion. The download then reports 503 with an
+            # understandable message instead of a generic 500.
             logger.error(f"PDF-Konvertierung abgebrochen: {type(fehler).__name__}: {fehler}")
             return [None] * len(paths)
 
@@ -103,16 +103,16 @@ def convert_docx_bytes_to_pdf(documents: List[Tuple[str, bytes]]) -> List[Option
 
 def convert_docx_files_to_pdf(docx_paths: List[Path]) -> Dict[Path, bool]:
     """
-    Konvertiert mehrere DOCX-Dateien in einem einzigen LibreOffice-Aufruf zu PDF
-    (spart den Prozessstart-Overhead pro Datei). Alle Dateien muessen im selben
-    Verzeichnis liegen, PDFs landen dort mit gleichem Namen (Endung .pdf).
+    Converts several DOCX files to PDF in a single LibreOffice call
+    (saves the process-start overhead per file). All files must be in the same
+    directory, PDFs end up there with the same name (extension .pdf).
 
-    Nutzt ein isoliertes LibreOffice-Profil, damit parallel laufende Konvertierungen
-    (z.B. mehrere User gleichzeitig) sich nicht gegenseitig durch ein Profil-Lock
+    Uses an isolated LibreOffice profile so that conversions running in parallel
+    (e.g. several users at once) do not block each other through a profile lock.
     blockieren.
 
     Returns:
-        Dict von DOCX-Pfad -> ob die PDF erfolgreich erstellt wurde.
+            Dict of DOCX path -> whether the PDF was created successfully.
     """
     docx_paths = [Path(p) for p in docx_paths]
     if not docx_paths:

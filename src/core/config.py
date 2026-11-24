@@ -1,15 +1,16 @@
 """
-Zentrale Konfiguration - wo Daten und Secrets liegen.
+Central configuration - where data and secrets live.
 
-Alles Veraenderliche liegt unter DATA_DIR: die .env mit den Secrets, die
-SQLite-Datenbank und die Session-Ordner. Im Container ist DATA_DIR=/data,
-sodass auf dem Server ein einziger Ordner neben der docker-compose.yml
-genuegt. Lokal ist es ./data im Projekt.
+Everything mutable lives under DATA_DIR: the .env with the secrets, the
+SQLite database and the session folders. In the container DATA_DIR=/data,
+so a single folder next to the docker-compose.yml is enough on the server.
+Locally it is ./data in the project.
 
-Einzelne Pfade lassen sich weiterhin per ENV ueberschreiben
-(ENV_FILE, DATABASE_PATH, OUTPUT_DIR). Existiert am neuen Ort nichts, am
-alten (Projekt-Root) aber schon, wird der alte Ort weiterbenutzt - damit
-ein halb migrierter Server nicht mit leerer Datenbank startet.
+Individual paths can still be overridden via ENV
+(ENV_FILE, DATABASE_PATH, OUTPUT_DIR). If nothing exists at the new
+location but something does at the old one (project root), the old
+location keeps being used - so a half-migrated server does not start with
+an empty database.
 """
 import os
 import secrets
@@ -24,33 +25,33 @@ logger = setup_logger("config")
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
-# Secrets, die beim allerersten Start erzeugt werden koennen. Beide muessen
-# ueber Neustarts hinweg stabil bleiben: ENCRYPTION_KEY entschluesselt die
-# gespeicherten DFB-Zugangsdaten, JWT_SECRET_KEY haelt Logins gueltig.
+# Secrets that can be generated on the very first start. Both must stay
+# stable across restarts: ENCRYPTION_KEY decrypts the stored DFB
+# credentials, JWT_SECRET_KEY keeps logins valid.
 _GENERATED_SECRETS = {
     "JWT_SECRET_KEY": lambda: secrets.token_urlsafe(32),
     "ENCRYPTION_KEY": lambda: Fernet.generate_key().decode(),
 }
 
 
-# Anwendungsversion. Im veroeffentlichten Image setzt sie der Release-Workflow
-# aus dem Git-Tag (v1.8.2 -> "1.8.2"), siehe ARG APP_VERSION im Dockerfile.
+# Application version. In the published image the release workflow sets it
+# from the Git tag (v1.8.2 -> "1.8.2"), see ARG APP_VERSION in the Dockerfile.
 #
-# Der Wert darunter ist nur der Rueckfall fuer einen Lauf aus dem Quellcode.
-# Frueher war er die einzige Quelle und musste beim Taggen von Hand mitgezogen
-# werden - was dreimal vergessen wurde, sodass v1.8.1 sich selbst als 1.7.0
-# ausgab: im Health-Endpunkt, im Betreff der Fehlerberichte und im User-Agent
-# gegenueber fussball.de und Nominatim.
+# The value below is only the fallback for a run from source. It used to be
+# the only source and had to be bumped by hand when tagging - which was
+# forgotten three times, so v1.8.1 reported itself as 1.7.0: in the health
+# endpoint, in the subject of the error reports and in the User-Agent sent
+# to fussball.de and Nominatim.
 APP_VERSION = os.getenv("APP_VERSION") or "1.10.1"
 
 
 def get_data_dir() -> Path:
-    """Basisverzeichnis fuer alle veraenderlichen Daten."""
+    """Base directory for all mutable data."""
     return Path(os.getenv("DATA_DIR") or PROJECT_ROOT / "data")
 
 
 def _prefer_existing(preferred: Path, legacy: Path) -> Path:
-    """Gibt den alten Pfad zurueck, solange nur dort Daten liegen."""
+    """Returns the old path as long as data exists only there."""
     if preferred.exists() or not legacy.exists() or legacy == preferred:
         return preferred
 
@@ -62,7 +63,7 @@ def _prefer_existing(preferred: Path, legacy: Path) -> Path:
 
 
 def get_env_file() -> Path:
-    """Pfad der .env mit den Secrets."""
+    """Path of the .env file holding the secrets."""
     if env_file := os.getenv("ENV_FILE"):
         return Path(env_file)
 
@@ -70,7 +71,7 @@ def get_env_file() -> Path:
 
 
 def get_db_path() -> Path:
-    """Pfad der SQLite-Datenbank."""
+    """Path of the SQLite database."""
     if db_path := os.getenv("DATABASE_PATH"):
         return Path(db_path)
 
@@ -78,15 +79,15 @@ def get_db_path() -> Path:
 
 
 def get_output_dir() -> Path:
-    """Basisverzeichnis der Session-Ordner mit den generierten Dokumenten."""
+    """Base directory of the session folders holding the generated documents."""
     if output_dir := os.getenv("OUTPUT_DIR"):
         return Path(output_dir)
 
     preferred = get_data_dir() / "output"
     legacy = PROJECT_ROOT / "output"
 
-    # Anders als bei Dateien zaehlt hier nur ein *gefuellter* alter Ordner:
-    # ein leeres output/ im Image ist kein Grund, DATA_DIR zu ignorieren.
+    # Unlike with files, only a *populated* old folder counts here:
+    # an empty output/ in the image is no reason to ignore DATA_DIR.
     if not preferred.exists() and legacy.is_dir() and any(legacy.iterdir()):
         return _prefer_existing(preferred, legacy)
 
@@ -95,10 +96,10 @@ def get_output_dir() -> Path:
 
 def _bootstrap_secrets(env_file: Path) -> None:
     """
-    Erzeugt fehlende Secrets beim allerersten Start.
+    Generates missing secrets on the very first start.
 
-    Eine bereits vorhandene .env wird nie angefasst - sonst wuerden
-    gespeicherte DFB-Zugangsdaten unentschluesselbar.
+    An existing .env is never touched - otherwise stored DFB credentials
+    would become undecryptable.
     """
     if env_file.exists():
         return
@@ -122,8 +123,8 @@ def _bootstrap_secrets(env_file: Path) -> None:
 
     try:
         env_file.parent.mkdir(parents=True, exist_ok=True)
-        # Exklusiv anlegen: startet ein zweiter Prozess gleichzeitig,
-        # gewinnt genau einer und der andere liest dessen Schluessel.
+        # Create exclusively: if a second process starts at the same time,
+        # exactly one wins and the other reads its keys.
         fd = os.open(env_file, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
     except FileExistsError:
         load_dotenv(env_file)
@@ -144,10 +145,10 @@ def _bootstrap_secrets(env_file: Path) -> None:
 
 def load_environment() -> Path:
     """
-    Laedt die .env und ergaenzt fehlende Secrets beim ersten Start.
+    Loads the .env and adds missing secrets on the first start.
 
-    Muss vor Modulen laufen, die Secrets beim Import lesen (core.security).
-    Bereits gesetzte Umgebungsvariablen gewinnen gegen die Datei.
+    Must run before modules that read secrets at import time (core.security).
+    Environment variables that are already set win over the file.
     """
     env_file = get_env_file()
     load_dotenv(env_file)

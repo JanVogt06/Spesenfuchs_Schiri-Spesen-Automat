@@ -1,10 +1,10 @@
 """
-Datenbankzugriff fuer Scrape-Laeufe.
+Database access for scrape runs.
 
-Ersetzt die metadata.json im Session-Ordner. Der Scraper laeuft in einem
-eigenen Prozess (Playwright vertraegt sich nicht mit dem asyncio-Loop der API),
-schrieb seinen Fortschritt bisher in diese Datei und die API las sie fuer den
-2-Sekunden-Poll des Frontends wieder aus. Diese Tabelle ist jetzt der Kanal.
+Replaces the metadata.json in the session folder. The scraper runs in its
+own process (Playwright does not get along with the API's asyncio loop),
+used to write its progress into that file and the API read it back for the
+frontend's 2-second poll. This table is now the channel.
 """
 from datetime import datetime, UTC, timedelta
 from typing import Dict, List, Optional
@@ -14,17 +14,17 @@ from utils.logger import setup_logger
 
 logger = setup_logger("db_scrape_runs")
 
-# Laeuft ein Lauf laenger als das ohne Lebenszeichen, gilt sein Prozess als tot.
-# Ein voller Scrape mit Login dauert wenige Minuten; alles darueber ist ein
-# abgestuerztes Kind, das sonst fuer immer auf "scraping" stehen bliebe.
+# If a run lasts longer than this without a sign of life, its process counts as dead.
+# A full scrape with login takes a few minutes; anything beyond is a
+# crashed child that would otherwise stay on "scraping" forever.
 STALE_AFTER_MINUTES = 30
 
-# Laeufe, die noch arbeiten
+# Runs that are still working
 ACTIVE_STATUS = ("pending", "scraping", "generating")
 
 
 def start_run(user_id: int) -> int:
-    """Legt einen neuen Lauf an und gibt seine ID zurueck."""
+    """Creates a new run and returns its ID."""
     now = datetime.now(UTC).isoformat()
     conn = get_connection()
 
@@ -51,11 +51,11 @@ def update_run(
     finished: bool = False,
 ) -> None:
     """
-    Schreibt den Fortschritt fort. Nur uebergebene Felder werden angefasst.
+    Writes progress forward. Only passed fields are touched.
 
     Args:
-        finished: Setzt zusaetzlich finished_at - fuer den letzten Aufruf
-                  eines Laufs, egal ob erfolgreich oder nicht.
+            finished: Additionally sets finished_at - for the last call
+                                of a run, whether successful or not.
     """
     now = datetime.now(UTC).isoformat()
 
@@ -88,7 +88,7 @@ def update_run(
 
 
 def get_run(run_id: int) -> Optional[Dict]:
-    """Einzelner Lauf, oder None."""
+    """A single run, or None."""
     conn = get_connection()
 
     try:
@@ -99,7 +99,7 @@ def get_run(run_id: int) -> Optional[Dict]:
 
 
 def get_latest_run(user_id: int) -> Optional[Dict]:
-    """Der juengste Lauf eines Users - das, was das Frontend pollt."""
+    """The most recent run of a user - what the frontend polls."""
     conn = get_connection()
 
     try:
@@ -113,7 +113,7 @@ def get_latest_run(user_id: int) -> Optional[Dict]:
 
 
 def get_runs(user_id: int, limit: int = 20) -> List[Dict]:
-    """Die letzten Laeufe eines Users, neueste zuerst."""
+    """The latest runs of a user, newest first."""
     conn = get_connection()
 
     try:
@@ -127,7 +127,7 @@ def get_runs(user_id: int, limit: int = 20) -> List[Dict]:
 
 
 def has_active_run(user_id: int) -> bool:
-    """Ob fuer den User gerade ein Lauf arbeitet (verhindert Doppelstarts)."""
+    """Whether a run is currently working for the user (prevents double starts)."""
     placeholders = ",".join("?" * len(ACTIVE_STATUS))
     conn = get_connection()
 
@@ -144,15 +144,15 @@ def has_active_run(user_id: int) -> bool:
 
 def fail_stale_runs() -> int:
     """
-    Schliesst Laeufe ab, deren Prozess offensichtlich gestorben ist.
+    Closes runs whose process has obviously died.
 
-    Der Scrape laeuft in einem daemonischen Kindprozess, den niemand
-    ueberwacht. Stirbt er - OOM, Container-Neustart, Absturz in Playwright -
-    blieb der Lauf bisher fuer immer auf "scraping" stehen und das Frontend
-    pollte endlos. Wird beim Start und vor jedem neuen Lauf aufgerufen.
+    The scrape runs in a daemonic child process that nobody
+    monitors. If it dies - OOM, container restart, crash in Playwright -
+    the run used to stay on "scraping" forever and the frontend
+    polled endlessly. Called at startup and before every new run.
 
     Returns:
-        Anzahl abgeraeumter Laeufe.
+            Number of runs cleaned up.
     """
     cutoff = (datetime.now(UTC) - timedelta(minutes=STALE_AFTER_MINUTES)).isoformat()
     now = datetime.now(UTC).isoformat()

@@ -1,12 +1,12 @@
 """
-Spesen und Fahrtkosten der eigenen Spiele, je Saison.
+Expenses and travel costs of the user's own matches, per season.
 
-Gezaehlt werden vergangene Ansetzungen, die nicht zurueckgezogen wurden.
-Spesen sind die der eigenen Rolle (SR- oder SRA-Satz, eingefroren beim
-ersten Abruf). Fahrtkosten kommen aus den eingetragenen Kilometern und
-OeVM-Betraegen; wo fuer die eigene Rolle nichts eingetragen ist, wird
-geschaetzt: allein vom eigenen Wohnort zum Platz und zurueck, nach
-Strassenkilometern. Die Antwort haelt erfasst und geschaetzt getrennt.
+Counted are past assignments that were not withdrawn.
+Expenses are those of the user's own role (SR or SRA rate, frozen at the
+first fetch). Travel costs come from the entered kilometres and
+public-transport (OeVM) amounts; where nothing is entered for the own role, they are
+estimated: alone from the own place of residence to the pitch and back, by
+road kilometres. The response keeps recorded and estimated separate.
 """
 import time
 from collections import defaultdict
@@ -59,7 +59,7 @@ def statistik(user_id: int, saison: Optional[str] = None, frist: Optional[float]
     summe = {"spiele": 0, "ohne_rolle": 0, "ohne_satz": 0, "spesen": 0.0}
     fahrt = {"erfasst": 0.0, "erfasst_spiele": 0, "geschaetzt": 0.0, "geschaetzt_spiele": 0,
              "geschaetzt_km": 0, "ohne_schaetzung": 0, "luftlinie_spiele": 0}
-    zu_schaetzen = []  # (Monat, km-Satz, Wohnort, Spielort)
+    zu_schaetzen = []  # (month, km rate, place of residence, venue)
 
     for match in (m for m in vergangene if m["_saison"] == saison):
         person = eigene_person(match, name)
@@ -121,13 +121,13 @@ def statistik(user_id: int, saison: Optional[str] = None, frist: Optional[float]
         "monate": [{"monat": k, **v} for k, v in sorted(monate.items())],
         "rollen": [{"rolle": k, "spiele": v["spiele"], "spesen": _euro(v["spesen"])}
                    for k, v in sorted(rollen.items())],
-        # Noch nicht nachgeschlagen: das Frontend fragt dann erneut
+        # Not looked up yet: the frontend then asks again
         "offen": ortsuche.offen + offen_strecken,
     }
 
 
 def _schaetzen(zu_schaetzen, frist, monate, fahrt) -> int:
-    """Traegt die geschaetzten Fahrtkosten ein; gibt die Zahl noch offener Spiele zurueck."""
+    """Enters the estimated travel costs; returns the number of matches still open."""
     offen = 0
     nach_wohnort = defaultdict(list)
     for eintrag in zu_schaetzen:

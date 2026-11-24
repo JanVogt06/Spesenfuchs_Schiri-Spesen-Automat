@@ -1,15 +1,15 @@
 """
-Datenbankzugriff fuer die eigenen Stammdaten eines Schiedsrichters.
+Database access for a referee's own master data (Stammdaten).
 
-DFBnet fuehrt diese Daten am SR-Account, und jeder App-User hinterlegt genau
-einen solchen Account - deshalb gehoert zu einem User genau eine Zeile und
-user_id ist zugleich Primaerschluessel.
+DFBnet keeps this data on the referee (SR) account, and every app user stores exactly
+one such account - therefore exactly one row belongs to a user and
+user_id is at the same time the primary key.
 
-Die persoenlichen Felder liegen Fernet-verschluesselt in der Datenbank, wie
-schon die DFBnet-Zugangsdaten. Anschrift, Geburtsdatum und Telefonnummern
-stuenden sonst im Klartext in app.db. Verschluesselt
-kostet das nichts: gelesen wird immer nur die eine Zeile des angemeldeten
-Users, es wird nie ueber diesen Feldern gefiltert oder sortiert.
+The personal fields are stored Fernet-encrypted in the database, like
+the DFBnet credentials already are. Address, date of birth and phone numbers
+would otherwise sit in plain text in app.db. Encrypting them
+costs nothing: only the one row of the logged-in
+user is ever read, and these fields are never filtered or sorted on.
 """
 import sqlite3
 from datetime import datetime, UTC
@@ -21,10 +21,10 @@ from utils.logger import setup_logger
 
 logger = setup_logger("db_stammdaten")
 
-# Alle Felder, die der Scraper liefert - in Schema-Reihenfolge. Die Liste ist
-# zugleich die Merge-Liste: ein leerer Wert heisst "der Scraper hat nichts
-# geliefert", nicht "das Feld ist jetzt leer". Ohne diese Unterscheidung
-# raeumte ein einziger Layout-Wechsel bei DFBnet den ganzen Reiter leer.
+# All fields the scraper delivers - in schema order. The list is
+# also the merge list: an empty value means "the scraper delivered
+# nothing", not "the field is now empty". Without this distinction
+# a single layout change at DFBnet would empty the whole tab.
 _FELDER = [
     "name_vorname",
     "strasse",
@@ -56,10 +56,10 @@ _FELDER = [
     "qmax_beobachter",
 ]
 
-# Felder, die verschluesselt abgelegt werden: alles, was die Person hinter dem
-# Account identifiziert oder zu ihr nach Hause fuehrt. Draussen bleibt, was
-# ohnehin oeffentlich am Spiel haengt (Verein, SR-Gebiet, Qualifikation) -
-# das steht so schon in der Ansetzung.
+# Fields stored encrypted: everything that identifies the person behind the
+# account or leads to their home. Left outside is what is publicly attached to the match anyway
+# (club, referee region, qualification) -
+# it already appears that way in the assignment.
 _VERSCHLUESSELTE_FELDER = {
     "name_vorname",
     "strasse",
@@ -83,19 +83,19 @@ def upsert_stammdaten(
     conn: Optional[sqlite3.Connection] = None,
 ) -> None:
     """
-    Schreibt die Stammdaten eines Users - eine Zeile, die ueberschrieben wird.
+    Writes the master data of a user - one row that is overwritten.
 
-    Eine Historie gibt es bewusst nicht: die Daten sollen den aktuellen Stand
-    aus DFBnet spiegeln, und alte Anschriften aufzubewahren waere zusaetzliche
-    Datenhaltung ohne Nutzen.
+    There is deliberately no history: the data should mirror the current state
+    from DFBnet, and keeping old addresses would be additional
+    data storage without benefit.
 
     Args:
-        stammdaten: flaches Dict mit den Schluesseln aus _FELDER; fehlende
-                    Schluessel werden wie leere Werte behandelt und lassen den
-                    gespeicherten Wert stehen.
-        scraped_at: Zeitpunkt des Abrufs (Default: jetzt)
-        conn: bestehende Verbindung; ohne sie wird eine eigene geoeffnet und
-              committet (gleiche Konvention wie upsert_match)
+            stammdaten: flat dict with the keys from _FELDER; missing
+                                    keys are treated like empty values and leave the
+                                    stored value in place.
+            scraped_at: Time of the fetch (default: now)
+            conn: existing connection; without it a connection of its own is opened and
+                        committed (same convention as upsert_match)
     """
     own_conn = conn is None
     if own_conn:
@@ -106,8 +106,8 @@ def upsert_stammdaten(
     values = {"user_id": user_id}
     for feld in _FELDER:
         wert = (stammdaten.get(feld) or "").strip()
-        # Fernet verschluesselt Leerstrings nicht (encrypt_credential gibt ''
-        # zurueck) - der NULLIF-Merge unten greift also unveraendert.
+        # Fernet does not encrypt empty strings (encrypt_credential returns ''
+        # for them) - the NULLIF merge below therefore works unchanged.
         values[feld] = encrypt_credential(wert) if feld in _VERSCHLUESSELTE_FELDER else wert
 
     values["first_seen_at"] = scraped_at
@@ -139,12 +139,12 @@ def upsert_stammdaten(
 
 def get_stammdaten(user_id: int) -> Optional[Dict]:
     """
-    Die Stammdaten eines Users im Klartext, oder None vor dem ersten Abruf.
+    The master data of a user in plain text, or None before the first fetch.
 
-    Laesst sich ein Feld nicht entschluesseln - etwa weil der ENCRYPTION_KEY
-    gewechselt hat -, wird es leer geliefert statt den ganzen Abruf scheitern
-    zu lassen: ein lueckenhafter Reiter ist besser als ein Fehler, der den
-    Nutzer nichts davon sehen laesst.
+    If a field cannot be decrypted - for example because the ENCRYPTION_KEY
+    was changed -, it is returned empty instead of letting the whole fetch
+    fail: a patchy tab is better than an error that lets the
+    user see nothing of it.
     """
     conn = get_connection()
 
@@ -172,15 +172,15 @@ def get_stammdaten(user_id: int) -> Optional[Dict]:
 
 def delete_stammdaten(user_id: int) -> bool:
     """
-    Loescht die Stammdaten eines Users.
+    Deletes the master data of a user.
 
-    Wird beim Hinterlegen neuer DFBnet-Zugangsdaten aufgerufen. Zeigt jemand
-    die App auf einen anderen DFBnet-Account, gehoeren die gespeicherten Daten
-    einer anderen Person - die stuenden sonst bis zum naechsten erfolgreichen
-    Abruf weiter im Reiter.
+    Called when new DFBnet credentials are stored. If someone points
+    the app at another DFBnet account, the stored data belongs
+    to another person - it would otherwise stay in the tab until the next successful
+    fetch.
 
     Returns:
-        Ob eine Zeile geloescht wurde.
+            Whether a row was deleted.
     """
     conn = get_connection()
 

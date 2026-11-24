@@ -1,6 +1,6 @@
 """
-Security Modul - Passwort Hashing + JWT Tokens
-Ganz einfach, nur das Noetigste
+Security module - password hashing + JWT tokens
+Very simple, only the bare minimum
 """
 import os
 import hashlib
@@ -9,7 +9,7 @@ import secrets
 import jwt
 from datetime import datetime, timedelta, UTC
 
-# JWT Configuration aus .env laden
+# Load JWT configuration from .env
 SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 if not SECRET_KEY:
     raise ValueError(
@@ -23,45 +23,45 @@ TOKEN_EXPIRE_DAYS = int(os.getenv("JWT_EXPIRATION_DAYS", "90"))
 
 def hash_password(password: str) -> str:
     """
-    Erstellt sicheren Hash aus Passwort.
+    Creates a secure hash from a password.
 
     Args:
-        password: Klartext-Passwort
+        password: Plain-text password
 
     Returns:
-        Hash-String (sicher zum Speichern)
+        Hash string (safe to store)
     """
-    # Generiere zufaelliges Salt
+    # Generate a random salt
     salt = secrets.token_hex(16)
 
-    # Hash erstellen
+    # Create the hash
     password_hash = hashlib.pbkdf2_hmac(
         'sha256',
         password.encode('utf-8'),
         salt.encode('utf-8'),
-        100000  # Iterationen
+        100000  # iterations
     )
 
-    # Salt + Hash kombinieren fuer Speicherung
+    # Combine salt + hash for storage
     return f"{salt}${password_hash.hex()}"
 
 
 def verify_password(password: str, password_hash: str) -> bool:
     """
-    Prueft ob Passwort korrekt ist.
+    Checks whether a password is correct.
 
     Args:
-        password: Eingegebenes Passwort
-        password_hash: Gespeicherter Hash
+        password: Entered password
+        password_hash: Stored hash
 
     Returns:
-        True wenn korrekt, False wenn falsch
+        True if correct, False if wrong
     """
     try:
-        # Trenne Salt und Hash
+        # Split salt and hash
         salt, stored_hash = password_hash.split('$')
 
-        # Hash neu berechnen mit gleichem Salt
+        # Recompute the hash with the same salt
         new_hash = hashlib.pbkdf2_hmac(
             'sha256',
             password.encode('utf-8'),
@@ -69,54 +69,54 @@ def verify_password(password: str, password_hash: str) -> bool:
             100000
         )
 
-        # Zeitkonstant vergleichen, damit die Laufzeit nichts ueber den Hash verraet
+        # Compare in constant time so the runtime reveals nothing about the hash
         return hmac.compare_digest(new_hash.hex(), stored_hash)
     except (ValueError, TypeError, AttributeError):
-        # Kaputter oder fehlender Hash
+        # Corrupt or missing hash
         return False
 
 
-# ===== JWT TOKEN FUNKTIONEN =====
+# ===== JWT TOKEN FUNCTIONS =====
 
 def create_access_token(user_id: int) -> str:
     """
-    Erstellt JWT Token fuer User.
+    Creates a JWT token for a user.
 
     Args:
         user_id: User ID
 
     Returns:
-        JWT Token String
+        JWT token string
     """
-    # Token-Daten
+    # Token data
     expire = datetime.now(UTC) + timedelta(days=TOKEN_EXPIRE_DAYS)
     payload = {
         "user_id": user_id,
-        "exp": expire  # Ablaufdatum
+        "exp": expire  # expiry date
     }
 
-    # Token erstellen
+    # Create the token
     token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
     return token
 
 
 def decode_access_token(token: str) -> int:
     """
-    Dekodiert JWT Token und gibt user_id zurueck.
+    Decodes a JWT token and returns the user_id.
 
     Args:
-        token: JWT Token String
+        token: JWT token string
 
     Returns:
-        user_id oder None wenn ungueltig
+        user_id, or None if invalid
     """
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id = payload.get("user_id")
         return user_id
     except jwt.ExpiredSignatureError:
-        # Token abgelaufen
+        # Token expired
         return None
     except jwt.InvalidTokenError:
-        # Token ungueltig
+        # Token invalid
         return None

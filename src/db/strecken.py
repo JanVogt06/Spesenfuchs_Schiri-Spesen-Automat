@@ -1,9 +1,9 @@
 """
-Zwischenspeicher fuer Strassenentfernungen.
+Cache for road distances.
 
-Wie db.geocode: ein Fehlschlag wird mit meter NULL festgehalten, sonst
-liefe jeder Aufruf erneut in dieselbe erfolglose Anfrage. Wie lange er
-gilt, entscheidet der Aufrufer (utils.routing).
+Like db.geocode: a failure is recorded with meter NULL, otherwise
+every call would run into the same unsuccessful request again. How long it
+stays valid is decided by the caller (utils.routing).
 """
 from datetime import datetime, UTC
 from typing import Dict, Iterable, List, Optional, Tuple
@@ -16,8 +16,8 @@ Paar = Tuple[Punkt, Punkt]
 
 def get_strecken(paare: Iterable[Paar], provider: str) -> Dict[Paar, Dict]:
     """
-    Die gespeicherten Eintraege zu den Paaren: {paar: {"meter", "resolved_at"}}.
-    Ein fehlendes Paar wurde noch nie gefragt.
+    The stored entries for the pairs: {pair: {"meter", "resolved_at"}}.
+    A missing pair has never been asked.
     """
     paare = list(dict.fromkeys(paare))
     if not paare:
@@ -26,7 +26,7 @@ def get_strecken(paare: Iterable[Paar], provider: str) -> Dict[Paar, Dict]:
     conn = get_connection()
     try:
         gefunden = {}
-        # Paarweise abfragen haelt das SQL einfach; es sind selten mehr als ein paar Dutzend
+        # Querying pair by pair keeps the SQL simple; rarely more than a few dozen
         for von, nach in paare:
             row = conn.execute(
                 """SELECT meter, resolved_at FROM strecken_cache
@@ -41,7 +41,7 @@ def get_strecken(paare: Iterable[Paar], provider: str) -> Dict[Paar, Dict]:
 
 
 def store_strecken(eintraege: List[Tuple[Punkt, Punkt, Optional[float]]], provider: str) -> None:
-    """Haelt Ergebnisse fest - auch "kein Weg gefunden" (meter None)."""
+    """Records results - also "no route found" (meter None)."""
     if not eintraege:
         return
 

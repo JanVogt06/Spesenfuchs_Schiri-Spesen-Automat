@@ -1,22 +1,22 @@
 """
-Die Thueringer Herren-Ligen und ihre Tabellen.
+The Thuringian men's (Herren) leagues and their tables.
 
-Gefuellt wird das jede Nacht aus fussball.de (siehe scraper.fussball_de).
-Zwei Verwendungen: der Reiter *Ligen* zeigt die Tabellen, und die Spesen der
-Pokal- und Freundschaftsspiele brauchen die Spielklasse der beteiligten
-Mannschaften (§2 Abs. 3 und 4 der Spesenordnung).
+This is filled every night from fussball.de (see scraper.fussball_de).
+Two uses: the *Ligen* tab shows the tables, and the expenses of
+cup and friendly matches need the Spielklasse (league level) of the participating
+teams (§2 para. 3 and 4 of the expense regulations, Spesenordnung).
 
-Zur Zuordnung eines DFBnet-Namens auf eine Tabellenzeile siehe
-finde_mannschaft - die Stelle entscheidet ueber Geld und ist entsprechend
-misstrauisch gebaut.
+For mapping a DFBnet name to a table row see
+finde_mannschaft - this place decides about money and is built
+accordingly distrustful.
 """
 from datetime import datetime, UTC
 from typing import Dict, List, Optional
 
 from db.database import get_connection
 
-# Rangfolge der Spielklassen fuer "die hoechstklassige am Spiel beteiligte
-# Mannschaft" (§2 Abs. 3). Kleiner ist hoeher.
+# Ranking of the Spielklassen for "the highest-ranked team
+# involved in the match" (§2 para. 3). Smaller is higher.
 RANG = {
     "regionalliga": 2,
     "oberliga": 3,
@@ -26,22 +26,22 @@ RANG = {
 
 
 def rang(spielklasse: str) -> int:
-    """Rang einer Spielklasse; unbekannte gelten als die niedrigste."""
+    """Rank of a Spielklasse; unknown ones count as the lowest."""
     return RANG.get(spielklasse, 99)
 
 
 def ersetze_staffel(staffel, tabelle: List) -> None:
     """
-    Schreibt eine Staffel samt Tabelle neu.
+    Rewrites a Staffel (division) including its table.
 
-    Vollstaendiger Austausch statt Zusammenfuehren: Auf- und Absteiger, ein
-    zurueckgezogenes Team oder eine Staffelreform wuerden sonst als Karteileiche
-    stehen bleiben - und eine Karteileiche in dieser Tabelle ist ein falscher
-    Spesensatz.
+    Complete replacement instead of merging: promoted and relegated teams, a
+    withdrawn team or a division reform would otherwise remain as a stale
+    record - and a stale record in this table is a wrong
+    expense rate.
 
-    Eine leere Tabelle laesst die alten Zeilen stehen. Vor dem ersten Spieltag
-    und bei einer Aenderung des Seitenaufbaus kommt nichts zurueck, und dann
-    sind veraltete Daten besser als gar keine.
+    An empty table leaves the old rows in place. Before the first matchday
+    and when the page layout changes nothing comes back, and then
+    outdated data is better than none at all.
     """
     from scraper.fussball_de import mannschaftsnummer, vereinskern
 
@@ -92,7 +92,7 @@ def ersetze_staffel(staffel, tabelle: List) -> None:
 
 
 def alle_staffeln() -> List[Dict]:
-    """Alle bekannten Staffeln, hoechste Spielklasse zuerst."""
+    """All known divisions (Staffeln), highest Spielklasse first."""
     conn = get_connection()
 
     try:
@@ -113,7 +113,7 @@ def alle_staffeln() -> List[Dict]:
 
 
 def tabelle(staffel_id: str) -> List[Dict]:
-    """Die Tabelle einer Staffel, von Platz 1 an."""
+    """The table of a division, from place 1."""
     conn = get_connection()
 
     try:
@@ -130,16 +130,16 @@ def tabelle(staffel_id: str) -> List[Dict]:
 
 def suche_mannschaft(name: str) -> List[Dict]:
     """
-    Alle Tabellenzeilen, die zu einer DFBnet-Mannschaft passen.
+    All table rows that match a DFBnet team.
 
-    Passend heisst: Vereinskern UND Mannschaftsnummer stimmen ueberein. Die
-    Nummer ist nicht verhandelbar: "SG FC Saalfeld 3." und "FC Saalfeld"
-    haben denselben Kern, spielen aber Kreisliga und Verbandsliga - ohne diese
-    Bedingung wuerde aus 25 Euro 50.
+    Matching means: club core AND team number agree. The
+    number is non-negotiable: "SG FC Saalfeld 3." and "FC Saalfeld"
+    have the same core, but play Kreisliga and Verbandsliga - without this
+    condition 25 euros would become 50.
 
-    Wer Geld daraus ableitet, muss "keine Zeile" und "mehrere Zeilen"
-    auseinanderhalten: das erste heisst "spielt in keiner erfassten Liga",
-    das zweite "spielt in einer davon, nur nicht feststellbar in welcher".
+    Whoever derives money from this must distinguish "no row" from "several rows":
+    the first means "plays in no recorded league",
+    the second "plays in one of them, but it cannot be determined which".
     """
     from scraper.fussball_de import mannschaftsnummer, vereinskern
 
@@ -167,30 +167,30 @@ def suche_mannschaft(name: str) -> List[Dict]:
 
 def finde_mannschaft(name: str) -> Optional[Dict]:
     """
-    Die eine Tabellenzeile einer DFBnet-Mannschaft, oder None.
+    The one table row of a DFBnet team, or None.
 
-    None, sobald das Ergebnis nicht eindeutig ist - lieber keine Spesen als
-    die falschen. Tauchte derselbe Kern mit derselben Nummer in zwei Staffeln
-    auf, waere nicht zu entscheiden, welche gemeint ist. Zur Abgrenzung von
-    "nicht gefunden" siehe suche_mannschaft.
+    None as soon as the result is not unambiguous - better no expenses than
+    the wrong ones. If the same core with the same number appeared in two divisions,
+    it could not be decided which is meant. For the distinction from
+    "not found" see suche_mannschaft.
     """
     treffer = suche_mannschaft(name)
     return treffer[0] if len(treffer) == 1 else None
 
 
-# Ab diesem Rang gilt eine Mannschaft als ueberregional (Regionalliga und
-# hoeher, dazu die Oberligen). Fuer diese Spiele bleiben die Pokalspesen leer.
+# From this rank a team counts as supra-regional (Regionalliga and
+# higher, plus the Oberligen). For these matches the cup expenses stay empty.
 RANG_UEBERREGIONAL = RANG["oberliga"]
 
 
 def kennt_ueberregionale_ligen() -> bool:
     """
-    Sind die ueberregionalen Tabellen ueberhaupt vorhanden?
+    Are the supra-regional tables present at all?
 
-    Entscheidet darueber, ob aus "steht in keiner Tabelle" geschlossen werden
-    darf, dass eine Mannschaft unterhalb der Landesklasse spielt. Fehlen die
-    ueberregionalen Staffeln, koennte sie ebenso gut Oberliga spielen - dann
-    ist nichts zu schliessen und es gibt keine Spesen.
+    Decides whether it may be concluded from "appears in no table"
+    that a team plays below the Landesklasse. If the
+    supra-regional divisions are missing, it could just as well play Oberliga - then
+    nothing can be concluded and there are no expenses.
     """
     conn = get_connection()
 
@@ -206,7 +206,7 @@ def kennt_ueberregionale_ligen() -> bool:
 
 
 def bestand() -> Dict[str, object]:
-    """Kurzer Ueberblick fuer Oberflaeche und Protokoll."""
+    """Short overview for the UI and the log."""
     conn = get_connection()
 
     try:

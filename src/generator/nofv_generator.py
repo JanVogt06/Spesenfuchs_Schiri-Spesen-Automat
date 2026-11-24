@@ -1,15 +1,15 @@
 """
-NOFV-Generator - Fuellt die Reisekostenabrechnung des NOFV.
+NOFV generator - fills in the NOFV travel expense settlement (Reisekostenabrechnung).
 
-Anders als das TFV-Formular, auf dem das ganze Gespann steht, ist die
-NOFV-Quittung eine Abrechnung je Person: Nach §9 Nr. 7.15 der Finanzordnung
-uebergibt jeder Schiedsrichter und Assistent dem platzbauenden Verein seine
-eigene Quittung. Die Vorlage ist deshalb eine Excel-Datei mit einem Blatt, das
-hier je angesetzter Person einmal kopiert und gefuellt wird - aus einer Mappe
-mit drei Blaettern wird eine dreiseitige PDF.
+Unlike the TFV form, on which the whole crew appears, the
+NOFV receipt is a settlement per person: under §9 no. 7.15 of the finance regulations (Finanzordnung)
+every referee and assistant hands the host club (platzbauender Verein) their
+own receipt. The template is therefore an Excel file with one sheet, which is
+copied and filled once per assigned person - a workbook
+with three sheets becomes a three-page PDF.
 
-Fahrtkosten-Felder und die Summe bleiben Formeln, damit die Excel-Datei beim
-Nachtragen von Hand weiterrechnet.
+Travel cost fields and the total remain formulas, so that the Excel file keeps
+calculating when entries are added by hand.
 """
 import copy
 import re
@@ -30,7 +30,7 @@ from utils.match_utils import parse_anpfiff
 
 logger = setup_logger("nofv_generator")
 
-# (Rolle in DFBnet, Eintrag "Einsatz als", Praefix der Fahrtkosten, Blattname)
+# (role in DFBnet, entry "Einsatz als" (duty as), prefix of the travel costs, sheet name)
 ROLLEN = [
     ("SR", "Schiedsrichter", "sr", "SR"),
     ("SRA 1", "Schiedsrichterassistent 1", "sra1", "SRA 1"),
@@ -39,7 +39,7 @@ ROLLEN = [
 
 DATUMSFORMAT = "DD.MM.YYYY"
 
-# Zellen der Vorlage (Blatt "Table 1", Formular Stand 15.08.2024)
+# Cells of the template (sheet "Table 1", form version of 15.08.2024)
 ZELLE_NAME = "E8"
 ZELLE_STRASSE = "E9"
 ZELLE_WOHNORT = "E10"
@@ -61,17 +61,17 @@ ZELLE_PKW = "J26"
 ZELLE_GESAMT = "J31"
 ZELLE_IN_WORTEN = "E32"
 
-# Felder mit Freitext unbekannter Laenge. Die Vorlage setzt sie in 16 pt, ein
-# langer Vereinsname liefe ueber den Rand und wuerde abgeschnitten.
+# Fields with free text of unknown length. The template sets them in 16 pt, a
+# long club name would run over the edge and be cut off.
 ZELLEN_SCHRUMPFEN = (
     ZELLE_NAME, ZELLE_STRASSE, ZELLE_WOHNORT, ZELLE_EINSATZ, ZELLE_SPIELKLASSE,
     ZELLE_HEIM, ZELLE_GAST, ZELLE_HINREISE_STRECKE, ZELLE_RUECKREISE_STRECKE,
     ZELLE_IN_WORTEN,
 )
 
-# Leere Felder sollen leer bleiben statt "0,00 €" zu zeigen. Die Summe erscheint
-# erst, wenn Aufwandsentschaedigung und Fahrtkosten da sind - wie beim
-# TFV-Formular, wo eine Summe ohne Fahrtkosten wie der Endbetrag aussaehe.
+# Empty fields should stay empty instead of showing "0,00 €". The total appears
+# only once expense allowance and travel costs are there - as with the
+# TFV form, where a total without travel costs would look like the final amount.
 FORMEL_PKW = f'=IF({ZELLE_KM}="","",{ZELLE_KM}*{ZELLE_KM_SATZ})'
 FORMEL_GESAMT = (
     f'=IF(OR({ZELLE_AUFWAND}="",AND({ZELLE_KM}="",{ZELLE_BAHN}="")),"",'
@@ -79,7 +79,7 @@ FORMEL_GESAMT = (
 )
 
 
-# ===== Betrag in Worten =====
+# ===== Amount in words =====
 
 _EINER = ["", "ein", "zwei", "drei", "vier", "fünf", "sechs", "sieben", "acht", "neun",
           "zehn", "elf", "zwölf", "dreizehn", "vierzehn", "fünfzehn", "sechzehn",
@@ -102,7 +102,7 @@ def _unter_tausend(n: int) -> str:
 
 
 def zahl_in_worten(n: int) -> str:
-    """Ganze Zahl von 0 bis 999.999 als deutsches Zahlwort ("dreihundertzehn")."""
+    """Whole number from 0 to 999,999 as a German number word ("dreihundertzehn")."""
     if n == 0:
         return "null"
     if n == 1:
@@ -111,7 +111,7 @@ def zahl_in_worten(n: int) -> str:
     tausender, rest = divmod(n, 1000)
     wort = (_unter_tausend(tausender) + "tausend" if tausender else "") + _unter_tausend(rest)
 
-    # "einundzwanzig" ja, aber am Ende "...hunderteins" statt "...hundertein"
+    # "einundzwanzig" yes, but at the end "...hunderteins" instead of "...hundertein"
     return wort + "s" if rest % 100 == 1 else wort
 
 
@@ -121,7 +121,7 @@ def betrag_in_worten(betrag: float) -> str:
     euro, cent = divmod(cent_gesamt, 100)
 
     def vor_einheit(n: int) -> str:
-        # "ein Euro", aber "einhunderteins Euro"
+        # "ein Euro", but "einhunderteins Euro"
         return "ein" if n == 1 else zahl_in_worten(n)
 
     text = f"{vor_einheit(euro)} Euro"
@@ -130,7 +130,7 @@ def betrag_in_worten(betrag: float) -> str:
     return text
 
 
-# ===== Hilfen =====
+# ===== Helpers =====
 
 def _ort_aus_plz_ort(plz_ort: str) -> str:
     """"99438 Bad Berka" -> "Bad Berka"."""
@@ -153,7 +153,7 @@ def _datum(anpfiff: str) -> Optional[date]:
 
 
 class NofvGenerator:
-    """Erzeugt die NOFV-Reisekostenabrechnung: ein Blatt je angesetzter Person."""
+    """Creates the NOFV travel expense settlement: one sheet per assigned person."""
 
     def __init__(self, template_path):
         self.template_path = Path(template_path)
@@ -161,9 +161,9 @@ class NofvGenerator:
         if not self.template_path.exists():
             raise FileNotFoundError(f"Vorlage nicht gefunden: {self.template_path}")
 
-        # Die Bilder (NOFV-Logo) direkt aus dem Archiv: openpyxl haengt geladene
-        # Bilder an einen Puffer, den es nach dem Laden schliesst - speichern
-        # oder kopieren laesst sich ein solches Bild dann nicht mehr.
+        # The images (NOFV logo) straight from the archive: openpyxl attaches loaded
+        # images to a buffer that it closes after loading - such an image can
+        # then no longer be saved or copied.
         with zipfile.ZipFile(self.template_path) as archiv:
             self._bilder = [
                 archiv.read(name) for name in sorted(archiv.namelist())
@@ -172,7 +172,7 @@ class NofvGenerator:
 
     @staticmethod
     def _spesen_for_match(match_data: dict) -> Tuple[Optional[float], Optional[float]]:
-        """Eingefrorene Saetze aus der Datenbank, sonst frisch gerechnet."""
+        """Frozen rates from the database, otherwise freshly calculated."""
         if 'sr_spesen' in match_data or 'sra_spesen' in match_data:
             return match_data.get('sr_spesen'), match_data.get('sra_spesen')
 
@@ -188,11 +188,11 @@ class NofvGenerator:
     @staticmethod
     def _besetzte_rollen(match_data: dict) -> List[Tuple[dict, str, str, str, str]]:
         """
-        Die angesetzten Personen in Formularreihenfolge.
+        The assigned persons in form order.
 
-        Ohne irgendeine Ansetzung entsteht trotzdem ein Blatt fuer den
-        Schiedsrichter - mit den Spieldaten, aber ohne Person - statt einer
-        leeren Datei.
+        Without any assignment a sheet is still created for the
+        referee - with the match data but without a person - instead of an
+        empty file.
         """
         personen = {
             ref.get('rolle'): ref
@@ -214,11 +214,11 @@ class NofvGenerator:
 
     def _kopiere_blatt(self, workbook, vorlage, titel: str):
         """
-        Kopiert das Vorlagenblatt samt allem, was copy_worksheet auslaesst.
+        Copies the template sheet including everything copy_worksheet leaves out.
 
-        openpyxl uebernimmt Zellen, Formate, Spaltenbreiten und verbundene
-        Zellen, nicht aber Bilder (das NOFV-Logo), Druckbereich und Ansicht.
-        Ohne Druckbereich verteilt LibreOffice das Blatt auf mehrere Seiten.
+        openpyxl takes over cells, formats, column widths and merged
+        cells, but not images (the NOFV logo), print area and view.
+        Without a print area LibreOffice spreads the sheet over several pages.
         """
         blatt = workbook.copy_worksheet(vorlage)
         blatt.title = titel
@@ -258,7 +258,7 @@ class NofvGenerator:
                 blatt[zelle] = spieldatum
                 blatt[zelle].number_format = DATUMSFORMAT
 
-        # Uhrzeiten traegt der Schiedsrichter selbst ein - die Abfahrt kennt nur er.
+        # The referee enters times themselves - only they know the departure.
         if wohnort and spielort:
             blatt[ZELLE_HINREISE_STRECKE] = f"{wohnort} - {spielort}"
             blatt[ZELLE_RUECKREISE_STRECKE] = f"{spielort} - {wohnort}"
@@ -266,14 +266,14 @@ class NofvGenerator:
         if aufwand is not None:
             blatt[ZELLE_AUFWAND] = aufwand
 
-        # 0 km / 0 € ist erfasst und zaehlt fuer die Summe, wird aber nur dann
-        # eingetragen, wenn sonst gar keine Fahrtkosten dastuenden.
+        # 0 km / 0 € is recorded and counts for the total, but is only
+        # entered if otherwise no travel costs at all would be there.
         if km:
             blatt[ZELLE_KM] = km
         if oevm:
             blatt[ZELLE_BAHN] = oevm
-        # Sonst bliebe die Gesamt-Formel leer, waehrend "In Worten" schon
-        # einen Betrag nennt. Die 0 landet in dem Feld, das erfasst wurde.
+        # Otherwise the total formula would stay empty while "In Worten" (in words) already
+        # states an amount. The 0 lands in the field that was recorded.
         if not km and not oevm:
             if km is not None:
                 blatt[ZELLE_KM] = 0
@@ -299,12 +299,12 @@ class NofvGenerator:
 
     def render_workbook(self, match_data: dict, expenses: dict = None) -> bytes:
         """
-        Rendert die Abrechnung eines Spiels als Excel-Mappe (ein Blatt je
-        angesetzter Person) und gibt sie als Bytes zurueck.
+        Renders the settlement of a match as an Excel workbook (one sheet per
+        assigned person) and returns it as bytes.
 
         Args:
-            expenses: Optionale Fahrtkosten/OeVM-Werte
-                      (Keys: sr_km, sr_oevm, sra1_km, sra1_oevm, sra2_km, sra2_oevm)
+                expenses: Optional travel cost/OeVM values
+                                    (keys: sr_km, sr_oevm, sra1_km, sra1_oevm, sra2_km, sra2_oevm)
         """
         expenses = expenses or {}
         sr_spesen, sra_spesen = self._spesen_for_match(match_data)
@@ -318,7 +318,7 @@ class NofvGenerator:
 
         besetzt = self._besetzte_rollen(match_data)
 
-        # Erst alle Kopien von der unberuehrten Vorlage ziehen, dann fuellen
+        # First take all copies from the untouched template, then fill
         blaetter = [vorlage] + [
             self._kopiere_blatt(workbook, vorlage, blatt_titel)
             for _, _, _, _, blatt_titel in besetzt[1:]

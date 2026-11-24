@@ -1,15 +1,15 @@
 """
-Spesen Calculator - Berechnet SR/SRA-Spesen nach der TFV Spesenordnung
-(Stand 01.07.2025), §2, und fuer die Pflichtspiele der NOFV-Spielklassen
-nach der Finanzordnung des NOFV, §9 Nr. 7.
+Expense calculator (Spesen Calculator) - computes SR/SRA expenses per the TFV expense regulations (Spesenordnung)
+(version of 01.07.2025), §2, and for the mandatory (Pflicht) matches of the NOFV Spielklassen (league levels)
+per the NOFV finance regulations (Finanzordnung), §9 no. 7.
 
-Der Rechner ist die EINZIGE Stelle, die entscheidet, ob es fuer ein Spiel
-einen Satz gibt. Frueher galt er nur fuer Punktspiele, waehrend Aufrufer
-getrennt pruefen mussten, ob ein Pokal- oder Freundschaftsspiel vorliegt -
-drei Stellen mit derselben Regel, und die eingefrorenen Saetze in der
-Datenbank waren trotzdem die eines Punktspiels. Jetzt liefert er fuer
-Pokal- und Freundschaftsspiele selbst das Richtige: einen Satz nur dort, wo
-er von der Spielklasse der Beteiligten unabhaengig ist, sonst nichts.
+The calculator is the ONLY place that decides whether there is a rate
+for a match. It used to apply only to league matches (Punktspiele), while callers had to
+check separately whether a cup or friendly match was involved -
+three places with the same rule, and the frozen rates in the
+database were nevertheless those of a league match. Now it returns the right thing itself for
+cup and friendly matches: a rate only where
+it is independent of the Spielklasse of those involved, otherwise nothing.
 """
 import re
 from typing import Tuple, Optional
@@ -19,9 +19,9 @@ from utils.logger import setup_logger
 logger = setup_logger("spesen_calculator")
 
 
-# ===== SPESEN-TABELLEN gemäß §2 Abs. 2 =====
+# ===== EXPENSE TABLES per §2 para. 2 =====
 
-# (2a) Männer - Punkt-, Entscheidungs- und Qualifikationsspiele
+# (2a) Men (Maenner) - league, deciding and qualification matches
 SPESEN_MAENNER = {
     "verbandsliga": (50.00, 40.00),
     "landesklasse": (40.00, 30.00),
@@ -30,35 +30,35 @@ SPESEN_MAENNER = {
     "kreisklasse": (25.00, 23.00),
 }
 
-# (2a) Alte Herren - eigene Zeilen derselben Tabelle. Auf Kreisebene gibt es
-# nur EINEN Satz ("Kreis Alte Herren"), unabhaengig davon ob die Staffel
-# Kreisoberliga, Kreisliga oder Kreisklasse heisst.
+# (2a) Veterans (Alte Herren) - rows of their own in the same table. At district (Kreis) level there is
+# only ONE rate ("Kreis Alte Herren"), regardless of whether the Staffel (division)
+# is called Kreisoberliga, Kreisliga or Kreisklasse.
 SPESEN_ALTE_HERREN_LANDESMEISTERSCHAFT = (40.00, 30.00)
 SPESEN_ALTE_HERREN_KREIS = (25.00, 23.00)
 SPESEN_ALTE_HERREN_KLEINFELD = (20.00, None)
 
-# (2b) Frauen/Juniorinnen
+# (2b) Women/Juniorinnen (girls)
 SPESEN_FRAUEN = {
     "verbandsliga": (25.00, 20.00),
     "landesklasse": (25.00, 20.00),
     "kreisoberliga": (20.00, None),
 }
-SPESEN_JUNIORINNEN_DEFAULT = (20.00, None)  # "in allen Spiel- und Altersklassen"
+SPESEN_JUNIORINNEN_DEFAULT = (20.00, None)  # "in allen Spiel- und Altersklassen" (in all match and age classes)
 
-# (2c) Junioren (männlich)
+# (2c) Junioren (boys)
 SPESEN_JUNIOREN_LANDESEBENE = (25.00, 20.00)  # A-, B-, C-Junioren
-SPESEN_JUNIOREN_LANDESEBENE_DJUN = (20.00, None)  # D-Junioren, Talenteliga, Kleinfeld
+SPESEN_JUNIOREN_LANDESEBENE_DJUN = (20.00, None)  # D-Junioren, Talenteliga, small-pitch (Kleinfeld)
 SPESEN_JUNIOREN_KREISEBENE_AB = (23.00, 18.00)  # A-, B-Junioren
-SPESEN_JUNIOREN_KREISEBENE_JUNG = (20.00, 15.00)  # C-Junioren und jünger
+SPESEN_JUNIOREN_KREISEBENE_JUNG = (20.00, 15.00)  # C-Junioren and younger
 
-# Die Spielklassen, die der TFV auf Landesebene fuehrt. Bewusst eine
-# geschlossene Liste statt eines Auffangzweigs: DFBnet normalisiert die
-# Spielklasse ueber die Verbandsgrenze hinweg - ein Spiel des HFV oder FLB
-# steht dort ebenfalls als "Landesliga" oder "Verbandsliga", der Verband ist
-# nur an der Staffel zu erkennen, die hier nicht vorliegt. Ein Auffangzweig
-# gaebe solchen Spielen still die 25/20 der TFV-Landesebene, obwohl nach
-# §2 Abs. 6 die Saetze des ausrichtenden Verbandes gelten, die diese Ordnung
-# nicht kennt. Lieber kein Satz und ein Hinweis als ein falscher Betrag.
+# The Spielklassen that the TFV runs at state (Landes) level. Deliberately a
+# closed list instead of a catch-all branch: DFBnet normalizes the
+# Spielklasse across association boundaries - a match of the HFV or FLB
+# also appears there as "Landesliga" or "Verbandsliga", the association can
+# only be recognized by the Staffel, which is not available here. A catch-all branch
+# would silently give such matches the 25/20 of the TFV state level, although under
+# §2 para. 6 the rates of the organizing association apply, which this regulation
+# does not know. Better no rate and a note than a wrong amount.
 SPIELKLASSEN_JUNIOREN_LANDESEBENE = (
     "verbandsliga",
     "landesklasse",
@@ -70,19 +70,19 @@ SPIELKLASSEN_JUNIOREN_LANDESEBENE = (
 )
 
 
-# Staffelbezeichnungen, an denen ein Spiel ausserhalb des TFV zu erkennen ist.
-# Noetig, weil DFBnet die Spielklasse ueber die Verbandsgrenze hinweg
-# normalisiert: ein Punktspiel in der Altmark steht dort als "Kreisoberliga",
-# ein NOFV-Spiel der C-Junioren als "Landesliga". Erst die Staffel nennt den
-# Wettbewerb beim Namen ("1. Altmark West Liga", "U14-Talente-Spielrunde-
-# Nordost"). Nach §2 Abs. 6 zahlt dort der ausrichtende Verband nach eigenen
-# Pauschalen, die diese Ordnung nicht kennt.
+# Staffel names by which a match outside the TFV can be recognized.
+# Necessary because DFBnet normalizes the Spielklasse across association boundaries:
+# a league match in the Altmark appears there as "Kreisoberliga",
+# an NOFV match of the C-Junioren as "Landesliga". Only the Staffel names the
+# competition outright ("1. Altmark West Liga", "U14-Talente-Spielrunde-
+# Nordost"). Under §2 para. 6 the organizing association pays there by its own
+# flat rates, which this regulation does not know.
 #
-# Bewusst eine Ausschlussliste. Eine Einschlussliste ist nicht moeglich: eine
-# gewoehnliche Thueringer Staffel heisst schlicht "Kreisliga Staffel 1" und
-# nennt ihren Verband nirgends. Die Liste kann deshalb nie vollstaendig sein -
-# sie nimmt aber immer nur Saetze weg und vergibt nie welche, ein blinder
-# Fleck kostet also hoechstens Abdeckung, nie Richtigkeit.
+# Deliberately an exclusion list. An inclusion list is not possible: an
+# ordinary Thuringian Staffel is simply called "Kreisliga Staffel 1" and
+# names its association nowhere. The list can therefore never be complete -
+# but it only ever takes rates away and never grants any, so a blind
+# spot costs at most coverage, never correctness.
 STAFFELN_FREMDER_VERBAND = (
     "nofv", "nordost", "dfb",
     "sachsen", "altmark", "hessen", "brandenburg", "bayern", "baden",
@@ -91,24 +91,24 @@ STAFFELN_FREMDER_VERBAND = (
     "mittelrhein", "niederrhein", "rheinland",
 )
 
-# Die Verbandskuerzel, die in den Kurzschluesseln von Freundschaftsspielen und
-# Turnieren fuer Thueringen stehen ("FS/H/K-FS/MT/1" = Kreis Mittelthueringen,
-# "FS/AJ/L-FS/TFV/1" = Landesverband). Nur hier ist der Verband strukturiert
-# genug fuer eine Einschlussliste - alles andere in diesem Feld ist Fliesstext.
+# The association abbreviations that appear in the short keys of friendly matches and
+# tournaments for Thuringia ("FS/H/K-FS/MT/1" = Kreis Mittelthueringen,
+# "FS/AJ/L-FS/TFV/1" = state association). Only here is the association structured
+# enough for an inclusion list - everything else in this field is free text.
 VERBANDSKUERZEL_TFV = ("tfv", "mt", "mth", "wt", "nt", "ot", "e-s", "jso", "ntkfa")
 
-# (3a)/(4) Pokal und Freundschaftsspiele im Herrenbereich. Der Satz richtet
-# sich nach der Spielklasse der beteiligten Mannschaften, nicht nach der des
-# Spiels; nachgeschlagen wird sie in den naechtlich abgeglichenen Ligatabellen
+# (3a)/(4) Cup and friendly matches in the men's (Herren) category. The rate depends
+# on the Spielklasse of the participating teams, not on that of the
+# match; it is looked up in the nightly reconciled league tables
 # (db.ligen).
 #
-# Bewusst nur die beiden Thueringer Spielklassen. Die Zeilen der Ordnung fuer
-# 3. Liga, Regionalliga und Oberliga fehlen hier, weil ueberregionale Spiele
-# gar nicht abgerechnet werden sollen - die ueberregionalen Tabellen dienen
-# allein dazu, eine solche Beteiligung zu ERKENNEN und dann nichts einzutragen.
-# Bei Freundschaftsspielen kommt hinzu, dass die Ordnung fuer die Regionalliga
-# zwei Saetze nebeneinander nennt ("170 €/120 €"), ohne zu sagen, wann welcher
-# gilt.
+# Deliberately only the two Thuringian Spielklassen. The rows of the regulation for
+# 3. Liga, Regionalliga and Oberliga are missing here because supra-regional matches
+# are not to be settled at all - the supra-regional tables serve
+# solely to RECOGNIZE such a participation and then enter nothing.
+# For friendly matches there is the added fact that the regulation names two rates
+# side by side for the Regionalliga ("170 €/120 €"), without saying when which one
+# applies.
 SPESEN_HERREN_NACH_SPIELKLASSE = {
     "verbandsliga": (50.00, 40.00),
     "landesklasse": (40.00, 30.00),
@@ -119,17 +119,17 @@ POKALSPIEL = "pokalspiel"
 FREUNDSCHAFTSSPIEL = "freundschaftsspiel"
 
 
-# ===== NOFV: Finanzordnung §9 Nr. 7 =====
+# ===== NOFV: Finanzordnung §9 no. 7 =====
 #
-# Fuer die NOFV-Spielklassen gilt nicht die TFV-Spesenordnung, sondern die
-# Finanzordnung des NOFV, und abgerechnet wird auf dessen eigener Quittung -
-# eine Seite je Schiedsrichter statt einer gemeinsamen.
+# The TFV expense regulations do not apply to the NOFV Spielklassen, but rather the
+# NOFV's finance regulations, and settlement is made on its own receipt -
+# one page per referee instead of a shared one.
 #
-# Bewusst nur die Pflichtspiel-Saetze. "Sonstige Spiele" haengen in der
-# Regionalliga von der Spielklasse des Gegners ab (Nr. 7.1 / 7.7), bei den
-# Frauen von der Ordnung des Landesverbandes (Nr. 7.3 / 7.9), und die Futsal-
-# Regionalliga (Nr. 7.6) nennt keinen Satz fuer Assistenten. Dort bleibt es wie
-# bisher leer.
+# Deliberately only the mandatory-match (Pflichtspiel) rates. "Sonstige Spiele" (other matches) depend in the
+# Regionalliga on the Spielklasse of the opponent (no. 7.1 / 7.7), for
+# women on the regulations of the state association (no. 7.3 / 7.9), and the Futsal
+# Regionalliga (no. 7.6) names no rate for assistants. There it stays empty as
+# before.
 NOFV_HERREN_REGIONALLIGA = "herren-regionalliga"
 NOFV_HERREN_OBERLIGA = "herren-oberliga"
 NOFV_FRAUEN_REGIONALLIGA = "frauen-regionalliga"
@@ -137,17 +137,17 @@ NOFV_A_JUNIOREN_REGIONALLIGA = "a-junioren-regionalliga"
 NOFV_BC_JUNIOREN_REGIONALLIGA = "bc-junioren-regionalliga"
 
 SPESEN_NOFV = {
-    NOFV_HERREN_REGIONALLIGA: (300.00, 150.00),      # Nr. 7.1 / 7.7
-    NOFV_HERREN_OBERLIGA: (100.00, 60.00),           # Nr. 7.2 / 7.8
-    NOFV_FRAUEN_REGIONALLIGA: (60.00, 40.00),        # Nr. 7.3 / 7.9
-    NOFV_A_JUNIOREN_REGIONALLIGA: (50.00, 35.00),    # Nr. 7.4 / 7.10
-    NOFV_BC_JUNIOREN_REGIONALLIGA: (40.00, 30.00),   # Nr. 7.5 / 7.11
+        NOFV_HERREN_REGIONALLIGA: (300.00, 150.00),      # no. 7.1 / 7.7
+        NOFV_HERREN_OBERLIGA: (100.00, 60.00),           # no. 7.2 / 7.8
+        NOFV_FRAUEN_REGIONALLIGA: (60.00, 40.00),        # no. 7.3 / 7.9
+        NOFV_A_JUNIOREN_REGIONALLIGA: (50.00, 35.00),    # no. 7.4 / 7.10
+        NOFV_BC_JUNIOREN_REGIONALLIGA: (40.00, 30.00),   # no. 7.5 / 7.11
 }
 
-# DFBnet fuehrt Aufstiegsspiele und Turniere unter derselben Spielklasse wie
-# den Ligabetrieb ("Regionalliga Nordost" / "Aufstiegsspiel zur NOFV-CJRL").
-# Keine regulaeren Pflichtspiele der Staffel - die Mannschaften spielen dort
-# noch gar nicht Regionalliga.
+# DFBnet keeps promotion matches (Aufstiegsspiele) and tournaments under the same Spielklasse as
+# league play ("Regionalliga Nordost" / "Aufstiegsspiel zur NOFV-CJRL").
+# Not regular mandatory matches of the Staffel - the teams there
+# do not yet play Regionalliga at all.
 STAFFELN_KEIN_NOFV_PFLICHTSPIEL = (
     "aufstieg", "relegation", "entscheidung", "qualifikation",
     "turnier", "futsal", "halle", "pokal", "freundschaft",
@@ -156,20 +156,20 @@ STAFFELN_KEIN_NOFV_PFLICHTSPIEL = (
 
 def nofv_spielklasse(spielklasse: str, mannschaftsart: str, staffel: str) -> Optional[str]:
     """
-    Erkennt ein Pflichtspiel einer NOFV-Spielklasse mit festem Satz.
+    Recognizes a mandatory match of an NOFV Spielklasse with a fixed rate.
 
-    Einzige Stelle fuer diese Entscheidung: sie bestimmt den Satz UND das
-    Formular. Bewusst eine Einschlussliste - ein Spiel, das hier durchfaellt,
-    bekommt wie bisher keinen Satz und das TFV-Formular, ein falsch erkanntes
-    dagegen einen Betrag, der niemandem auffaellt.
+    The only place for this decision: it determines the rate AND the
+    form. Deliberately an inclusion list - a match that falls through here
+    gets no rate and the TFV form, as before, whereas a wrongly recognized one
+    would get an amount that nobody notices.
 
-    Die Oberliga braucht "NOFV" in der Staffel: DFBnet normalisiert auch die
-    Oberligen anderer Regionalverbaende zur Spielklasse "Oberliga". Bei der
-    Regionalliga nennt schon die Spielklasse den Verband ("Regionalliga
+    The Oberliga needs "NOFV" in the Staffel: DFBnet also normalizes the
+    Oberligen of other regional associations to the Spielklasse "Oberliga". For the
+    Regionalliga the Spielklasse already names the association ("Regionalliga
     Nordost").
 
     Returns:
-        Schluessel in SPESEN_NOFV oder None.
+            Key into SPESEN_NOFV or None.
     """
     if wettbewerbsart(spielklasse) != PUNKTSPIEL:
         return None
@@ -189,8 +189,8 @@ def nofv_spielklasse(spielklasse: str, mannschaftsart: str, staffel: str) -> Opt
     if "regionalliga" not in klasse or "nordost" not in klasse or "regionalliga" not in st:
         return None
 
-    # Exakter Vergleich statt Teilstring: "Herren Ü35" ist keine Regionalliga-
-    # Mannschaft, und "A-Juniorinnen" darf nicht als A-Junioren durchgehen.
+    # Exact comparison instead of substring: "Herren Ü35" is not a Regionalliga
+    # team, and "A-Juniorinnen" must not pass as A-Junioren.
     if art == "herren":
         return NOFV_HERREN_REGIONALLIGA
     if art == "frauen":
@@ -204,7 +204,7 @@ def nofv_spielklasse(spielklasse: str, mannschaftsart: str, staffel: str) -> Opt
 
 
 def ist_nofv_spiel(spiel_info: dict) -> bool:
-    """Ob fuer dieses Spiel die NOFV-Quittung statt des TFV-Formulars gilt."""
+    """Whether the NOFV receipt rather than the TFV form applies to this match."""
     return nofv_spielklasse(
         spiel_info.get("spielklasse") or "",
         spiel_info.get("mannschaftsart") or "",
@@ -214,13 +214,13 @@ def ist_nofv_spiel(spiel_info: dict) -> bool:
 
 def wettbewerbsart(spielklasse: str) -> str:
     """
-    Ordnet eine DFBnet-Spielklasse einer der drei Wettbewerbsarten zu.
+    Assigns a DFBnet Spielklasse to one of the three competition types.
 
-    Einzige Quelle fuer diese Unterscheidung - sie entscheidet sowohl ueber
-    den Spesensatz als auch darueber, welches Kaestchen im Formular
-    angekreuzt wird. Turniere haben im Formular kein eigenes Kaestchen und
-    zaehlen wie der Rest zu den Punktspielen; §2 Abs. 2 fuehrt Turnierserien
-    ausdruecklich dort mit auf.
+    The only source for this distinction - it decides both the
+    expense rate and which box on the form
+    is ticked. Tournaments have no box of their own on the form and
+    count with the rest as league matches; §2 para. 2 explicitly lists tournament series
+    there.
     """
     s = (spielklasse or "").lower()
 
@@ -236,21 +236,21 @@ def calculate_spesen(spielklasse: str, mannschaftsart: str, staffel: str = "",
                      heim_team: str = "",
                      gast_team: str = "") -> Tuple[Optional[float], Optional[float]]:
     """
-    Berechnet SR- und SRA-Spesen gemäß TFV Spesenordnung.
+    Computes SR and SRA expenses per the TFV expense regulations.
 
     Args:
-        spielklasse: Spielklasse aus DFBnet (z.B. "Verbandsliga", "1.Kreisklasse")
-        mannschaftsart: Mannschaftsart aus DFBnet (z.B. "Herren", "B-Junioren")
-        staffel: Staffel aus DFBnet (z.B. "1. Altmark West Liga"). Optional,
-            aber ohne sie sind Spiele fremder Landesverbaende nicht zu
-            erkennen - siehe STAFFELN_FREMDER_VERBAND.
-        heim_team, gast_team: Die Mannschaften. Optional, aber ohne sie bleiben
-            Pokal- und Freundschaftsspiele im Herrenbereich ohne Satz: dort
-            entscheidet die Spielklasse der Vereine.
+            spielklasse: Spielklasse from DFBnet (e.g. "Verbandsliga", "1.Kreisklasse")
+            mannschaftsart: Team type (Mannschaftsart) from DFBnet (e.g. "Herren", "B-Junioren")
+            staffel: Staffel from DFBnet (e.g. "1. Altmark West Liga"). Optional,
+                    but without it matches of other state associations cannot be
+                    recognized - see STAFFELN_FREMDER_VERBAND.
+            heim_team, gast_team: The teams. Optional, but without them
+                    cup and friendly matches in the men's category stay without a rate: there
+                    the Spielklasse of the clubs decides.
 
     Returns:
-        Tuple (sr_spesen, sra_spesen) - sra_spesen kann None sein wenn kein SRA vorgesehen
-        Bei unbekannter Kombination oder Nicht-TFV-Spielen: (None, None)
+            Tuple (sr_spesen, sra_spesen) - sra_spesen can be None if no SRA is provided
+            For an unknown combination or non-TFV matches: (None, None)
     """
     if not spielklasse or not mannschaftsart:
         logger.warning("Spielklasse oder Mannschaftsart fehlt")
@@ -259,14 +259,14 @@ def calculate_spesen(spielklasse: str, mannschaftsart: str, staffel: str = "",
     spielklasse_lower = spielklasse.lower()
     mannschaftsart_lower = mannschaftsart.lower()
 
-    # NOFV-Pflichtspiele: Finanzordnung des NOFV, §9 Nr. 7. Vor dem Ausschluss
-    # ueberregionaler Spiele, der alles andere oberhalb des TFV leer laesst.
+    # NOFV mandatory matches: NOFV finance regulations, §9 no. 7. Before the exclusion
+    # of supra-regional matches, which leaves everything else above the TFV empty.
     nofv = nofv_spielklasse(spielklasse, mannschaftsart, staffel)
     if nofv:
         logger.debug(f"NOFV-Pflichtspiel {nofv}: {SPESEN_NOFV[nofv]}")
         return SPESEN_NOFV[nofv]
 
-    # DFB/Überregionale Spiele ausschließen (nicht TFV-Spesenordnung)
+    # Exclude DFB/supra-regional matches (not TFV expense regulations)
     if _is_ueberregional(spielklasse_lower):
         logger.info(f"Überregionales Spiel (kein TFV): {spielklasse}")
         return (None, None)
@@ -280,7 +280,7 @@ def calculate_spesen(spielklasse: str, mannschaftsart: str, staffel: str = "",
             spielklasse_lower, mannschaftsart_lower, heim_team, gast_team
         )
 
-    # Kategorie bestimmen und entsprechende Berechnung aufrufen
+    # Determine the category and call the corresponding calculation
     if _is_maenner(mannschaftsart_lower):
         return _calc_maenner(spielklasse_lower, mannschaftsart_lower)
     elif _is_frauen_oder_juniorinnen(mannschaftsart_lower):
@@ -294,13 +294,13 @@ def calculate_spesen(spielklasse: str, mannschaftsart: str, staffel: str = "",
 
 def _ist_fremder_verband(staffel: str) -> bool:
     """
-    Prüft, ob die Staffel ein Spiel ausserhalb des TFV bezeichnet.
+    Checks whether the Staffel designates a match outside the TFV.
 
-    Zwei Wege, weil das Feld zwei Formen kennt: Punktspielstaffeln sind
-    Fliesstext ("1. Altmark West Liga") und werden gegen Stichwoerter geprueft,
-    Freundschaftsspiele und Turniere tragen einen Kurzschluessel
-    ("FS/H/K-FS/MT/1", "TU/H/VTUR/WT/1"), dessen vorletztes Feld den Verband
-    oder Kreis nennt und sich deshalb gegen eine Einschlussliste pruefen laesst.
+    Two ways, because the field has two forms: league Staffeln are
+    free text ("1. Altmark West Liga") and are checked against keywords,
+    friendly matches and tournaments carry a short key
+    ("FS/H/K-FS/MT/1", "TU/H/VTUR/WT/1"), whose second-to-last field names the association
+    or district and can therefore be checked against an inclusion list.
     """
     if not staffel:
         return False
@@ -316,8 +316,8 @@ def _ist_fremder_verband(staffel: str) -> bool:
 
 
 def _is_ueberregional(spielklasse: str) -> bool:
-    """Prüft ob Spiel überregional ist (DFB, Regionalliga, etc.)."""
-    # Kreis-Spielklassen sind immer lokal (z.B. Kreisoberliga ≠ Oberliga)
+    """Checks whether the match is supra-regional (DFB, Regionalliga, etc.)."""
+    # Kreis Spielklassen are always local (e.g. Kreisoberliga ≠ Oberliga)
     if "kreis" in spielklasse:
         return False
     ueberregional_keywords = [
@@ -331,53 +331,53 @@ def _is_ueberregional(spielklasse: str) -> bool:
 
 
 def _is_maenner(mannschaftsart: str) -> bool:
-    """Prüft ob Männer/Alte Herren."""
+    """Checks whether men/veterans (Alte Herren)."""
     return any(x in mannschaftsart for x in ["herren", "männer"])
 
 
 def is_alte_herren(mannschaftsart: str) -> bool:
     """
-    Prüft ob Alte Herren.
+    Checks whether veterans (Alte Herren).
 
-    DFBnet schreibt die Mannschaftsart als "Herren Ü32" bis "Herren Ü50" -
-    das Wort "Alte Herren" steht dort nie. Eine Suche danach ginge deshalb
-    immer ins Leere und jedes Ü-Spiel liefe als normales Männerspiel durch.
+    DFBnet writes the Mannschaftsart as "Herren Ü32" to "Herren Ü50" -
+    the words "Alte Herren" never appear there. A search for them would therefore
+    always come up empty and every Ü match would pass as an ordinary men's match.
     """
     return "alte herren" in mannschaftsart or re.search(r"ü\s*\d{2}", mannschaftsart) is not None
 
 
 def _is_frauen_oder_juniorinnen(mannschaftsart: str) -> bool:
-    """Prüft ob Frauen oder Juniorinnen."""
+    """Checks whether women or Juniorinnen."""
     return any(x in mannschaftsart for x in ["frauen", "damen", "juniorinnen", "mädchen"])
 
 
 def _is_junioren(mannschaftsart: str) -> bool:
-    """Prüft ob männliche Junioren."""
-    # "junioren" aber NICHT "juniorinnen"
+    """Checks whether male Junioren."""
+    # "junioren" but NOT "juniorinnen"
     return "junioren" in mannschaftsart and "juniorinnen" not in mannschaftsart
 
 
 def _is_kreisebene(spielklasse: str) -> bool:
-    """Prüft ob Kreisebene (nicht Landesebene)."""
+    """Checks whether district (Kreis) level (not state level)."""
     return "kreis" in spielklasse
 
 
 def _calc_maenner(spielklasse: str, mannschaftsart: str) -> Tuple[Optional[float], Optional[float]]:
-    """Berechnet Spesen für Männer/Alte Herren gemäß §2 Abs. 2a."""
+    """Computes expenses for men/veterans per §2 para. 2a."""
 
-    # Alte Herren haben eigene Zeilen und duerfen die Maenner-Tabelle nicht
-    # sehen: eine Kreisoberliga Ue45 bekaeme dort die 30/25 der Maenner
-    # statt der 25/23 der Alten Herren.
+    # Veterans have rows of their own and must not see the men's table:
+    # a Kreisoberliga Ue45 would get the men's 30/25 there
+    # instead of the veterans' 25/23.
     if is_alte_herren(mannschaftsart):
         return _calc_alte_herren(spielklasse)
 
-    # Standard-Tabelle durchsuchen
+    # Search the standard table
     for key, spesen in SPESEN_MAENNER.items():
         if key in spielklasse:
             logger.debug(f"Männer-Spesen gefunden: {key} -> SR {spesen[0]}€, SRA {spesen[1]}€")
             return spesen
 
-    # Fallback: Alles mit "kreis" im Namen -> Kreisliga/Kreisklasse Sätze
+    # Fallback: everything with "kreis" in the name -> Kreisliga/Kreisklasse rates
     if _is_kreisebene(spielklasse):
         logger.debug(f"Männer Kreisebene Fallback für: {spielklasse}")
         return SPESEN_MAENNER["kreisliga"]
@@ -389,35 +389,35 @@ def _calc_maenner(spielklasse: str, mannschaftsart: str) -> Tuple[Optional[float
 def _calc_pokal_oder_freundschaft(spielklasse: str, mannschaftsart: str,
                                   heim_team: str, gast_team: str) -> Tuple[Optional[float], Optional[float]]:
     """
-    Berechnet Spesen für Pokal- und Freundschaftsspiele gemäß §2 Abs. 3 und 4.
+    Computes expenses for cup and friendly matches per §2 para. 3 and 4.
 
-    Beide richten sich nicht nach der Spielklasse des Spiels, sondern nach der
-    der beteiligten Mannschaften: beim Pokal nach der hoechstklassigen
+    Both depend not on the Spielklasse of the match but on that
+    of the participating teams: for the cup on the highest-ranked
     ("Die Entschaedigungssaetze richten sich nach der hoechstklassigen am Spiel
-    beteiligten Mannschaft"), beim Freundschaftsspiel nach der des Gastgebers
-    ("Entscheidend ist die aktuelle Spielklasse des Gastgebers"). In den
-    Ansetzungsdaten von DFBnet steht davon nichts - dort ist die Spielklasse
-    "Kreispokal" oder "Kreisfreundschaftsspiele", nicht die Liga der Vereine.
+    beteiligten Mannschaft"), for the friendly on that of the host
+    ("Entscheidend ist die aktuelle Spielklasse des Gastgebers"). The
+    DFBnet assignment data says nothing of this - there the Spielklasse is
+    "Kreispokal" or "Kreisfreundschaftsspiele", not the clubs' league.
 
-    Drei Wege zu einem Satz, in dieser Reihenfolge:
+    Three ways to a rate, in this order:
 
-    1. Klassenunabhaengige Faelle. Wo die Ordnung fuer eine Mannschaftsart nur
-       einen einzigen Satz kennt, gibt es nichts nachzuschlagen.
-    2. Herren: Nachschlagen in den Ligatabellen (siehe _calc_herren_nach_liga).
-    3. Sonst nichts. Ein leeres Feld traegt der Schiedsrichter in der Kabine
-       selbst nach, ein plausibel aussehender falscher Betrag faellt niemandem
-       auf.
+    1. Class-independent cases. Where the regulation knows only a single rate
+          for a team type, there is nothing to look up.
+    2. Men (Herren): look up in the league tables (see _calc_herren_nach_liga).
+    3. Otherwise nothing. An empty field is filled in by the referee in the
+          dressing room, a plausible-looking wrong amount goes
+          unnoticed.
     """
-    # Juniorinnen: 20 Euro "in allen Spiel- und Altersklassen" (Abs. 2b). Abs. 3
-    # Nr. 2 und Abs. 4 verweisen beide dorthin zurueck, und da die Zeile keine
-    # Klasse unterscheidet, gibt es nichts nachzuschlagen.
+    # Juniorinnen: 20 euros "in allen Spiel- und Altersklassen" (para. 2b). Para. 3
+    # no. 2 and para. 4 both refer back to it, and since the row distinguishes no
+    # class, there is nothing to look up.
     if "juniorinnen" in mannschaftsart or "mädchen" in mannschaftsart:
         logger.debug(f"Juniorinnen (klassenunabhängig): {SPESEN_JUNIORINNEN_DEFAULT}")
         return SPESEN_JUNIORINNEN_DEFAULT
 
-    # Alte Herren auf Kreisebene: "Kreis Alte Herren" ist eine einzige Zeile
-    # fuer jede Kreisstaffel. Wer auch immer im Kreispokal antritt oder
-    # Gastgeber eines Kreisfreundschaftsspiels ist - der Satz ist derselbe.
+    # Veterans at Kreis level: "Kreis Alte Herren" is a single row
+    # for every Kreis Staffel. Whoever plays in the Kreispokal or
+    # hosts a Kreis friendly match - the rate is the same.
     if is_alte_herren(mannschaftsart) and _is_kreisebene(spielklasse):
         if "kleinfeld" in spielklasse:
             return SPESEN_ALTE_HERREN_KLEINFELD
@@ -439,29 +439,29 @@ def _calc_pokal_oder_freundschaft(spielklasse: str, mannschaftsart: str,
 def _calc_herren_nach_liga(spielklasse: str, heim_team: str,
                            gast_team: str) -> Tuple[Optional[float], Optional[float]]:
     """
-    Schlaegt die Spielklasse der beteiligten Herrenmannschaften nach.
+    Looks up the Spielklasse of the participating men's teams.
 
-    Nachgeschlagen wird in den naechtlich abgeglichenen Ligatabellen. Die
-    decken die Thueringer Landesebene ab (Verbandsliga, Landesklasse) und
-    zusaetzlich Regionalliga und Oberliga - letztere nicht, um daraus
-    abzurechnen, sondern um eine ueberregionale Beteiligung zu erkennen.
+    The lookup is in the nightly reconciled league tables. They
+    cover the Thuringian state level (Verbandsliga, Landesklasse) and
+    additionally Regionalliga and Oberliga - the latter not to settle
+    from, but to recognize a supra-regional participation.
 
-    Die Regeln, alle in dieselbe Richtung vorsichtig:
+    The rules, all cautious in the same direction:
 
-    - Kreispokal: nie ein Satz. Alle Beteiligten spielen Kreisebene, und dort
-      unterscheidet Abs. 2a zwischen Kreisoberliga (30/25) und Kreisliga
-      (25/23) - welche der beiden, verraet die Ansetzung nicht.
-    - Ist eine Mannschaft ueberregional, bleibt es leer.
-    - Steht eine Mannschaft in mehreren Tabellen, ist nicht zu sagen, welche
-      gilt - dann bleibt es leer. Sie darf nicht wie eine Mannschaft ohne
-      Tabelle behandelt werden, sonst setzte sich still der Satz des Gegners
-      durch, obwohl sie selbst hoeher spielen koennte.
-    - Eine Mannschaft, die in keiner Tabelle steht, spielt unterhalb der
-      Landesklasse und kann den Satz nicht anheben. Dieser Schluss gilt aber
-      nur, solange die ueberregionalen Tabellen ueberhaupt vorhanden sind -
-      sonst koennte sie ebenso gut Oberliga spielen.
-    - Beim Freundschaftsspiel zaehlt allein der Gastgeber, beim Pokal die
-      hoehere der beiden Klassen.
+    - Kreispokal: never a rate. All participants play at Kreis level, and there
+        para. 2a distinguishes between Kreisoberliga (30/25) and Kreisliga
+        (25/23) - which of the two, the assignment does not reveal.
+    - If a team is supra-regional, it stays empty.
+    - If a team appears in several tables, it cannot be said which
+        applies - then it stays empty. It must not be treated like a team without a
+        table, otherwise the opponent's rate would silently prevail, although it itself
+        might play higher.
+    - A team that appears in no table plays below the
+        Landesklasse and cannot raise the rate. This conclusion holds, however,
+        only as long as the supra-regional tables are present at all -
+        otherwise it could just as well play Oberliga.
+    - For a friendly match only the host counts, for the cup the
+        higher of the two classes.
     """
     from db.ligen import suche_mannschaft, kennt_ueberregionale_ligen, RANG_UEBERREGIONAL
 
@@ -498,8 +498,8 @@ def _calc_herren_nach_liga(spielklasse: str, heim_team: str,
         logger.info(f"Keine der Mannschaften ({', '.join(beteiligte)}) steht in einer Ligatabelle")
         return (None, None)
 
-    # "Steht in keiner Tabelle" heisst nur dann "unterhalb der Landesklasse",
-    # wenn nach oben hin alles erfasst ist.
+    # "Appears in no table" means "below the Landesklasse" only
+    # if everything above is covered.
     if len(gefunden) < len(beteiligte) and not kennt_ueberregionale_ligen():
         logger.info("Überregionale Tabellen fehlen - unbekannte Mannschaft nicht einzuordnen")
         return (None, None)
@@ -519,13 +519,13 @@ def _calc_herren_nach_liga(spielklasse: str, heim_team: str,
 
 def _calc_alte_herren(spielklasse: str) -> Tuple[Optional[float], Optional[float]]:
     """
-    Berechnet Spesen für Alte Herren gemäß §2 Abs. 2a.
+    Computes expenses for veterans (Alte Herren) per §2 para. 2a.
 
-    Die Tabelle kennt fuer Alte Herren genau drei Zeilen: Landesmeister-
-    schaften, "Kreis Alte Herren" und "Kreis Kleinfeld Alte Herren". Auf
-    Kreisebene gilt derselbe Satz fuer jede Staffel - eine nach Kreisoberliga
-    und Kreisliga gestaffelte Verguetung wie bei den Maennern gibt es hier
-    nicht.
+    For veterans the table knows exactly three rows: Landesmeister-
+    schaften (state championships), "Kreis Alte Herren" and "Kreis Kleinfeld Alte Herren". At
+    Kreis level the same rate applies to every Staffel - a remuneration graded by Kreisoberliga
+    and Kreisliga as for the men does not exist
+    here.
     """
     if _is_kreisebene(spielklasse):
         if "kleinfeld" in spielklasse:
@@ -535,10 +535,10 @@ def _calc_alte_herren(spielklasse: str) -> Tuple[Optional[float], Optional[float
         logger.debug(f"Alte Herren Kreisebene: {SPESEN_ALTE_HERREN_KREIS}")
         return SPESEN_ALTE_HERREN_KREIS
 
-    # Die Ue-Wettbewerbe des TFV auf Landesebene sind die Landesmeisterschaften.
-    # DFBnet fuehrt sie als Spielklasse "Landesturnier" bzw.
-    # "Hallen-Landesturnier"; das Wort "Landesmeisterschaft" steht nur in der
-    # Staffel, die hier nicht vorliegt.
+    # The Ü competitions of the TFV at state level are the Landesmeisterschaften.
+    # DFBnet lists them as Spielklasse "Landesturnier" or
+    # "Hallen-Landesturnier"; the word "Landesmeisterschaft" appears only in the
+    # Staffel, which is not available here.
     if "landesmeisterschaft" in spielklasse or "landesturnier" in spielklasse:
         logger.debug(f"Alte Herren Landesmeisterschaft: {SPESEN_ALTE_HERREN_LANDESMEISTERSCHAFT}")
         return SPESEN_ALTE_HERREN_LANDESMEISTERSCHAFT
@@ -548,20 +548,20 @@ def _calc_alte_herren(spielklasse: str) -> Tuple[Optional[float], Optional[float
 
 
 def _calc_frauen(spielklasse: str, mannschaftsart: str) -> Tuple[Optional[float], Optional[float]]:
-    """Berechnet Spesen für Frauen/Juniorinnen gemäß §2 Abs. 2b."""
+    """Computes expenses for women/Juniorinnen per §2 para. 2b."""
 
-    # Juniorinnen: immer 20€, kein SRA - "in allen Spiel- und Altersklassen"
+    # Juniorinnen: always 20€, no SRA - "in allen Spiel- und Altersklassen"
     if "juniorinnen" in mannschaftsart or "mädchen" in mannschaftsart:
         logger.debug(f"Juniorinnen-Spesen: {SPESEN_JUNIORINNEN_DEFAULT}")
         return SPESEN_JUNIORINNEN_DEFAULT
 
-    # Frauen: Tabelle durchsuchen
+    # Women: search the table
     for key, spesen in SPESEN_FRAUEN.items():
         if key in spielklasse:
             logger.debug(f"Frauen-Spesen gefunden: {key} -> SR {spesen[0]}€, SRA {spesen[1]}€")
             return spesen
 
-    # Fallback Kreisebene Frauen
+    # Fallback Kreis level women
     if _is_kreisebene(spielklasse):
         logger.debug(f"Frauen Kreisebene Fallback für: {spielklasse}")
         return (20.00, None)
@@ -571,19 +571,19 @@ def _calc_frauen(spielklasse: str, mannschaftsart: str) -> Tuple[Optional[float]
 
 
 def _calc_junioren(spielklasse: str, mannschaftsart: str) -> Tuple[Optional[float], Optional[float]]:
-    """Berechnet Spesen für Junioren (männlich) gemäß §2 Abs. 2c."""
+    """Computes expenses for Junioren (male) per §2 para. 2c."""
 
-    # Altersklasse bestimmen
+    # Determine the age group
     ist_d_junior_oder_juenger = any(
         x in mannschaftsart
         for x in ["d-junioren", "e-junioren", "f-junioren", "g-junioren"]
     )
     ist_c_junior_oder_juenger = ist_d_junior_oder_juenger or "c-junioren" in mannschaftsart
 
-    # Kreisebene
+    # Kreis level
     if _is_kreisebene(spielklasse):
         if ist_c_junior_oder_juenger:
-            # C-Junioren und jünger: 20€ / 15€
+            # C-Junioren and younger: 20€ / 15€
             logger.debug(f"Junioren Kreisebene (C+jünger): {SPESEN_JUNIOREN_KREISEBENE_JUNG}")
             return SPESEN_JUNIOREN_KREISEBENE_JUNG
         else:
@@ -591,32 +591,32 @@ def _calc_junioren(spielklasse: str, mannschaftsart: str) -> Tuple[Optional[floa
             logger.debug(f"Junioren Kreisebene (A/B): {SPESEN_JUNIOREN_KREISEBENE_AB}")
             return SPESEN_JUNIOREN_KREISEBENE_AB
 
-    # Landesebene - nur die Spielklassen des TFV
+    # State level - only the Spielklassen of the TFV
     if not any(k in spielklasse for k in SPIELKLASSEN_JUNIOREN_LANDESEBENE):
         logger.warning(f"Keine Spesen gefunden für Junioren: {spielklasse}")
         return (None, None)
 
     if ist_d_junior_oder_juenger or "talenteliga" in spielklasse or "kleinfeld" in spielklasse:
-        # D-Junioren, Talenteliga, Kleinfeld: 20€, kein SRA
+        # D-Junioren, Talenteliga, small-pitch: 20€, no SRA
         logger.debug(f"Junioren Landesebene (D/Talenteliga/Kleinfeld): {SPESEN_JUNIOREN_LANDESEBENE_DJUN}")
         return SPESEN_JUNIOREN_LANDESEBENE_DJUN
     else:
-        # A-, B-, C-Junioren Landesebene: 25€ / 20€
+        # A-, B-, C-Junioren state level: 25€ / 20€
         logger.debug(f"Junioren Landesebene (A/B/C): {SPESEN_JUNIOREN_LANDESEBENE}")
         return SPESEN_JUNIOREN_LANDESEBENE
 
 
 def format_spesen(betrag: Optional[float]) -> str:
     """
-    Formatiert Spesen-Betrag für Anzeige im Dokument.
+    Formats the expense amount for display in the document.
 
     Args:
-        betrag: Spesen-Betrag oder None
+            betrag: Expense amount or None
 
     Returns:
-        Formatierter String (z.B. "25,00 €") oder leerer String
+            Formatted string (e.g. "25,00 €") or empty string
     """
     if betrag is None:
         return ""
-    # Deutsches Format: Komma als Dezimaltrenner
+    # German format: comma as decimal separator
     return f"{betrag:.2f} €".replace(".", ",")

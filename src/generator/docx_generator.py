@@ -1,6 +1,6 @@
 """
-DOCX Generator - Füllt Spesenabrechnung-Vorlage mit Daten
-Verbesserte Version mit korrekter Checkbox-Formatierung
+DOCX generator - fills the expense settlement (Spesenabrechnung) template with data
+Improved version with correct checkbox formatting
 """
 from io import BytesIO
 from pathlib import Path
@@ -21,20 +21,20 @@ from generator.spesen_calculator import (
 
 logger = setup_logger("docx_generator")
 
-# Kilometerpauschale laut Formular
+# Mileage allowance per the form
 KM_SATZ_EURO = 0.30
 
-# Checkbox-Zeichen (beide Unicode, beide mit Segoe UI Symbol darstellbar)
+# Checkbox characters (both Unicode, both renderable with Segoe UI Symbol)
 CHECKBOX_CHECKED = '☒'    # U+2612 - Ballot Box with X
-CHECKBOX_UNCHECKED = '☐'  # U+2610 - Ballot Box (leer)
+CHECKBOX_UNCHECKED = '☐'  # U+2610 - Ballot Box (empty)
 CHECKBOX_FONT = 'Segoe UI Symbol'
 
 
 def format_name_nachname_vorname(name: str) -> str:
     """
-    Wandelt einen gescrapten Namen im Format "Vorname Nachname" in das im
-    Formular erwartete Format "Nachname, Vorname" um.
-    Letztes Wort gilt als Nachname, der Rest als Vorname.
+    Converts a scraped name in the format "Vorname Nachname" (first name last name) into the format
+    "Nachname, Vorname" (last name, first name) expected on the form.
+    The last word counts as the last name, the rest as the first name.
     """
     parts = name.strip().split()
     if len(parts) < 2:
@@ -43,17 +43,17 @@ def format_name_nachname_vorname(name: str) -> str:
 
 
 class SpesenGenerator:
-    """Generiert ausgefüllte Spesenabrechnung-Dokumente"""
+    """Generates filled-in expense settlement documents"""
 
     def __init__(self, template_path: str, output_dir: Optional[Path] = None):
         """
-        Initialisiert den Generator.
+        Initializes the generator.
 
         Args:
-            template_path: Pfad zur DOCX-Vorlage
-            output_dir: Optional - nur noetig, wenn Dokumente auf die Platte
-                        geschrieben werden sollen. Fuer den Download-Pfad
-                        bleibt es None und render_document() liefert Bytes.
+                template_path: Path to the DOCX template
+                output_dir: Optional - only needed if documents are to be
+                                        written to disk. For the download path
+                                        it stays None and render_document() returns bytes.
         """
         self.template_path = Path(template_path)
         self.output_dir = Path(output_dir) if output_dir else None
@@ -67,7 +67,7 @@ class SpesenGenerator:
         logger.debug(f"Generator initialisiert mit Vorlage: {self.template_path}")
 
     def _determine_checkboxes(self, match_data: dict) -> dict:
-        """Bestimmt welche Checkboxen aktiviert werden müssen."""
+        """Determines which checkboxes have to be ticked."""
         spiel_info = match_data.get('spiel_info', {})
 
         checkbox_keys = [
@@ -79,7 +79,7 @@ class SpesenGenerator:
         ]
         checkboxes = {key: False for key in checkbox_keys}
 
-        # Spielklasse prüfen
+        # Check the Spielklasse (league level)
         art = wettbewerbsart(spiel_info.get('spielklasse', ''))
         if art == POKALSPIEL:
             checkboxes['CHECKBOX_POKALSPIEL'] = True
@@ -88,13 +88,13 @@ class SpesenGenerator:
         else:
             checkboxes['CHECKBOX_PUNKTSPIEL'] = True
 
-        # Mannschaftsart prüfen. Die Reihenfolge zaehlt: Juniorinnen muessen vor
-        # den gleichnamigen Junioren-Zweigen stehen, sonst landet ein
-        # Maedchenspiel je nach Schreibweise in der falschen Zeile.
+        # Check the team type (Mannschaftsart). The order matters: Juniorinnen (girls' teams) must come before
+        # the Junioren (boys') branches of the same name, otherwise a
+        # girls' match ends up in the wrong row depending on the spelling.
         mannschaftsart = spiel_info.get('mannschaftsart', '').lower()
         if 'juniorinnen' in mannschaftsart or 'mädchen' in mannschaftsart:
-            # Das Formular hat fuer Juniorinnen nur die Zeile "Maedchen" -
-            # die Altersklassen darunter sind die maennlichen.
+            # The form has only the row "Maedchen" (girls) for Juniorinnen -
+            # the age groups below it are the boys' ones.
             checkboxes['CHECKBOX_MAEDCHEN'] = True
         elif 'herren' in mannschaftsart or 'männer' in mannschaftsart:
             if is_alte_herren(mannschaftsart):
@@ -121,14 +121,14 @@ class SpesenGenerator:
         return checkboxes
 
     def _get_referee_by_role(self, referees: list, role: str) -> dict:
-        """Findet Schiedsrichter nach Rolle."""
+        """Finds referees by role."""
         for ref in referees:
             if ref.get('rolle') == role:
                 return ref
         return {}
 
     def _set_run_font(self, run, font_name: str):
-        """Setzt die Schriftart eines Runs vollständig."""
+        """Sets the font of a run completely."""
         run.font.name = font_name
         r = run._element
         rPr = r.get_or_add_rPr()
@@ -143,29 +143,29 @@ class SpesenGenerator:
 
     @staticmethod
     def _collect_replacements(checkbox_states: dict, text_replacements: dict) -> dict:
-        """Baut die Tabelle Platzhalter -> (Ersatztext, ist Checkbox)."""
+        """Builds the table placeholder -> (replacement text, is checkbox)."""
         all_replacements = {}
 
         for key, is_checked in checkbox_states.items():
             placeholder = f"{{{{{key}}}}}"
             char = CHECKBOX_CHECKED if is_checked else CHECKBOX_UNCHECKED
-            all_replacements[placeholder] = (char, True)  # True = ist Checkbox
+            all_replacements[placeholder] = (char, True)  # True = is a checkbox
 
         for key, value in text_replacements.items():
             placeholder = f"{{{{{key}}}}}"
-            all_replacements[placeholder] = (str(value), False)  # False = ist Text
+            all_replacements[placeholder] = (str(value), False)  # False = is text
 
         return all_replacements
 
     def _replace_in_paragraph(self, paragraph, all_replacements: dict):
         """
-        Ersetzt Platzhalter in einem Paragraph.
-        Behandelt auch Platzhalter die über mehrere Runs verteilt sind.
+        Replaces placeholders in a paragraph.
+        Also handles placeholders that are spread over several runs.
 
-        Der Absatztext wird einmal zusammengesetzt und als Filter benutzt: die
-        allermeisten Absaetze der Vorlage enthalten ueberhaupt keinen
-        Platzhalter, und den Text je Platzhalter erneut aus den Runs
-        zusammenzusetzen war der mit Abstand teuerste Teil der Generierung.
+        The paragraph text is assembled once and used as a filter: the
+        vast majority of the template's paragraphs contain no placeholder at all,
+        and re-assembling the text from the runs for each placeholder was by far the
+        most expensive part of the generation.
         """
         runs = paragraph.runs
         if not runs:
@@ -175,33 +175,33 @@ class SpesenGenerator:
         if '{{' not in full_text:
             return
 
-        # Nur die Platzhalter anfassen, die hier wirklich vorkommen. Der
-        # Text kann durch eine Ersetzung veralten, aber Ersatzwerte bringen
-        # nie neue Platzhalter mit - ein Treffer zu viel ist harmlos, denn
-        # _replace_placeholder_in_paragraph prueft selbst nochmal.
+        # Only touch the placeholders that actually occur here. The
+        # text can go stale through a replacement, but replacement values never
+        # bring new placeholders with them - one hit too many is harmless, because
+        # _replace_placeholder_in_paragraph checks again itself.
         for placeholder, (replacement, is_checkbox) in all_replacements.items():
             if placeholder in full_text:
                 self._replace_placeholder_in_paragraph(paragraph, placeholder, replacement, is_checkbox)
 
     def _replace_placeholder_in_paragraph(self, paragraph, placeholder: str, replacement: str, is_checkbox: bool):
         """
-        Ersetzt einen Platzhalter im Paragraph - auch wenn er über mehrere Runs verteilt ist.
+        Replaces a placeholder in a paragraph - even if it is spread over several runs.
         """
         runs = paragraph.runs
         if not runs:
             return
 
-        # Gesamttext und Run-Grenzen ermitteln
+        # Determine the full text and run boundaries
         full_text = ''.join(run.text for run in runs)
 
         if placeholder not in full_text:
             return
 
-        # Finde Position des Platzhalters
+        # Find the position of the placeholder
         start_idx = full_text.find(placeholder)
         end_idx = start_idx + len(placeholder)
 
-        # Finde welche Runs betroffen sind
+        # Find which runs are affected
         char_count = 0
         start_run_idx = None
         end_run_idx = None
@@ -212,12 +212,12 @@ class SpesenGenerator:
             run_start = char_count
             run_end = char_count + len(run.text)
 
-            # Start des Platzhalters in diesem Run?
+            # Start of the placeholder in this run?
             if start_run_idx is None and run_start <= start_idx < run_end:
                 start_run_idx = i
                 start_char_in_run = start_idx - run_start
 
-            # Ende des Platzhalters in diesem Run?
+            # End of the placeholder in this run?
             if end_run_idx is None and run_start < end_idx <= run_end:
                 end_run_idx = i
                 end_char_in_run = end_idx - run_start
@@ -227,38 +227,38 @@ class SpesenGenerator:
         if start_run_idx is None or end_run_idx is None:
             return
 
-        # Fall 1: Platzhalter komplett in einem Run
+        # Case 1: placeholder entirely within one run
         if start_run_idx == end_run_idx:
             run = runs[start_run_idx]
             run.text = run.text[:start_char_in_run] + replacement + run.text[end_char_in_run:]
             if is_checkbox:
                 self._set_run_font(run, CHECKBOX_FONT)
 
-        # Fall 2: Platzhalter über mehrere Runs verteilt
+        # Case 2: placeholder spread over several runs
         else:
-            # Ersten Run: Text vor Platzhalter + Ersetzung
+            # First run: text before the placeholder + replacement
             first_run = runs[start_run_idx]
             first_run.text = first_run.text[:start_char_in_run] + replacement
             if is_checkbox:
                 self._set_run_font(first_run, CHECKBOX_FONT)
 
-            # Mittlere Runs: komplett leeren
+            # Middle runs: clear completely
             for i in range(start_run_idx + 1, end_run_idx):
                 runs[i].text = ''
 
-            # Letzten Run: nur Text nach Platzhalter behalten
+            # Last run: keep only the text after the placeholder
             last_run = runs[end_run_idx]
             last_run.text = last_run.text[end_char_in_run:]
 
     def _replace_placeholders(self, doc: Document, checkbox_states: dict, text_replacements: dict):
-        """Ersetzt alle Platzhalter im Dokument."""
+        """Replaces all placeholders in the document."""
         all_replacements = self._collect_replacements(checkbox_states, text_replacements)
 
-        # In Paragraphs ersetzen
+        # Replace in paragraphs
         for paragraph in doc.paragraphs:
             self._replace_in_paragraph(paragraph, all_replacements)
 
-        # In Tabellen ersetzen
+        # Replace in tables
         for table in doc.tables:
             for row in table.rows:
                 for cell in row.cells:
@@ -268,13 +268,12 @@ class SpesenGenerator:
     @staticmethod
     def _spesen_for_match(match_data: dict) -> tuple:
         """
-        Liefert (sr_spesen, sra_spesen) als Zahlen.
+        Returns (sr_spesen, sra_spesen) as numbers.
 
-        Stammt das Spiel aus der Datenbank, sind die Saetze dort beim ersten
-        Scrape eingefroren worden und werden hier nur noch gelesen - sonst
-        wuerde eine spaetere Aenderung der Spesenordnung eine bereits
-        abgegebene Abrechnung rueckwirkend umschreiben. Nur ohne
-        eingefrorene Werte wird gerechnet.
+        If the match comes from the database, the rates were frozen there on the first
+        scrape and are only read here - otherwise a later change of the
+        expense regulations would retroactively rewrite a settlement that has already been
+        submitted. Only without frozen values is anything calculated.
         """
         if 'sr_spesen' in match_data or 'sra_spesen' in match_data:
             return match_data.get('sr_spesen'), match_data.get('sra_spesen')
@@ -290,12 +289,12 @@ class SpesenGenerator:
 
     def _calculate_spesen_for_match(self, match_data: dict) -> tuple:
         """
-        Formatiert die Spesen für ein Spiel.
+        Formats the expenses for a match.
 
-        Ob es ueberhaupt einen Satz gibt, entscheidet allein der Rechner - auch
-        fuer Pokal- und Freundschaftsspiele. Ein zweiter Filter hier waere eine
-        zweite Meinung zur selben Frage, und genau so kam es frueher dazu, dass
-        in der Datenbank Punktspielsaetze fuer Pokalspiele lagen.
+        Whether there is a rate at all is decided solely by the calculator - also
+        for cup and friendly matches. A second filter here would be a second opinion on the same question,
+        and that is exactly how it once came about that
+        league-match rates sat in the database for cup matches.
         """
         sr_spesen, sra_spesen = self._spesen_for_match(match_data)
         sr_spesen_str = format_spesen(sr_spesen)
@@ -309,27 +308,27 @@ class SpesenGenerator:
     def _build_expense_replacements(self, expenses: dict,
                                     match_data: dict, sra1_active: bool, sra2_active: bool) -> dict:
         """
-        Baut die Platzhalter fuer Fahrtkosten (km x 0,30 EUR), OeVM und die
-        Summen-Zeile (Spesen + Fahrtkosten + OeVM) pro Person.
+        Builds the placeholders for travel costs (km x 0.30 EUR), public transport (OeVM) and the
+        total line (expenses + travel costs + OeVM) per person.
         """
         expenses = expenses or {}
 
-        # Numerische Spesen fuer die Summenberechnung
+        # Numeric expenses for the total calculation
         sr_spesen_num, sra_spesen_num = self._spesen_for_match(match_data)
 
-        # Ist schon der SR-Satz unbekannt, ist fuer dieses Spiel gar kein Satz
-        # ermittelt - ueberregional, oder ein Pokal-/Freundschaftsspiel, dessen
-        # Satz von der Spielklasse der Vereine abhaengt. Dann darf auch keine
-        # Summe gedruckt werden: sie bestuende nur aus den Fahrtkosten, saehe
-        # aber wie der Endbetrag aus, und wer die Spesen von Hand nachtraegt,
-        # laesst darunter eine zu niedrige Summe stehen.
+        # If even the SR rate is unknown, no rate at all has been determined for this match
+        # - supra-regional, or a cup/friendly match whose
+        # rate depends on the clubs' Spielklasse. Then no
+        # total may be printed either: it would consist only of the travel costs, but would look
+        # like the final amount, and whoever fills in the expenses by hand
+        # would leave a total that is too low underneath.
         #
-        # Ein fehlender SRA-Satz bei bekanntem SR-Satz heisst dagegen "kein SRA
-        # vorgesehen" (z.B. Juniorinnen) - dort bleibt die Summe aus
-        # Fahrtkosten und OeVM richtig.
+        # A missing SRA rate with a known SR rate, by contrast, means "no SRA
+        # provided" (e.g. Juniorinnen) - there the total of
+        # travel costs and OeVM remains correct.
         saetze_bekannt = sr_spesen_num is not None
 
-        # Der km-Satz wird wie die Spesen beim Scrapen eingefroren
+        # The km rate is frozen when scraping, like the expenses
         km_satz = match_data.get('km_satz') or KM_SATZ_EURO
 
         replacements = {}
@@ -339,8 +338,8 @@ class SpesenGenerator:
             ('SRA2', 'sra2', sra_spesen_num, sra2_active),
         ]
 
-        # Fuer die Gesamtsumme: alle angesetzten Personen muessen erfasst sein
-        # (eine explizite 0 zaehlt als erfasst, ein leeres Feld nicht)
+        # For the grand total: all assigned persons must be recorded
+        # (an explicit 0 counts as recorded, an empty field does not)
         alle_aktiven_erfasst = True
         einzelsummen = []
 
@@ -348,17 +347,17 @@ class SpesenGenerator:
             km = expenses.get(f'{key}_km')
             oevm = expenses.get(f'{key}_oevm')
 
-            # 0 ist ein gueltiger Wert (bewusst erfasst), None = nicht eingetragen
+            # 0 is a valid value (deliberately recorded), None = not entered
             erfasst = km is not None or oevm is not None
             km_kosten = round(km * km_satz, 2) if km is not None else None
             oevm_betrag = oevm if oevm is not None else None
 
-            # Anzeige: 0-Betraege bleiben im Formular leer
+            # Display: 0 amounts stay empty on the form
             replacements[f'{prefix}_Kilometer'] = format_spesen(km_kosten) if km_kosten else ''
             replacements[f'{prefix}_OEVM'] = format_spesen(oevm_betrag) if oevm_betrag else ''
 
-            # Summe erst, wenn die Person angesetzt ist und ihre Fahrtkosten erfasst sind.
-            # Sonst stuende dort ein Betrag, zu dem die Fahrtkosten noch fehlen.
+            # Total only once the person is assigned and their travel costs are recorded.
+            # Otherwise an amount would be shown to which the travel costs are still missing.
             komponenten = [v for v in (spesen_num, km_kosten, oevm_betrag) if v is not None]
             berechenbar = komponenten and active and erfasst and saetze_bekannt
             summe = round(sum(komponenten), 2) if berechenbar else None
@@ -370,7 +369,7 @@ class SpesenGenerator:
                 elif summe is not None:
                     einzelsummen.append(summe)
 
-        # Gesamtsumme ueber alle angesetzten Personen
+        # Grand total over all assigned persons
         if saetze_bekannt and alle_aktiven_erfasst and einzelsummen:
             replacements['Summe'] = format_spesen(round(sum(einzelsummen), 2))
         else:
@@ -380,13 +379,13 @@ class SpesenGenerator:
 
     def render_document(self, match_data: dict, expenses: dict = None) -> bytes:
         """
-        Rendert ein Dokument und gibt es als Bytes zurueck - ohne Umweg ueber
-        die Platte. Das ist der Weg fuer Downloads: das Dokument entsteht bei
-        jedem Abruf neu aus den Datenbankzeilen.
+        Renders a document and returns it as bytes - without a detour via
+        the disk. This is the path for downloads: the document is created anew on
+        every request from the database rows.
 
         Args:
-            expenses: Optionale Fahrtkosten/OeVM-Werte
-                      (Keys: sr_km, sr_oevm, sra1_km, sra1_oevm, sra2_km, sra2_oevm)
+                expenses: Optional travel cost/OeVM values
+                                    (keys: sr_km, sr_oevm, sra1_km, sra1_oevm, sra2_km, sra2_oevm)
         """
         doc = self._fill_template(match_data, expenses)
 
@@ -396,12 +395,12 @@ class SpesenGenerator:
 
     def generate_document(self, match_data: dict, output_filename: str = None, expenses: dict = None) -> Path:
         """
-        Generiert ein ausgefülltes Dokument für ein Spiel und legt es im
-        output_dir ab.
+        Generates a filled-in document for a match and stores it in
+        output_dir.
 
         Args:
-            expenses: Optionale Fahrtkosten/OeVM-Werte
-                      (Keys: sr_km, sr_oevm, sra1_km, sra1_oevm, sra2_km, sra2_oevm)
+                expenses: Optional travel cost/OeVM values
+                                    (keys: sr_km, sr_oevm, sra1_km, sra1_oevm, sra2_km, sra2_oevm)
         """
         if not self.output_dir:
             raise ValueError("Kein output_dir gesetzt - render_document() verwenden")
@@ -419,9 +418,9 @@ class SpesenGenerator:
 
     def _fill_template(self, match_data: dict, expenses: dict = None):
         """
-        Fuellt die Vorlage mit den Daten eines Spiels und gibt das
-        python-docx-Dokument zurueck. Gemeinsamer Kern von render_document()
-        und generate_document().
+        Fills the template with the data of a match and returns the
+        python-docx document. Common core of render_document()
+        and generate_document().
         """
         spiel_info = match_data.get('spiel_info', {})
         schiedsrichter = match_data.get('schiedsrichter', [])
@@ -480,11 +479,11 @@ class SpesenGenerator:
 
     def generate_all_documents(self, matches_data: list, expenses_map: dict = None) -> list:
         """
-        Generiert Dokumente für alle Spiele.
+        Generates documents for all matches.
 
         Args:
-            expenses_map: Optionales Dict {(heim, gast, datum_iso): expenses}
-                          mit gespeicherten Fahrtkosten/OeVM pro Spiel.
+                expenses_map: Optional dict {(heim, gast, datum_iso): expenses}
+                                            with stored travel costs/OeVM per match.
         """
         logger.info(f"Generiere {len(matches_data)} Dokumente...")
         expenses_map = expenses_map or {}

@@ -1,5 +1,5 @@
 """
-Database Modul - SQLite Datenbank fuer User und Sessions
+Database module - SQLite database for users and sessions
 """
 import sqlite3
 from pathlib import Path
@@ -12,17 +12,17 @@ from utils.logger import setup_logger
 
 logger = setup_logger("database")
 
-# Wartezeit, bevor SQLite bei einer gesperrten Datenbank aufgibt. Der Scraper
-# laeuft in einem eigenen Prozess und schreibt waehrend die API liest.
+# Wait time before SQLite gives up on a locked database. The scraper
+# runs in its own process and writes while the API reads.
 BUSY_TIMEOUT_MS = 5000
 
 
-# Datenbankpfad
+# Database path
 def get_db_path() -> Path:
-    """Gibt Datenbank-Pfad zurueck (DATABASE_PATH oder DATA_DIR/app.db)"""
+    """Returns the database path (DATABASE_PATH or DATA_DIR/app.db)"""
     path = config.get_db_path()
 
-    # Erstelle Verzeichnis falls nicht existiert
+    # Create the directory if it does not exist
     path.parent.mkdir(exist_ok=True, parents=True)
 
     return path
@@ -32,12 +32,12 @@ DB_PATH = get_db_path()
 
 
 def get_connection() -> sqlite3.Connection:
-    """Erstellt DB-Verbindung mit Row Factory"""
+    """Creates a DB connection with row factory"""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
 
-    # Beide Pragmas gelten nur fuer diese Verbindung und muessen daher bei
-    # jeder neu gesetzt werden - anders als journal_mode, das in der Datei steht.
+    # Both pragmas apply only to this connection and must therefore be set anew on
+    # each one - unlike journal_mode, which is stored in the file.
     conn.execute(f"PRAGMA busy_timeout = {BUSY_TIMEOUT_MS}")
     conn.execute("PRAGMA foreign_keys = ON")
 
@@ -45,7 +45,7 @@ def get_connection() -> sqlite3.Connection:
 
 
 def init_database():
-    """Bringt das Schema per Migrationen auf den aktuellen Stand"""
+    """Brings the schema up to date via migrations"""
     conn = get_connection()
     try:
         version = apply_migrations(conn, DB_PATH)
@@ -55,18 +55,18 @@ def init_database():
     logger.info(f"Datenbank initialisiert: {DB_PATH} (Schema-Version {version})")
 
 
-# ===== USER FUNKTIONEN =====
+# ===== USER FUNCTIONS =====
 
 def create_user(email: str, password_hash: str) -> int:
     """
-    Erstellt neuen User.
+    Creates a new user.
 
     Args:
-        email: User Email
-        password_hash: Gehashtes Passwort
+            email: User email
+            password_hash: Hashed password
 
     Returns:
-        User ID
+            User ID
     """
     conn = get_connection()
     cursor = conn.cursor()
@@ -85,17 +85,17 @@ def create_user(email: str, password_hash: str) -> int:
 
 def get_user_by_email(email: str) -> Optional[Dict]:
     """
-    Findet User anhand Email.
+    Finds a user by email.
 
     Returns:
-        User Dict oder None
+            User dict or None
     """
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Gross-/Kleinschreibung zaehlt bei E-Mail-Adressen praktisch nie. Aeltere
-    # Datenbanken koennen dieselbe Adresse noch in zwei Schreibweisen
-    # enthalten; dann gewinnt die exakt passende, sonst die aelteste.
+    # Case hardly ever matters for email addresses. Older
+    # databases may still contain the same address in two spellings;
+    # then the exactly matching one wins, otherwise the oldest.
     cursor.execute("""
         SELECT * FROM users WHERE email = ? COLLATE NOCASE
         ORDER BY (email = ?) DESC, id
@@ -111,7 +111,7 @@ def get_user_by_email(email: str) -> Optional[Dict]:
 
 
 def get_user_by_id(user_id: int) -> Optional[Dict]:
-    """Findet User anhand ID"""
+    """Finds a user by ID"""
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -127,10 +127,10 @@ def get_user_by_id(user_id: int) -> Optional[Dict]:
 
 def get_all_users() -> List[Dict]:
     """
-    Gibt alle User zurueck.
+    Returns all users.
 
     Returns:
-        Liste von User Dicts
+            List of user dicts
     """
     conn = get_connection()
     cursor = conn.cursor()
@@ -145,18 +145,18 @@ def get_all_users() -> List[Dict]:
 
 def update_dfb_credentials(user_id: int, encrypted_username: str, encrypted_password: str):
     """
-    Speichert verschluesselte DFB-Credentials fuer User.
+    Stores encrypted DFB credentials for a user.
 
     Args:
-        user_id: User ID
-        encrypted_username: Verschluesselter Username
-        encrypted_password: Verschluesseltes Passwort
+            user_id: User ID
+            encrypted_username: Encrypted username
+            encrypted_password: Encrypted password
     """
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Neue Zugangsdaten sind ungeprueft - ein alter Ablehnungs-Hinweis
-    # gilt fuer sie nicht mehr.
+    # New credentials are unverified - an old rejection notice
+    # no longer applies to them.
     cursor.execute("""
         UPDATE users 
         SET dfb_username_encrypted = ?, dfb_password_encrypted = ?,
@@ -170,10 +170,10 @@ def update_dfb_credentials(user_id: int, encrypted_username: str, encrypted_pass
 
 def get_dfb_credentials(user_id: int) -> Optional[Dict]:
     """
-    Holt verschluesselte DFB-Credentials fuer User.
+    Fetches encrypted DFB credentials for a user.
 
     Returns:
-        Dict mit dfb_username_encrypted und dfb_password_encrypted oder None
+            Dict with dfb_username_encrypted and dfb_password_encrypted, or None
     """
     conn = get_connection()
     cursor = conn.cursor()
@@ -194,10 +194,10 @@ def get_dfb_credentials(user_id: int) -> Optional[Dict]:
 
 def dfb_login_abgelehnt(user_id: int) -> None:
     """
-    DFBnet hat die gespeicherten Zugangsdaten abgelehnt.
+    DFBnet has rejected the stored credentials.
 
-    Der erste Zeitpunkt bleibt stehen: jede weitere Nacht mit demselben
-    Fehler aendert nichts daran, seit wann keine Daten mehr kommen.
+    The first point in time is kept: every further night with the same
+    error changes nothing about since when no data has been arriving.
     """
     conn = get_connection()
 
@@ -212,7 +212,7 @@ def dfb_login_abgelehnt(user_id: int) -> None:
 
 
 def dfb_login_angenommen(user_id: int) -> None:
-    """DFBnet hat die Zugangsdaten angenommen - ein alter Hinweis erledigt sich."""
+    """DFBnet has accepted the credentials - an old notice resolves itself."""
     conn = get_connection()
 
     try:
@@ -226,14 +226,14 @@ def dfb_login_angenommen(user_id: int) -> None:
 
 def update_user_password(user_id: int, password_hash: str) -> bool:
     """
-    Aktualisiert das Passwort eines Users.
+    Updates a user's password.
 
     Args:
-        user_id: ID des Users
-        password_hash: Neuer Passwort-Hash
+            user_id: ID of the user
+            password_hash: New password hash
 
     Returns:
-        True wenn erfolgreich
+            True if successful
     """
     conn = get_connection()
     cursor = conn.cursor()
@@ -248,10 +248,10 @@ def update_user_password(user_id: int, password_hash: str) -> bool:
     finally:
         conn.close()
 
-# ===== LOGIN LOG FUNKTIONEN =====
+# ===== LOGIN LOG FUNCTIONS =====
 
 def log_login(user_id: int) -> None:
-    """Protokolliert einen erfolgreichen Login (fuer Nutzungsstatistik)"""
+    """Records a successful login (for usage statistics)"""
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -267,10 +267,10 @@ def log_login(user_id: int) -> None:
 def log_download(user_id: int, filename: str, file_type: str,
                  match_id: Optional[int] = None, session_id: Optional[str] = None) -> None:
     """
-    Protokolliert einen Download (fuer Nutzungsstatistik).
+    Records a download (for usage statistics).
 
-    Downloads haengen an einem Spiel; session_id gibt es nur noch fuer die
-    Altlast-Endpunkte, solange die existieren.
+    Downloads are attached to a match; session_id only exists for the
+    legacy endpoints, as long as those exist.
     """
     conn = get_connection()
     cursor = conn.cursor()
@@ -287,10 +287,10 @@ def log_download(user_id: int, filename: str, file_type: str,
 def log_spielbericht(user_id: int, spielbericht_id: int, aktion: str,
                      quelle: str = "direkt", dokument_id: Optional[int] = None) -> None:
     """
-    Protokolliert das Oeffnen eines Spielberichts oder seiner Dokumente (Nutzungsstatistik).
+    Records the opening of a match report or its documents (usage statistics).
 
-    Derselbe Eintrag innerhalb von 10 Sekunden zaehlt nur einmal - ein
-    Doppelklick oder ein schnelles Neuladen ist kein zweiter Aufruf.
+    The same entry within 10 seconds counts only once - a
+    double click or a quick reload is not a second access.
     """
     jetzt = datetime.now(UTC)
     conn = get_connection()
@@ -316,7 +316,7 @@ def log_spielbericht(user_id: int, spielbericht_id: int, aktion: str,
 
 
 def count_downloads() -> int:
-    """Gesamtzahl aller Downloads - fuer die Zahl auf der Startseite."""
+    """Total number of all downloads - for the number on the start page."""
     conn = get_connection()
 
     try:

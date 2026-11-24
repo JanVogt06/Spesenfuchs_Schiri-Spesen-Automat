@@ -1,9 +1,9 @@
 """
-Saisonrechnung im DFBnet-Format.
+Season arithmetic in the DFBnet format.
 
-Eine Saison beginnt am 1. Juli und endet am 30. Juni des Folgejahres. DFBnet
-nennt sie mit den beiden zweistelligen Jahreszahlen: "25/26" laeuft vom
-01.07.2025 bis zum 30.06.2026.
+A season begins on 1 July and ends on 30 June of the following year. DFBnet
+names it with the two two-digit years: "25/26" runs from
+01.07.2025 to 30.06.2026.
 """
 import re
 from datetime import date, datetime
@@ -14,11 +14,11 @@ _SAISON = re.compile(r"\s*(\d{2})/(\d{2})\s*")
 
 def saison_start_jahr(saison: str, heute: Optional[date] = None) -> Optional[int]:
     """
-    Das Kalenderjahr, in dem eine Saison beginnt: "25/26" -> 2025.
+    The calendar year in which a season begins: "25/26" -> 2025.
 
-    Zweistellige Jahre brauchen ein Jahrhundert. Alles, was mehr als ein Jahr
-    nach dem laufenden Jahr laege, gehoert ins 20. Jahrhundert - ein
-    "Schiedsrichter seit 1995" landet so in "95/96" und nicht in 2095.
+    Two-digit years need a century. Anything that would lie more than one year
+    after the current year belongs to the 20th century - a
+    "referee since 1995" thus lands in "95/96" and not in 2095.
     """
     treffer = _SAISON.fullmatch(saison or "")
     if not treffer:
@@ -26,20 +26,20 @@ def saison_start_jahr(saison: str, heute: Optional[date] = None) -> Optional[int
 
     kurz = int(treffer.group(1))
     obergrenze = (heute or date.today()).year + 1
-    # Im Jahrhundert der Obergrenze, notfalls eins davor. Mit "% 100" auf
-    # die Grenze kippte das im Jahr 2099, wo die Grenze zu 0 wuerde.
+    # In the century of the upper bound, if necessary the one before. With "% 100" on
+    # the bound this broke in the year 2099, where the bound would become 0.
     jahr = obergrenze // 100 * 100 + kurz
     return jahr - 100 if jahr > obergrenze else jahr
 
 
 def saison_fuer_datum(tag: date) -> str:
-    """Die Saison, in die ein Tag faellt: 15.03.2026 -> "25/26"."""
+    """The season a day falls into: 15.03.2026 -> "25/26"."""
     start = tag.year if tag.month >= 7 else tag.year - 1
     return f"{start % 100:02d}/{(start + 1) % 100:02d}"
 
 
 def saison_zeitraum(saison: str) -> Optional[Tuple[date, date]]:
-    """Erster und letzter Tag einer Saison: "25/26" -> (01.07.2025, 30.06.2026)."""
+    """First and last day of a season: "25/26" -> (01.07.2025, 30.06.2026)."""
     start = saison_start_jahr(saison)
     if start is None:
         return None
@@ -47,7 +47,7 @@ def saison_zeitraum(saison: str) -> Optional[Tuple[date, date]]:
 
 
 def parse_deutsches_datum(text: str) -> Optional[date]:
-    """'26.01.2019' -> date(2019, 1, 26); alles andere -> None."""
+    """'26.01.2019' -> date(2019, 1, 26); anything else -> None."""
     try:
         return datetime.strptime((text or "").strip(), "%d.%m.%Y").date()
     except ValueError:

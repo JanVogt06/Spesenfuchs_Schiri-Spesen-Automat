@@ -1,15 +1,15 @@
 """
-Zwischenspeicher fuer aufgeloeste Adressen.
+Cache for resolved addresses.
 
-Die Karte braucht Koordinaten, DFBnet liefert Klartext. Jede Adresse wird
-deshalb genau einmal beim Geocoder nachgeschlagen und danach hier behalten.
-Ueber eine Saison hinweg sind das eine Handvoll Anfragen: die eigene
-Anschrift ist eine einzige, Kollegen und Spielstaetten wiederholen sich.
+The map needs coordinates, DFBnet delivers plain text. Each address is
+therefore looked up at the geocoder exactly once and kept here afterwards.
+Over a season that is a handful of requests: the user's own
+address is a single one, colleagues and venues repeat.
 
-Ein Fehlschlag wird ebenfalls gespeichert (lat/lon NULL), sonst liefe jeder
-Aufruf der Karte erneut in dieselbe erfolglose Anfrage. Wie lange so ein
-Fehlschlag gilt, entscheidet der Aufrufer - die Tabelle merkt sich nur, wann
-gefragt wurde.
+A failure is stored as well (lat/lon NULL), otherwise every
+call of the map would run into the same unsuccessful request again. How long such a
+failure stays valid is decided by the caller - the table only remembers when
+it was asked.
 """
 from datetime import datetime, UTC
 from typing import Dict, Optional
@@ -19,11 +19,11 @@ from db.database import get_connection
 
 def get_cached(anfrage: str, provider: str) -> Optional[Dict]:
     """
-    Liest einen Eintrag zur Anfrage.
+    Reads an entry for the request.
 
-    None heisst "noch nie gefragt". Ein Treffer mit lat=None heisst dagegen
-    "gefragt, aber nichts gefunden" - die beiden Faelle muessen
-    unterscheidbar bleiben, sonst wird ein Fehlschlag endlos wiederholt.
+    None means "never asked". A hit with lat=None, by contrast, means
+    "asked, but nothing found" - the two cases must
+    stay distinguishable, otherwise a failure is repeated endlessly.
     """
     conn = get_connection()
 
@@ -42,7 +42,7 @@ def get_cached(anfrage: str, provider: str) -> Optional[Dict]:
 
 
 def store(anfrage: str, provider: str, lat: Optional[float], lon: Optional[float]) -> None:
-    """Haelt das Ergebnis einer Anfrage fest - auch den Fehlschlag."""
+    """Records the result of a request - including the failure."""
     conn = get_connection()
 
     try:

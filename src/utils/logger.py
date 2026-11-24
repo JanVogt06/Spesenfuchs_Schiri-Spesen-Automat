@@ -6,23 +6,23 @@ from logging.handlers import RotatingFileHandler, WatchedFileHandler
 from pathlib import Path
 from typing import Optional
 
-# Format: [2025-01-15 14:30:45] INFO - Nachricht
+# Format: [2025-01-15 14:30:45] INFO - message
 _FORMAT = logging.Formatter(
     '[%(asctime)s] %(levelname)s - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 
-# Ein Handler je Prozess, den sich alle Logger teilen. None heisst: noch
-# nicht versucht; False: versucht, aber nicht moeglich.
+# One handler per process, shared by all loggers. None means: not
+# tried yet; False: tried, but not possible.
 _datei_handler = None
 
 
 def _log_datei() -> Path:
     """
-    Wohin das Protokoll geschrieben wird: LOG_FILE, sonst DATA_DIR/logs.
+    Where the log is written: LOG_FILE, otherwise DATA_DIR/logs.
 
-    Bewusst ohne core.config: config importiert diesen Logger beim Laden, ein
-    Import in die Gegenrichtung liefe im Kreis.
+    Deliberately without core.config: config imports this logger while loading, an
+    import in the opposite direction would be circular.
     """
     if log_file := os.getenv("LOG_FILE"):
         return Path(log_file)
@@ -33,21 +33,21 @@ def _log_datei() -> Path:
 
 def _hole_datei_handler() -> Optional[logging.Handler]:
     """
-    Der Datei-Handler dieses Prozesses, beim ersten Aufruf angelegt.
+    This process's file handler, created on the first call.
 
-    Auf dem Server gibt es sonst nur stdout des Containers - und das ist auf
-    einem NAS oft nicht erreichbar. Die Datei liegt im data-Ordner neben der
-    Datenbank und laesst sich ueber jeden Dateimanager oeffnen.
+    On the server there is otherwise only the container's stdout - and on
+    a NAS that is often not reachable. The file sits in the data folder next to the
+    database and can be opened with any file manager.
 
-    Die Abrufe laufen in eigenen Prozessen, die unter Python 3.14 per
-    forkserver starten und keine Handler erben. Deshalb entsteht der Handler
-    hier, in jedem Prozess neu, statt einmal beim Start.
+    The fetches run in their own processes, which under Python 3.14 start via
+    forkserver and inherit no handlers. That is why the handler is created
+    here, anew in every process, instead of once at startup.
 
-    Rotieren darf nur der Hauptprozess. Rotierten zwei Prozesse dieselbe
-    Datei, benennte jeder sie fuer sich um, und ein Teil des Protokolls
-    landete in einer Datei, die gleich darauf ueberschrieben wird. Die
-    Abrufprozesse haengen deshalb nur an und oeffnen die Datei neu, sobald der
-    Hauptprozess sie weggerollt hat.
+    Only the main process may rotate. If two processes rotated the same
+    file, each would rename it on its own, and part of the log
+    would end up in a file that is overwritten right afterwards. The
+    fetch processes therefore only append and reopen the file as soon as the
+    main process has rolled it away.
     """
     global _datei_handler
 
@@ -72,23 +72,23 @@ def _hole_datei_handler() -> Optional[logging.Handler]:
 
 def setup_logger(name: str = "dfb_scraper", level: int = logging.INFO) -> logging.Logger:
     """
-    Richtet einen einfachen Logger ein.
+    Sets up a simple logger.
 
     Args:
-        name: Name des Loggers
-        level: Log-Level (default: INFO)
+            name: Name of the logger
+            level: Log level (default: INFO)
 
     Returns:
-        Konfigurierter Logger
+            Configured logger
     """
     logger = logging.getLogger(name)
     logger.setLevel(level)
 
-    # Verhindere doppelte Handler
+    # Prevent duplicate handlers
     if logger.handlers:
         return logger
 
-    # Console Handler
+    # Console handler
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(level)
     console_handler.setFormatter(_FORMAT)
