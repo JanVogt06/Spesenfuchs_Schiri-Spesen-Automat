@@ -33,8 +33,9 @@ export interface Statistik {
     offen: number;
 }
 
-export async function getStatistik(saison: string): Promise<Statistik> {
-    const response = await api.get<Statistik>('/api/statistik', {params: {saison}});
+/** Without a season the server picks the newest one that has matches */
+export async function getStatistik(saison: string | null): Promise<Statistik> {
+    const response = await api.get<Statistik>('/api/statistik', saison ? {params: {saison}} : undefined);
     return response.data;
 }
 

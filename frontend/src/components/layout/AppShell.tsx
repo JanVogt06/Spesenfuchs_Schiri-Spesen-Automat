@@ -3,7 +3,7 @@ import {useNavigate, useLocation, Link} from 'react-router-dom';
 import {Button} from '@/components/ui/button';
 import {logout} from '@/lib/auth';
 import {
-    Receipt, Settings, LogOut, LayoutDashboard, IdCard, Trophy, CalendarDays, Table2, Bug, Ellipsis, ClipboardCheck,
+    Receipt, Settings, LogOut, LayoutDashboard, IdCard, Trophy, CalendarDays, ChartColumn, Table2, Bug, Ellipsis, ClipboardCheck,
 } from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {useDfbLoginStatus} from '@/hooks/useDfbLoginStatus';
@@ -27,11 +27,12 @@ interface NavItem {
     icon: typeof LayoutDashboard;
 }
 
-// The four main tabs: in the header and, on phones, directly in the tab bar
+// The main tabs: in the header and, on phones, directly in the tab bar
 const hauptItems: NavItem[] = [
     {label: 'Übersicht', path: '/dashboard', icon: LayoutDashboard},
     {label: 'Spiele', path: '/spiele', icon: CalendarDays},
     {label: 'Saison', path: '/saison', icon: Trophy},
+    {label: 'Statistik', path: '/statistik', icon: ChartColumn},
     {label: 'Beobachtungen', kurz: 'Noten', path: '/beobachtungen', icon: ClipboardCheck},
 ];
 

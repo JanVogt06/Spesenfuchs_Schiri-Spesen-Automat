@@ -119,7 +119,7 @@ describe('AppShell - Navigation', () => {
         const aktiv = kopfzeile().getByRole('button', {name: 'Saison'});
         expect(aktiv).toHaveClass('bg-primary/10', 'text-primary');
         expect(aktiv).toHaveAttribute('aria-current', 'page');
-        for (const name of ['Übersicht', 'Spiele', 'Beobachtungen', /Mehr/]) {
+        for (const name of ['Übersicht', 'Spiele', 'Statistik', 'Beobachtungen', /Mehr/]) {
             expect(kopfzeile().getByRole('button', {name})).not.toHaveClass('text-primary');
         }
     });
@@ -168,7 +168,7 @@ describe('AppShell - Navigation', () => {
         zeige('/stammdaten');
         await waitFor(() => expect(apiGet).toHaveBeenCalled());
 
-        for (const name of ['Übersicht', 'Spiele', 'Saison', 'Noten']) {
+        for (const name of ['Übersicht', 'Spiele', 'Saison', 'Statistik', 'Noten']) {
             expect(tabLeiste().getByRole('button', {name})).not.toHaveAttribute('aria-current');
         }
         const mehr = tabLeiste().getByRole('button', {name: /Mehr/});
@@ -190,6 +190,9 @@ describe('AppShell - Navigation', () => {
 
         await userEvent.click(tabLeiste().getByRole('button', {name: 'Saison'}));
         expect(screen.getByTestId('ort')).toHaveTextContent('/saison');
+
+        await userEvent.click(kopfzeile().getByRole('button', {name: 'Statistik'}));
+        expect(screen.getByTestId('ort')).toHaveTextContent('/statistik');
 
         await userEvent.click(tabLeiste().getByRole('button', {name: /Mehr/}));
         await userEvent.click(within(screen.getByRole('navigation', {name: 'Weitere Seiten'}))

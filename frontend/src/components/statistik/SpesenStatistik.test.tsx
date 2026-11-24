@@ -81,6 +81,22 @@ describe('SpesenStatistik', () => {
         expect(screen.queryByText(/Strecken in Berechnung/)).not.toBeInTheDocument();
     });
 
+    it('nimmt ohne Saison die neueste und meldet jede Antwort', async () => {
+        getRouten({'/api/statistik': STATISTIK});
+        const geladen = vi.fn();
+        render(<SpesenStatistik saison={null} onGeladen={geladen}/>);
+
+        expect(await screen.findByText(euro('80,00 €'))).toBeInTheDocument();
+        expect(apiGet).toHaveBeenCalledWith('/api/statistik', undefined);
+        expect(geladen).toHaveBeenCalledWith(STATISTIK);
+    });
+
+    it('sagt ohne jede Saison, dass noch nichts vorliegt', async () => {
+        getRouten({'/api/statistik': {...STATISTIK, saisons: [], saison: null, spiele: 0, ohne_rolle: 0, monate: []}});
+        render(<SpesenStatistik saison={null}/>);
+        expect(await screen.findByText(/Noch liegen keine vergangenen/)).toBeInTheDocument();
+    });
+
     it('meldet einen Ladefehler', async () => {
         getRouten({'/api/statistik': new Error('500')});
         render(<SpesenStatistik saison="26/27"/>);

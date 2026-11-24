@@ -6,7 +6,7 @@ import {AppShell} from '@/components/layout/AppShell';
 import {getBugReportStatus, sendeBugReport, type BugReportStatus} from '@/lib/bugreport';
 import {AlertCircle, Bug, CheckCircle2, Loader2, Send} from 'lucide-react';
 
-const BEREICHE = ['Dashboard', 'Spiele', 'Saison', 'Ligen', 'Stammdaten', 'Einstellungen', 'Sonstiges'];
+const BEREICHE = ['Übersicht', 'Spiele', 'Saison', 'Statistik', 'Beobachtungen', 'Ligen', 'Stammdaten', 'Einstellungen', 'Sonstiges'];
 
 function fehlertext(err: unknown, fallback: string): string {
     const detail = (err as {response?: {data?: {error?: {message?: string}}}})

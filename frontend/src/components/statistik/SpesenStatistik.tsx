@@ -1,4 +1,4 @@
-import {useEffect, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import {Separator} from '@/components/ui/separator';
 import {getStatistik, monatsName, type Statistik, type StatistikMonat} from '@/lib/statistik';
@@ -13,8 +13,10 @@ const NACHFRAGE_MS = 1500;
 const SCHRAFFUR = 'repeating-linear-gradient(45deg, var(--diagramm-fahrt) 0 2px, transparent 2px 5px)';
 
 interface SpesenStatistikProps {
-    /** Remount on season change (key), then the state starts fresh */
-    saison: string;
+    /** null: the newest season with matches. Remount (key) on a change of season, then the state starts fresh */
+    saison: string | null;
+    /** Called with every answer - the page builds its season selection from it */
+    onGeladen?: (statistik: Statistik) => void;
 }
 
 function Kennzahl({label, wert, zusatz}: {label: string; wert: string; zusatz?: string}) {
@@ -91,9 +93,14 @@ function MonatsZeile({monat, maximum}: {monat: StatistikMonat; maximum: number})
  * travel costs are entered, the server estimates them from the route from the
  * own home address - this always appears here marked as "geschätzt".
  */
-export function SpesenStatistik({saison}: SpesenStatistikProps) {
+export function SpesenStatistik({saison, onGeladen}: SpesenStatistikProps) {
     const [daten, setDaten] = useState<Statistik | null>(null);
     const [fehler, setFehler] = useState(false);
+    // A ref, so a new callback identity does not restart the polling
+    const onGeladenRef = useRef(onGeladen);
+    useEffect(() => {
+        onGeladenRef.current = onGeladen;
+    }, [onGeladen]);
 
     useEffect(() => {
         let aktiv = true;
@@ -109,6 +116,7 @@ export function SpesenStatistik({saison}: SpesenStatistikProps) {
                 .then((antwort) => {
                     if (!aktiv) return;
                     setDaten(antwort);
+                    onGeladenRef.current?.(antwort);
                     versuche += 1;
                     ohneFortschritt = antwort.offen < vorherOffen ? 0 : ohneFortschritt + 1;
                     vorherOffen = antwort.offen;
@@ -143,11 +151,12 @@ export function SpesenStatistik({saison}: SpesenStatistikProps) {
                 Rechne…
             </p>
         );
-    } else if (daten.saison !== saison || (daten.spiele === 0 && daten.ohne_rolle === 0)) {
+    } else if (!daten.saison || (saison !== null && daten.saison !== saison) || (daten.spiele === 0 && daten.ohne_rolle === 0)) {
         inhalt = (
             <p className="text-sm text-muted-foreground">
-                Für {saison} liegen keine vergangenen Ansetzungen in Spesenfuchs vor. Die Statistik
-                rechnet mit den Spielen, die seit dem ersten Abruf hier gespeichert sind.
+                {saison ?? daten.saison ? `Für ${saison ?? daten.saison} liegen` : 'Noch liegen'} keine vergangenen
+                Ansetzungen in Spesenfuchs vor. Die Statistik rechnet mit den Spielen, die seit dem
+                ersten Abruf hier gespeichert sind.
             </p>
         );
     } else {
