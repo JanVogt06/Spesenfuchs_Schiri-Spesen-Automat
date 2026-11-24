@@ -1,13 +1,13 @@
 import {api} from './api';
 
 /**
- * Aus welchem DFBnet-Modul eine Beobachtung stammt:
- * - herren: Schiri-Beobachtung (Landesverband, Herren-Spielklassen)
- * - portal: Schiri-Portal (DFB-Nachwuchs) - haben nur wenige Schiedsrichter
+ * From which DFBnet module an observation comes:
+ * - herren: referee observation (state association, men's leagues)
+ * - portal: referee portal (DFB youth) - only few referees have these
  */
 export type BeobachtungsQuelle = 'herren' | 'portal';
 
-/** Die eigene Rolle im Gespann, in der die Note vergeben wurde */
+/** The own role on the crew in which the grade was given */
 export type BeobachtungsRolle = 'SR' | 'SRA1' | 'SRA2' | '4OF';
 
 export interface Beobachtung {
@@ -23,13 +23,13 @@ export interface Beobachtung {
     ergebnis: string;
     rolle: BeobachtungsRolle;
     note: number;
-    /** Die Note so, wie DFBnet sie anzeigt */
+    /** The grade as DFBnet displays it */
     note_text: string;
     beobachter: string;
     freigegeben_am: string;
 }
 
-/** Eine vollständig gelesene Saison einer Quelle - auch eine leere */
+/** A completely read season of a source - even an empty one */
 export interface GeleseneSaison {
     quelle: BeobachtungsQuelle;
     saison: string;
@@ -49,8 +49,8 @@ export async function getBeobachtungen(): Promise<BeobachtungsDaten> {
 }
 
 /**
- * Die Gruppen, für die ein eigener Schnitt gebildet wird. SRA1 und SRA2 zählen
- * gemeinsam als Assistent.
+ * The groups for which a separate average is formed. SRA1 and SRA2 count
+ * together as assistant.
  */
 export type RollenGruppe = 'sr' | 'assistent' | 'vierter';
 
@@ -74,7 +74,7 @@ export interface Schnitt {
     anzahl: number;
 }
 
-/** Ein Schnitt je Rollengruppe - nur für Gruppen mit mindestens einer Note */
+/** One average per role group - only for groups with at least one grade */
 export function schnitte(beobachtungen: Beobachtung[]): Schnitt[] {
     return ROLLEN_GRUPPEN.flatMap(({gruppe, label, rollen}) => {
         const noten = beobachtungen.filter((b) => rollen.includes(b.rolle)).map((b) => b.note);
@@ -84,7 +84,7 @@ export function schnitte(beobachtungen: Beobachtung[]): Schnitt[] {
     });
 }
 
-/** Gruppiert nach Staffel, in der Reihenfolge des ersten Auftretens */
+/** Grouped by league, in order of first appearance */
 export function nachStaffel(beobachtungen: Beobachtung[]): {staffel: string; beobachtungen: Beobachtung[]}[] {
     const gruppen = new Map<string, Beobachtung[]>();
     for (const b of beobachtungen) {
@@ -94,13 +94,13 @@ export function nachStaffel(beobachtungen: Beobachtung[]): {staffel: string; beo
     return [...gruppen].map(([staffel, liste]) => ({staffel, beobachtungen: liste}));
 }
 
-/** "25/26" -> 2025; Unbekanntes sortiert ans Ende */
+/** "25/26" -> 2025; unknown values sort to the end */
 function startJahr(saison: string): number {
     const treffer = /^(\d{2})\/\d{2}$/.exec(saison.trim());
     return treffer ? 2000 + Number(treffer[1]) : -1;
 }
 
-/** Saison eines Datums im DFBnet-Format: "26.01.2019" -> "18/19" (Beginn am 1. Juli) */
+/** Season of a date in DFBnet format: "26.01.2019" -> "18/19" (starts on 1 July) */
 export function saisonVonDatum(deutsch: string | null): string | null {
     const treffer = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec((deutsch || '').trim());
     if (!treffer) return null;
@@ -111,11 +111,11 @@ export function saisonVonDatum(deutsch: string | null): string | null {
 }
 
 /**
- * Die Saisons, die der Reiter anbietet, neueste zuerst.
+ * The seasons that the tab offers, newest first.
  *
- * Herren: jede gelesene Saison ab "Schiedsrichter seit" - auch ohne
- * Beobachtung, denn dann ist genau das die Auskunft. Portal: nur Saisons, in
- * denen es dort wirklich Beobachtungen gibt.
+ * Men's: every read season from "Schiedsrichter seit" onwards - even without an
+ * observation, because then that is exactly the answer. Portal: only seasons in
+ * which there really are observations.
  */
 export function angeboteneSaisons(daten: BeobachtungsDaten): string[] {
     const erste = saisonVonDatum(daten.schiedsrichter_seit);

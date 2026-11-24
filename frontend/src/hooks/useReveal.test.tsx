@@ -3,7 +3,7 @@ import {act, render, renderHook, screen} from '@testing-library/react';
 import {useRef} from 'react';
 import {magKeineBewegung, useCountUp, useImBild, useRevealOnScroll, useScrollProgress} from './useReveal';
 
-/** Ein IntersectionObserver, den der Test von Hand ausloest */
+/** An IntersectionObserver that the test triggers by hand */
 class BeobachterAttrappe {
     static alle: BeobachterAttrappe[] = [];
     beobachtet = new Set<Element>();
@@ -192,7 +192,7 @@ describe('useScrollProgress', () => {
     }
 
     it('laeuft von 0 (Oberkante unten) bis 1 (Unterkante in der oberen Haelfte)', () => {
-        // Strecke = Hoehe 550 + 850 (Beginn) - 400 (Ende) = 1000
+        // Distance = height 550 + 850 (start) - 400 (end) = 1000
         oben = 900;
         render(<Strecke/>);
         const strecke = screen.getByTestId('strecke');
@@ -265,7 +265,7 @@ describe('useCountUp', () => {
         bild(0);
         expect(result.current).toBe(0);
         bild(500);
-        // 1 - (1 - 0,5)^3 = 0,875
+        // 1 - (1 - 0.5)^3 = 0.875
         expect(result.current).toBe(875);
         bild(1000);
         expect(result.current).toBe(1000);

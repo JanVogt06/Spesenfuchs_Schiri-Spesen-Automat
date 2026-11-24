@@ -5,15 +5,15 @@ import {getStatistik, monatsName, type Statistik, type StatistikMonat} from '@/l
 import {formatEuro} from '@/lib/spielberichte';
 import {Euro, Loader2} from 'lucide-react';
 
-// Wie oft hoechstens nachgefragt wird, solange Strecken offen sind
+// How often to poll at most while routes are outstanding
 const MAX_NACHFRAGEN = 20;
 const NACHFRAGE_MS = 1500;
 
-/** Schraffur fuer geschaetzte Fahrtkosten - dieselbe Farbe, aber erkennbar "unsicher" */
+/** Hatching for estimated travel costs - same color, but recognizably "uncertain" */
 const SCHRAFFUR = 'repeating-linear-gradient(45deg, var(--diagramm-fahrt) 0 2px, transparent 2px 5px)';
 
 interface SpesenStatistikProps {
-    /** Beim Saisonwechsel neu einhaengen (key), dann beginnt der Zustand frisch */
+    /** Remount on season change (key), then the state starts fresh */
     saison: string;
 }
 
@@ -87,9 +87,9 @@ function MonatsZeile({monat, maximum}: {monat: StatistikMonat; maximum: number})
 }
 
 /**
- * Spesen und Fahrtkosten der eigenen Spiele einer Saison. Wo keine
- * Fahrtkosten eingetragen sind, schätzt der Server sie aus der Strecke vom
- * eigenen Wohnort - das steht hier immer als "geschätzt" dabei.
+ * Expenses and travel costs of the own matches of a season. Where no
+ * travel costs are entered, the server estimates them from the route from the
+ * own home address - this always appears here marked as "geschätzt".
  */
 export function SpesenStatistik({saison}: SpesenStatistikProps) {
     const [daten, setDaten] = useState<Statistik | null>(null);
@@ -102,8 +102,8 @@ export function SpesenStatistik({saison}: SpesenStatistikProps) {
         let ohneFortschritt = 0;
         let vorherOffen = Infinity;
 
-        // Der Server schlaegt je Aufruf nur einige Sekunden lang nach; was
-        // offen bleibt, holt die naechste Anfrage - bis nichts mehr voran geht
+        // The server only looks up for a few seconds per call; whatever
+        // stays open is picked up by the next request - until nothing progresses any more
         const laden = () => {
             getStatistik(saison)
                 .then((antwort) => {

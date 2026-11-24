@@ -2,12 +2,12 @@ import {useEffect, useState} from 'react';
 import {DFB_STATUS_EVENT, getCurrentUser} from '@/lib/auth';
 
 /**
- * Seit wann DFBnet die gespeicherten Zugangsdaten ablehnt - oder null.
+ * Since when DFBnet has rejected the stored credentials - or null.
  *
- * Laedt beim Oeffnen einer Seite, nach jedem fertigen Abruf, nach dem
- * Speichern neuer Zugangsdaten und wenn die App wieder in den Vordergrund
- * kommt (eine installierte PWA bleibt oft tagelang offen, waehrend nachts
- * abgerufen wird).
+ * Loads when a page is opened, after every finished run, after
+ * saving new credentials and when the app returns to the foreground
+ * (an installed PWA often stays open for days while runs happen
+ * at night).
  */
 export function useDfbLoginStatus(): string | null {
     const [abgelehntSeit, setAbgelehntSeit] = useState<string | null>(null);
@@ -20,7 +20,7 @@ export function useDfbLoginStatus(): string | null {
                 .then((user) => {
                     if (aktiv) setAbgelehntSeit(user.dfb_login_abgelehnt_seit ?? null);
                 })
-                // Ohne Antwort lieber kein Hinweis als ein falscher
+                // Better no notice than a wrong one when there is no response
                 .catch(() => {});
         };
         const sichtbar = () => {

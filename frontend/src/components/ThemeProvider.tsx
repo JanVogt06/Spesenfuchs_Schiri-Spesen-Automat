@@ -12,7 +12,7 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({children}: { children: React.ReactNode }) {
     const [theme, setThemeState] = useState<Theme>(() => {
-        // Initial aus localStorage lesen
+        // Read the initial value from localStorage
         if (typeof window !== 'undefined') {
             return (localStorage.getItem('theme') as Theme) || 'system';
         }
@@ -58,8 +58,8 @@ export function ThemeProvider({children}: { children: React.ReactNode }) {
     );
 }
 
-// Hook und Provider gehoeren zusammen; Fast Refresh laedt diese Datei dann
-// eben vollstaendig neu.
+// Hook and provider belong together; Fast Refresh then reloads this file
+// completely.
 // eslint-disable-next-line react-refresh/only-export-components
 export function useTheme() {
     const context = useContext(ThemeContext);

@@ -2,13 +2,13 @@
 <html lang="de">
   <head>
     <meta charset="UTF-8" />
-    <!-- Favicon und Touch-Icon liegen unter src/assets, damit Vite sie mit
-         Hash nach /assets baut und sie dauerhaft gecacht werden duerfen. -->
+    <!-- Favicon and touch icon live under src/assets so that Vite builds them with
+         a hash into /assets and they may be cached permanently. -->
     <link rel="icon" type="image/png" sizes="64x64" href="./src/assets/favicon-64.png" />
     <link rel="apple-touch-icon" href="./src/assets/apple-touch-icon.png" />
-    <!-- Manifest, App-Icons und Service Worker liegen in public/ und damit
-         direkt in dist/: das Backend reicht Dateien dort unveraendert durch,
-         jede andere Adresse bekommt die index.html. -->
+    <!-- Manifest, app icons and service worker live in public/ and thus
+         directly in dist/: the backend serves files there unchanged,
+         every other address gets index.html. -->
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#171717" media="(prefers-color-scheme: dark)" />
@@ -22,7 +22,7 @@
     <meta property="og:title" content="Spesenfuchs — Abpfiff für den Papierkram" />
     <meta property="og:description" content="Spesenabrechnungen für Schiedsrichter im TFV, jede Nacht aus deinen DFBnet-Ansetzungen. Du trägst nur noch die Kilometer ein. Kostenlos." />
     <script>
-      // Theme sofort anwenden um Flackern zu verhindern
+      // Apply the theme immediately to prevent flicker
       (function() {
         const theme = localStorage.getItem('theme') || 'system';
         const isDark = theme === 'dark' ||

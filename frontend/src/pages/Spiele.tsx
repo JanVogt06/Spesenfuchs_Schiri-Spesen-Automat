@@ -25,8 +25,8 @@ export function SpielePage() {
         }
     }, []);
 
-    // Ein Lauf-Zustand statt einer Liste von Sessions; laedt die Spiele neu,
-    // sobald der laufende Scrape durch ist
+    // One running state instead of a list of sessions; reloads the matches
+    // as soon as the running scrape is done
     const {run, isRunning, isStarting, error, startGeneration} = useScrapeRun(loadMatches);
 
     useEffect(() => {
@@ -97,7 +97,7 @@ export function SpielePage() {
                 </div>
             ) : (
                 <div className="space-y-4">
-                    {/* Abgelehnte Zugangsdaten meldet der Hinweis oben auf jeder Seite */}
+                    {/* Rejected credentials are reported by the notice at the top of every page */}
                     {run?.status === 'failed' && !istAnmeldefehler && (
                         <div className="flex items-start gap-3 rounded-lg bg-destructive/10 px-4 py-3 ring-1 ring-destructive/20">
                             <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive"/>

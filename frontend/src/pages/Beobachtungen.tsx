@@ -28,8 +28,8 @@ export function BeobachtungenPage() {
             setDaten(neu);
             setLadeFehler('');
 
-            // Beim ersten Laden die neueste Saison; nach einem Abruf die
-            // gewaehlte behalten, solange es sie noch gibt.
+            // On first load the latest season; after a fetch keep the
+            // selected one as long as it still exists.
             const liste = angeboteneSaisons(neu);
             setGewaehlt((bisher) => (bisher && liste.includes(bisher) ? bisher : liste[0] ?? null));
         } catch (err: unknown) {
@@ -39,7 +39,7 @@ export function BeobachtungenPage() {
         }
     }, []);
 
-    // Die Beobachtungen werden beim regulaeren Abruf mitgelesen
+    // The observations are read along with the regular fetch
     const {run, isRunning, isStarting, error, startGeneration} = useScrapeRun(loadDaten);
 
     useEffect(() => {

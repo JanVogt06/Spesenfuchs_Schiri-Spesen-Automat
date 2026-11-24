@@ -24,8 +24,8 @@ export function StammdatenPage() {
         }
     }, []);
 
-    // Die Stammdaten werden beim regulaeren Abruf mitgelesen, also haengt diese
-    // Seite am selben Lauf wie das Dashboard und laedt nach, sobald er durch ist
+    // The master data is read along with the regular fetch, so this page
+    // hangs on the same run as the dashboard and reloads as soon as it is done
     const {run, isRunning, isStarting, error, startGeneration} = useScrapeRun(loadStammdaten);
 
     useEffect(() => {

@@ -154,7 +154,7 @@ describe('DFBCredentialsForm - Speichern', () => {
 
         expect(await screen.findByText('DFB-Benutzername darf nicht leer sein')).toBeInTheDocument();
         expect(dfbEvents).not.toHaveBeenCalled();
-        // Die Ablehnung gilt weiter, die Eingaben bleiben stehen
+        // The rejection still applies, the entries remain
         expect(screen.getByText(ROT)).toBeInTheDocument();
         expect(screen.getByLabelText('DFB-Benutzername')).toHaveValue('sr-muster');
     });

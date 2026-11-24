@@ -21,7 +21,7 @@ function gespannText(spiel: SaisonSpiel): string {
     return spiel.gespann.map((p) => `${p.rolle} ${p.name}`).join(' · ');
 }
 
-/** Button zum Spielbericht - mit Büroklammer und Anzahl, wenn Dokumente dranhängen */
+/** Button to the match report - with paperclip and count when documents are attached */
 function BerichtButton({spiel, className}: {spiel: SaisonSpiel; className?: string}) {
     if (!spiel.spielbericht) return null;
     const {id, dokumente} = spiel.spielbericht;
@@ -45,10 +45,10 @@ function BerichtButton({spiel, className}: {spiel: SaisonSpiel; className?: stri
 }
 
 /**
- * Kartenspalten in der Reihenfolge der DFBnet-Tabelle.
+ * Card columns in the order of the DFBnet table.
  *
- * Die drei Karten je Mannschaft stehen dort nur als Symbole im Kopf; hier
- * tragen sie ein Kürzel, damit die Spalte ohne Legende lesbar bleibt.
+ * The three cards per team appear there only as symbols in the header; here
+ * they carry an abbreviation so the column stays readable without a legend.
  */
 const KARTEN: {feld: keyof SaisonSpiel; kurz: string; titel: string}[] = [
     {feld: 'heim_gelb', kurz: 'G', titel: 'Heim: Gelbe Karten'},
@@ -90,14 +90,14 @@ export function SaisonSpiele({spiele}: SaisonSpieleProps) {
             </CardHeader>
             <Separator/>
 
-            {/* Breite Ansicht: die Tabelle wie in DFBnet */}
+            {/* Wide view: the table as in DFBnet */}
             <CardContent className="hidden p-0 lg:block">
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead>
-                            {/* Zweizeilig wie in DFBnet: die Karten stehen dort unter einer
-                                gemeinsamen Ueberschrift je Mannschaft. Einzeilig waere
-                                "G" fuer Gast und "G" fuer Gelb nicht zu unterscheiden. */}
+                            {/* Two rows as in DFBnet: the cards sit there under a
+                                shared heading per team. In one row,
+                                "G" for Gast and "G" for Gelb could not be told apart. */}
                             <tr className="text-xs tracking-wide text-muted-foreground uppercase">
                                 <th className="px-4 pt-2 text-left font-medium sm:px-6" rowSpan={2}>Datum</th>
                                 <th className="px-3 pt-2 text-left font-medium" rowSpan={2}>Liga</th>
@@ -182,7 +182,7 @@ export function SaisonSpiele({spiele}: SaisonSpieleProps) {
                 </div>
             </CardContent>
 
-            {/* Schmale Ansicht: dieselben Daten als Karten, die Tabelle passt nicht aufs Handy */}
+            {/* Narrow view: the same data as cards, the table does not fit on a phone */}
             <CardContent className="space-y-3 p-4 lg:hidden">
                 {spiele.map((spiel) => (
                     <div key={spiel.id} className="rounded-lg border border-dashed p-3 text-sm">

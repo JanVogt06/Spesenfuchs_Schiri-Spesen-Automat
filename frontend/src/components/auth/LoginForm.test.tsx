@@ -59,7 +59,7 @@ describe('LoginForm', () => {
         await anmelden('sr@example.org', 'falsch');
 
         expect(await screen.findByText('E-Mail oder Passwort falsch')).toBeInTheDocument();
-        // Die Eingaben bleiben fuer den naechsten Versuch stehen
+        // The entries remain for the next attempt
         expect(screen.getByLabelText('E-Mail')).toHaveValue('sr@example.org');
     });
 

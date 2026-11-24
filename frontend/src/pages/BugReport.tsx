@@ -133,10 +133,10 @@ export function BugReportPage() {
                         />
                     </div>
 
-                    {/* Rueckmeldung gehoert direkt an den Knopf. Stand sie oben ueber
-                        dem Formular, erschien sie nach dem Absenden ausserhalb des
-                        Sichtfelds - und ein Versand kann ueber zwanzig Sekunden
-                        dauern, bevor eine Zeitueberschreitung greift. */}
+                    {/* Feedback belongs right at the button. When it sat above
+                        the form, it appeared outside the viewport after submitting -
+                        and sending can take over twenty seconds before a
+                        timeout kicks in. */}
                     {fehler && (
                         <div className="flex items-start gap-2 rounded-lg bg-destructive/10 px-4 py-3 ring-1 ring-destructive/20">
                             <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive"/>

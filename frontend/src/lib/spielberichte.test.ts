@@ -48,7 +48,7 @@ describe('spielberichtPfad', () => {
 
 describe('formatEuro', () => {
     it('formatiert Betraege deutsch mit Euro-Zeichen', () => {
-        // Zwischen Zahl und Zeichen steht ein geschuetztes Leerzeichen
+        // A non-breaking space sits between number and sign
         expect(formatEuro(12.5)).toMatch(/^12,50\s€$/);
         expect(formatEuro(0)).toMatch(/^0,00\s€$/);
         expect(formatEuro(1234.567)).toMatch(/^1\.234,57\s€$/);
@@ -173,7 +173,7 @@ describe('oeffneDokument', () => {
         }));
 
         const laeuft = oeffneDokument(4, dokument);
-        // Noch vor der Antwort - sonst blockt Safari das Pop-up
+        // Before the response - otherwise Safari blocks the pop-up
         expect(open).toHaveBeenCalledWith('', '_blank');
 
         aufloesen({data: new Blob(['pdf'])});
@@ -186,7 +186,7 @@ describe('oeffneDokument', () => {
         expect(fenster.location.href).toBe('blob:test/1');
         expect(download.klicks).toHaveLength(0);
 
-        // Die URL bleibt eine Minute gueltig
+        // The URL stays valid for one minute
         vi.advanceTimersByTime(59_999);
         expect(download.revokeObjectURL).not.toHaveBeenCalled();
         vi.advanceTimersByTime(1);

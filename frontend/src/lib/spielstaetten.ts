@@ -5,7 +5,7 @@ export interface Besuch {
     saison: string;
     heim: string;
     gast: string;
-    /** Eigene Rolle, wenn sie sich zuordnen ließ */
+    /** Own role, if it could be assigned */
     rolle: string | null;
 }
 
@@ -14,10 +14,10 @@ export interface BesuchterOrt {
     adresse: string;
     lat: number;
     lon: number;
-    /** platz: Koordinate aus DFBnet; adresse/ort: über die Adresssuche */
+    /** platz: coordinate from DFBnet; adresse/ort: via the address search */
     genauigkeit: 'platz' | 'adresse' | 'ort';
     anzahl: number;
-    /** Neueste zuerst */
+    /** Newest first */
     spiele: Besuch[];
 }
 
@@ -34,7 +34,7 @@ export async function getSpielstaetten(): Promise<Spielstaetten> {
     return response.data;
 }
 
-/** Nur die Orte - und an ihnen nur die Spiele - einer Saison; null heißt alle */
+/** Only the venues - and at them only the matches - of one season; null means all */
 export function inSaison(orte: BesuchterOrt[], saison: string | null): BesuchterOrt[] {
     if (!saison) return orte;
     return orte
@@ -58,7 +58,7 @@ function datum(iso: string): string {
 
 const MAX_SPIELE_IM_POPUP = 6;
 
-/** Inhalt des Popups eines Ortes als HTML für Leaflet */
+/** Content of a venue's popup as HTML for Leaflet */
 export function ortPopup(ort: BesuchterOrt): string {
     const spiele = ort.spiele.slice(0, MAX_SPIELE_IM_POPUP).map((s) => {
         const paarung = s.heim && s.gast ? `${s.heim} – ${s.gast}` : s.heim || 'Turnier';

@@ -1,17 +1,17 @@
 import {Calendar, Check, Download, FileArchive, Lock, Route, Table2, User} from 'lucide-react';
 
 /*
- * Schaufenster der Landingpage: nachgebaute Ausschnitte der Anwendung mit
- * ausgedachten Beispieldaten. Vereine, Kilometer und Zaehler sind erfunden,
- * die Saetze stammen aus der TFV-Spesenordnung (Stand 01.07.2025). Gerechnet
- * wird hier nichts - das bleibt Sache des Backends, siehe
+ * Showcase of the landing page: recreated excerpts of the application with
+ * made-up sample data. Clubs, kilometers and counters are invented,
+ * the rates come from the TFV expense regulations (as of 01.07.2025). Nothing
+ * is calculated here - that remains the backend's job, see
  * generator/spesen_calculator.py.
  *
- * Alles hier ist Bild, nicht Inhalt: die Bausteine sind fuer Screenreader
- * ausgeblendet, beschrieben wird die Funktion jeweils im Text daneben.
+ * Everything here is image, not content: the building blocks are hidden
+ * from screen readers, the function is described in the text next to each.
  */
 
-/** Pulsierender Punkt, wie ein Live-Signal */
+/** Pulsating dot, like a live signal */
 export function Puls({className = 'size-2'}: { className?: string }) {
     return (
         <span className={`relative grid shrink-0 place-items-center ${className}`}>
@@ -22,8 +22,8 @@ export function Puls({className = 'size-2'}: { className?: string }) {
 }
 
 /*
- * Das Gespann der Beispielabrechnung. Summe = Satz + km x 0,30 EUR, so wie
- * das Formular sie je Person ausweist.
+ * The crew of the sample statement. Total = rate + km x 0.30 EUR, just as
+ * the form shows it per person.
  */
 const GESPANN = [
     {rolle: 'SR', satz: '50,00', km: '42', summe: '62,60'},
@@ -32,8 +32,8 @@ const GESPANN = [
 ];
 
 /*
- * Spalten der Abrechnung. Schmal (die Karte am Handy, 320 px) ruecken sie
- * enger zusammen, damit kein Betrag umbricht.
+ * Columns of the statement. When narrow (the card on phones, 320 px) they move
+ * closer together so no amount wraps.
  */
 const SPALTEN = 'grid grid-cols-[2.75rem_minmax(0,1fr)_auto_3.75rem] gap-x-2 px-2.5 ' +
     'min-[400px]:grid-cols-[3.25rem_minmax(0,1fr)_auto_4.75rem] min-[400px]:gap-x-3 min-[400px]:px-3';
@@ -48,9 +48,9 @@ function Dateiknopf({label}: { label: string }) {
 }
 
 /**
- * Die Beispielabrechnung: ein Spiel mit Gespann, Saetzen, Kilometern und
- * Summen. Die Flaeche ist bewusst deckend - durchscheinende Karten dahinter
- * wirkten wie ein Darstellungsfehler.
+ * The sample statement: one match with crew, rates, kilometers and
+ * totals. The surface is deliberately opaque - translucent cards behind it
+ * would look like a rendering glitch.
  */
 export function Abrechnungskarte() {
     return (
@@ -93,7 +93,7 @@ export function Abrechnungskarte() {
                     >
                         <span className="text-white/60">{zeile.rolle}</span>
                         <span className="font-medium text-flutlicht">{zeile.satz} €</span>
-                        {/* Die Kilometer traegt man selbst ein - deshalb wie ein Eingabefeld */}
+                        {/* The kilometers are entered by oneself - hence styled like an input field */}
                         <span className="rounded-md border border-dashed border-white/25 px-1.5 py-px text-xs text-white/80">
                             {zeile.km} km
                         </span>
@@ -148,7 +148,7 @@ function Standanzeige({stand}: { stand: Stand }) {
     );
 }
 
-/** Das Fenster "Meine Spiele" hinter der Beispielabrechnung */
+/** The "Meine Spiele" window behind the sample statement */
 export function Spieleliste() {
     return (
         <div
@@ -183,7 +183,7 @@ export function Spieleliste() {
     );
 }
 
-/** Stecknadel mit der Spitze auf (x, y) */
+/** Pin with its tip at (x, y) */
 function Nadel({x, y, className}: { x: number; y: number; className: string }) {
     return (
         <g transform={`translate(${x} ${y})`}>
@@ -194,9 +194,9 @@ function Nadel({x, y, className}: { x: number; y: number; className: string }) {
 }
 
 /**
- * Eine gezeichnete Anfahrtskarte: Strassen, ein Fluss, drei Anschriften des
- * Gespanns und die Spielstaette. Keine echte Gegend - nur das Bild, das die
- * Karte in der Anwendung liefert.
+ * A drawn route map: roads, a river, three addresses of the
+ * crew and the venue. Not a real area - just the image that the
+ * map in the application delivers.
  */
 export function Anfahrtskarte({dunkel = false, beschriftet = true, className}: {
     dunkel?: boolean;
@@ -220,14 +220,14 @@ export function Anfahrtskarte({dunkel = false, beschriftet = true, className}: {
             <path d="M184 -5 L 198 145" strokeWidth="2.5" className={strasse}/>
             <path d="M120 60 L 245 52" strokeWidth="2" className={strasse}/>
 
-            {/* Wege zur Spielstaette */}
+            {/* Routes to the venue */}
             <g strokeWidth="1.6" strokeDasharray="3 4" strokeLinecap="round" className={weg}>
                 <path d="M40 116 C 70 104, 104 96, 140 80"/>
                 <path d="M58 36 C 86 46, 116 58, 144 70"/>
                 <path d="M214 118 C 200 102, 182 90, 164 82"/>
             </g>
 
-            {/* Spielstaette als kleines Feld */}
+            {/* Venue as a small field */}
             <g transform="translate(140 66)">
                 <rect width="26" height="17" rx="2.5" className={haupt}/>
                 <line x1="13" y1="1.5" x2="13" y2="15.5" strokeWidth="1" className="stroke-white/80"/>
@@ -250,7 +250,7 @@ export function Anfahrtskarte({dunkel = false, beschriftet = true, className}: {
     );
 }
 
-/** Kleiner Anhaenger zur Buehne im Hero: die Karte zur Anfahrt */
+/** Small appendix to the stage in the hero: the map of the route */
 export function Anfahrtschip() {
     return (
         <div
@@ -258,7 +258,7 @@ export function Anfahrtschip() {
             className="overflow-hidden rounded-2xl border border-white/15 bg-[oklch(0.2_0.03_158)] text-white shadow-2xl shadow-black/60"
         >
             <Anfahrtskarte dunkel beschriftet={false} className="block h-auto w-full bg-[oklch(0.17_0.025_158)]"/>
-            {/* Rechtsbuendig: links schiebt sich im Hero die Abrechnung darueber */}
+            {/* Right-aligned: on the left the statement slides over it in the hero */}
             <div className="flex items-center justify-end gap-2 border-t border-white/10 px-3 py-2 text-[11px]">
                 <Route className="size-3.5 text-flutlicht"/>
                 <span className="text-white/70">Anfahrt SR</span>
@@ -269,9 +269,9 @@ export function Anfahrtschip() {
 }
 
 /**
- * Uhr auf drei Uhr nachts - die Zeit, zu der der Lauf fuer alle Nutzer
- * startet. Der Stundenzeiger ist kurz und kraeftig, der Minutenzeiger lang
- * und duenn, sonst liesse sich die Uhr genauso als Viertel nach zwoelf lesen.
+ * Clock at three a.m. - the time at which the run starts for all users. The hour
+ * hand is short and thick, the minute hand long
+ * and thin, otherwise the clock could just as well be read as quarter past twelve.
  */
 export function Nachtuhr({className = 'size-24 sm:size-28'}: { className?: string }) {
     return (
@@ -293,7 +293,7 @@ export function Nachtuhr({className = 'size-24 sm:size-28'}: { className?: strin
                     />
                 );
             })}
-            {/* Minutenzeiger auf 12, Stundenzeiger auf 3 */}
+            {/* Minute hand at 12, hour hand at 3 */}
             <line x1="50" y1="50" x2="50" y2="17" strokeWidth="2" strokeLinecap="round" className="stroke-white/75"/>
             <line x1="50" y1="50" x2="70" y2="50" strokeWidth="4.5" strokeLinecap="round" className="stroke-flutlicht"/>
             <circle cx="50" cy="50" r="3.5" className="fill-flutlicht stroke-none"/>
@@ -317,9 +317,9 @@ function Kartenzaehler({farbe, zahl}: { farbe: string; zahl: number }) {
 }
 
 /**
- * Die Saison als Mini-Tafel: Einsatzbilanz nach Rolle, Karten ueber alle
- * geleiteten Spiele, Lehrabende und Leistungspruefung. Die Balken wachsen
- * beim Einblenden (siehe .spesen-balken), ohne Bewegung stehen sie sofort.
+ * The season as a mini board: appearance balance by role, cards across all
+ * matches officiated, teaching evenings and fitness test. The bars grow
+ * when faded in (see .spesen-balken), without motion they stand immediately.
  */
 export function Saisontafel() {
     const hoechstens = Math.max(...EINSAETZE.map((eintrag) => eintrag.zahl));
@@ -357,14 +357,14 @@ export function Saisontafel() {
 }
 
 /*
- * Die hellen Belege stehen in Kacheln von fester Hoehe, die als @container
- * ausgezeichnet sind (siehe Funktionskachel in Landing.tsx). Wird eine Kachel
- * schmaler als 13rem - am Handy mit 320 px -, ruecken die Belege per zoom ein
- * Stueck zusammen, statt umzubrechen und unten aus der Kachel zu laufen.
+ * The light vouchers sit in tiles of fixed height that are marked as
+ * @container (see Funktionskachel in Landing.tsx). When a tile becomes
+ * narrower than 13rem - on phones at 320 px -, the vouchers move together a
+ * bit via zoom instead of wrapping and running out of the tile at the bottom.
  */
 const SCHMAL = '@max-[13rem]:[zoom:0.85]';
 
-/** Ein Pokalspiel und wie der Satz dazu zustande kommt */
+/** A cup match and how the rate for it comes about */
 export function Ligenauszug() {
     return (
         <div aria-hidden className={`w-full max-w-[20rem] rounded-xl border bg-card p-3 text-xs shadow-sm ${SCHMAL}`}>
@@ -402,7 +402,7 @@ function Stammzeile({name, children}: { name: string; children: React.ReactNode 
     );
 }
 
-/** Ausschnitt aus dem Reiter "Stammdaten" - ohne Namen, die Angaben verdeckt */
+/** Excerpt from the "Stammdaten" tab - without names, the details concealed */
 export function Stammdatenauszug() {
     return (
         <div aria-hidden className={`w-full max-w-[20rem] rounded-xl border bg-card p-3 text-xs shadow-sm ${SCHMAL}`}>
@@ -459,8 +459,8 @@ function Blatt({endung, vorne}: { endung: string; vorne?: boolean }) {
 }
 
 /**
- * Word und PDF je Spiel, alles zusammen als ZIP. Wird die Kachel zu schmal,
- * rutscht das ZIP unter die Blaetter, statt in zwei Zeilen umzubrechen.
+ * Word and PDF per match, everything together as a ZIP. If the tile gets too narrow,
+ * the ZIP slides below the sheets instead of wrapping into two lines.
  */
 export function Dokumente() {
     return (

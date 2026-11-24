@@ -10,7 +10,7 @@ function lauf(status: ScrapeRun['status'], step = ''): ScrapeRun {
     return {run_id: 1, status, progress: status === 'idle' ? null : {current: 0, total: 0, step}};
 }
 
-/** Der Server antwortet nacheinander mit diesen Staenden; der letzte bleibt stehen */
+/** The server responds with these states one after another; the last one stays */
 function statusFolge(...staende: (ScrapeRun | Error)[]) {
     const rest = [...staende];
     apiGet.mockImplementation(async (url: string) => {
@@ -21,7 +21,7 @@ function statusFolge(...staende: (ScrapeRun | Error)[]) {
     });
 }
 
-/** Laesst ausstehende Promises und die daraus folgenden Renders durchlaufen */
+/** Lets pending promises and the resulting renders run through */
 async function abwarten() {
     await act(async () => {
         await vi.advanceTimersByTimeAsync(0);
@@ -277,9 +277,9 @@ describe('useScrapeRun - startGeneration', () => {
         expect(result.current.isRunning).toBe(true);
     });
 
-    // Ist der Lauf beim ersten Status nach dem Start schon vorbei (Prozess
-    // sofort gescheitert), muss onFinished trotzdem genau einmal kommen -
-    // und ein spaeteres reload() darf es nicht noch einmal ausloesen.
+    // If the run is already over at the first status after the start (process
+    // failed immediately), onFinished must still come exactly once -
+    // and a later reload() must not trigger it again.
     it('ruft onFinished, auch wenn der Lauf beim ersten Status schon beendet ist', async () => {
         const onFinished = vi.fn();
         statusFolge(lauf('idle'), lauf('failed'));
@@ -293,7 +293,7 @@ describe('useScrapeRun - startGeneration', () => {
         await weiter(10_000);
         expect(onFinished).toHaveBeenCalledTimes(1);
 
-        // Ein spaeteres Nachladen darf es nicht noch einmal ausloesen
+        // A later reload must not trigger it again
         await act(async () => {
             await result.current.reload();
         });

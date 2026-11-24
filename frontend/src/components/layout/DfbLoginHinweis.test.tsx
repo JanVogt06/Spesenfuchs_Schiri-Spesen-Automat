@@ -22,10 +22,10 @@ function zeige(abgelehntSeit: string, pfad = '/dashboard', inhalt: React.ReactNo
 const scrollIntoView = vi.fn();
 
 beforeEach(() => {
-    // Das Datum haengt von der Zeitzone ab; die Nutzer sitzen in Deutschland
+    // The date depends on the time zone; the users are in Germany
     vi.stubEnv('TZ', 'Europe/Berlin');
     scrollIntoView.mockReset();
-    // jsdom kennt kein Scrollen
+    // jsdom does not know scrolling
     Object.defineProperty(Element.prototype, 'scrollIntoView', {configurable: true, writable: true, value: scrollIntoView});
 });
 
@@ -50,7 +50,7 @@ describe('DfbLoginHinweis', () => {
     });
 
     it('rechnet den UTC-Zeitpunkt des Servers in deutsche Zeit um', () => {
-        // So schreibt das Backend: datetime.now(UTC).isoformat()
+        // This is how the backend writes it: datetime.now(UTC).isoformat()
         zeige('2026-11-19T23:30:00.123456+00:00');
 
         expect(screen.getByRole('alert')).toHaveTextContent('Seit dem 20.11.2026 ');

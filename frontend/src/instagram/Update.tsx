@@ -25,18 +25,18 @@ import {
 import {ADRESSE, Beitrag, Etikett, Folie, Kachel, Leucht, STORY, Titel} from './Rahmen';
 
 /*
- * Instagram-Story zum Update: was seit der Vorstellung im September
- * dazugekommen ist. Fuenf Slides im selben Rahmen wie der erste Beitrag
- * (Slides.tsx), aufrufbar unter /instagram-update.html mit ?s=1 bis ?s=5;
- * gedacht fuer &f=story (9:16), ohne den Parameter entsteht dasselbe in 3:4.
+ * Instagram story for the update: what has been added since the introduction
+ * in September. Five slides in the same frame as the first post
+ * (Slides.tsx), reachable at /instagram-update.html with ?s=1 to ?s=5;
+ * meant for &f=story (9:16), without the parameter the same is produced in 3:4.
  *
- * Die Ausschnitte sind nachgebaut, die Daten ausgedacht - wie auf der
- * Landingpage. Die Noten folgen den Skalen der Schiri-Beobachtung: als SR um 240 Punkte, als Assistent um 60.
+ * The excerpts are recreated, the data made up - like on the
+ * landing page. The grades follow the scales of the referee observation: around 240 points as referee, around 60 as assistant.
  */
 
 const ANZAHL = 5;
 
-/** Deckende Karte wie die Abrechnung auf der Landingpage */
+/** Opaque card like the statement on the landing page */
 function Karte({className = '', children}: { className?: string; children: ReactNode }) {
     return (
         <div className={`overflow-hidden rounded-2xl border border-white/15 bg-[oklch(0.215_0.03_158)] text-white shadow-2xl shadow-black/60 ${className}`}>
@@ -55,7 +55,7 @@ const KLASSEN = [
     {klasse: 'Landesklasse', sr: '245,00', srAnzahl: 2, sra: null, sraAnzahl: 0},
 ];
 
-/** Der neue Reiter "Beobachtungen": Schnitt je Rolle, bei den Herren je Spielklasse */
+/** The new tab "Beobachtungen": average per role, for the men's leagues per league class */
 function Beobachtungstafel({klassen = true}: { klassen?: boolean }) {
     return (
         <Karte>
@@ -134,7 +134,7 @@ const TABS = [
     {label: 'Mehr', icon: Ellipsis},
 ];
 
-/** Die schwebende Tab-Leiste vom Handy */
+/** The floating tab bar of the phone */
 function Tableiste({aktiv = 0}: { aktiv?: number }) {
     return (
         <div className="flex rounded-full border border-white/15 bg-[oklch(0.24_0.03_158)] p-1 shadow-2xl shadow-black/60">
@@ -153,7 +153,7 @@ function Tableiste({aktiv = 0}: { aktiv?: number }) {
     );
 }
 
-/** Kennzahl aus dem Dashboard, wie sie am Handy jetzt nebeneinander steht */
+/** Key figure from the dashboard, as it now sits side by side on the phone */
 function Kennzahl({label, wert, zusatz}: { label: string; wert: string; zusatz: string }) {
     return (
         <div className="min-w-0 rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-2">
@@ -164,7 +164,7 @@ function Kennzahl({label, wert, zusatz}: { label: string; wert: string; zusatz: 
     );
 }
 
-/** Ein Handy mit installiertem Spesenfuchs: kein Browser, unten die Tab-Leiste */
+/** A phone with Spesenfuchs installed: no browser, the tab bar at the bottom */
 function Handy() {
     return (
         <div className="relative h-full w-full overflow-hidden rounded-[2.1rem] border-[5px] border-[oklch(0.3_0.02_158)] bg-nacht shadow-2xl shadow-black/70">
@@ -202,7 +202,7 @@ function Handy() {
     );
 }
 
-/* 1 - Aufhaenger: es gibt Neues, mit Blick auf das Groesste davon */
+/* 1 - Hook: there is something new, with a view of the biggest part of it */
 function Ankuendigung() {
     return (
         <Folie anzahl={ANZAHL} nummer={1} feld>
@@ -232,7 +232,7 @@ const HINWEISE = [
     'Jede Note einzeln, mit Spiel und Beobachter',
 ];
 
-/* 2 - Beobachtungen: der neue Reiter */
+/* 2 - Observations: the new tab */
 function Beobachtungen() {
     return (
         <Folie anzahl={ANZAHL} nummer={2}>
@@ -264,7 +264,7 @@ const INSTALLATION = [
     {geraet: 'Danach', icon: SquarePlus, text: 'Eigenes Symbol, keine Browserleiste.'},
 ];
 
-/* 3 - Als App: installierbar, mit Tab-Leiste */
+/* 3 - As an app: installable, with tab bar */
 function App() {
     return (
         <Folie anzahl={ANZAHL} nummer={3}>
@@ -300,7 +300,7 @@ function App() {
     );
 }
 
-/** Ein Kollege im Gespann, Telefon und E-Mail zum Antippen */
+/** A colleague on the crew, phone and e-mail tappable */
 function Kontakt() {
     return (
         <div className="w-full rounded-xl border border-white/10 bg-black/25 p-3 text-[11.5px]">
@@ -320,7 +320,7 @@ function Kontakt() {
     );
 }
 
-/** Das Kilometerfeld in Daumengroesse */
+/** The kilometer field in thumb size */
 function Kilometerfeld() {
     return (
         <div className="w-[85%] text-[11.5px]">
@@ -333,7 +333,7 @@ function Kilometerfeld() {
     );
 }
 
-/** Die Kennzahlen des Dashboards, am Handy jetzt nebeneinander */
+/** The key figures of the dashboard, now side by side on the phone */
 function Kennzahlen() {
     return (
         <div className="grid w-full grid-cols-2 gap-2">
@@ -345,7 +345,7 @@ function Kennzahlen() {
     );
 }
 
-/** Funkloch: eine klare Meldung statt "Network Error" */
+/** Dead zone: a clear message instead of "Network Error" */
 function Funkloch() {
     return (
         <div className="grid w-full gap-2 text-[11.5px]">
@@ -358,7 +358,7 @@ function Funkloch() {
     );
 }
 
-/* 4 - Feinschliff: was am Handy besser geworden ist */
+/* 4 - Polish: what has gotten better on the phone */
 function Feinschliff() {
     return (
         <Folie anzahl={ANZAHL} nummer={4}>
@@ -383,7 +383,7 @@ function Feinschliff() {
     );
 }
 
-/* 5 - Aufruf: das Update ist schon da */
+/* 5 - Call to action: the update is already here */
 function Aufruf() {
     return (
         <Folie anzahl={ANZAHL} nummer={5} feld>
@@ -414,7 +414,7 @@ function Aufruf() {
                 </div>
             </Karte>
 
-            {/* Frei fuer den Link-Sticker, der erst in Instagram dazukommt */}
+            {/* Left free for the link sticker, which is only added in Instagram */}
             {STORY && <div className="h-[88px] shrink-0"/>}
 
             <ul className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[14px] text-white/70">

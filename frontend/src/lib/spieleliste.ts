@@ -1,11 +1,11 @@
 import type {MatchData} from './matches';
 
-/** Heute als ISO-Datum - die Spiele tragen ihr Datum ebenfalls als "YYYY-MM-DD" */
+/** Today as an ISO date - the matches also carry their date as "YYYY-MM-DD" */
 export function heuteIso(jetzt: Date = new Date()): string {
     return `${jetzt.getFullYear()}-${String(jetzt.getMonth() + 1).padStart(2, '0')}-${String(jetzt.getDate()).padStart(2, '0')}`;
 }
 
-/** Anstosszeit als "HH:MM" zum Sortieren - zwei Spiele am selben Tag */
+/** Kickoff time as "HH:MM" for sorting - two matches on the same day */
 export function anstoss(match: MatchData): string {
     const treffer = /(\d{1,2}):(\d{2})/.exec(match.spiel_info?.anpfiff || '');
     return treffer ? `${treffer[1].padStart(2, '0')}:${treffer[2]}` : '99:99';
@@ -16,9 +16,9 @@ function frueherZuerst(a: MatchData, b: MatchData): number {
 }
 
 /**
- * Kommende Spiele (ab heute) mit dem naechsten zuerst, vergangene mit dem
- * juengsten zuerst. Ein Spiel ohne Datum laesst sich nicht einordnen und
- * steht ganz hinten bei den vergangenen.
+ * Upcoming matches (from today) with the next one first, past ones with the
+ * most recent first. A match without a date cannot be placed and
+ * goes at the very end of the past ones.
  */
 export function teileSpiele(matches: MatchData[], heute: string): {kommend: MatchData[]; vergangen: MatchData[]} {
     const kommend = matches.filter((m) => m._datum && m._datum >= heute).sort(frueherZuerst);
@@ -31,7 +31,7 @@ export function teileSpiele(matches: MatchData[], heute: string): {kommend: Matc
     return {kommend, vergangen};
 }
 
-/** Sucht in Vereinen, Spielklasse, Mannschaftsart und Spielstaette; Gross-/Kleinschreibung egal */
+/** Searches clubs, league class, team type and venue; case-insensitive */
 export function passtZurSuche(match: MatchData, suche: string): boolean {
     const woerter = suche.toLocaleLowerCase('de-DE').split(/\s+/).filter(Boolean);
     if (woerter.length === 0) return true;
@@ -42,7 +42,7 @@ export function passtZurSuche(match: MatchData, suche: string): boolean {
         match.spielstaette?.name, match.spielstaette?.adresse,
     ].filter(Boolean).join(' ').toLocaleLowerCase('de-DE');
 
-    // Jedes Wort muss irgendwo vorkommen - "jena kreisliga" findet das Spiel in Jena der Kreisliga
+    // Every word must occur somewhere - "jena kreisliga" finds the match in Jena of the Kreisliga
     return woerter.every((wort) => text.includes(wort));
 }
 
@@ -52,7 +52,7 @@ export interface Monatsgruppe {
     spiele: MatchData[];
 }
 
-/** Fasst die (schon sortierten) Spiele nach Monat zusammen, Reihenfolge bleibt */
+/** Groups the (already sorted) matches by month, order is preserved */
 export function nachMonat(matches: MatchData[]): Monatsgruppe[] {
     const gruppen: Monatsgruppe[] = [];
     for (const match of matches) {

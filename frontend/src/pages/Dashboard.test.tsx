@@ -80,7 +80,7 @@ function zeige({matches = [], saisons = [{saison: '26/27'}], saison = SAISON, ru
     );
 }
 
-/** Wert und Zusatz einer Kennzahl, gefunden ueber ihre Beschriftung */
+/** Value and extra of a metric, found via its label */
 function kennzahl(label: string | RegExp) {
     const beschriftung = screen.getByText(label).closest('p')!;
     const wert = beschriftung.nextElementSibling;
@@ -96,10 +96,10 @@ const naechsteAnsetzungen = () => within(screen.getByText('Nächste Ansetzungen'
 beforeEach(() => {
     apiZuruecksetzen();
     naechsteId = 1;
-    // Nur Date: so laufen waitFor und userEvent mit echten Timern
+    // Date only: that way waitFor and userEvent run with real timers
     vi.useFakeTimers({toFake: ['Date']});
     vi.setSystemTime(new Date(2026, 10, 23, 10, 0));
-    // jsdom kennt matchMedia nicht; der Installationshinweis fragt danach
+    // jsdom does not know matchMedia; the install notice asks for it
     vi.stubGlobal('matchMedia', vi.fn((query: string) => ({matches: false, media: query})));
 });
 
@@ -184,7 +184,7 @@ describe('DashboardPage - Kennzahlen', () => {
     });
 
     it('bildet den Kartenschnitt ueber beide Mannschaften und zaehlt Gelb-Rot und Rot als Platzverweise', async () => {
-        // 9 Karten in 4 Spielen; Platzverweise: 1x Rot, 1x Gelb-Rot
+        // 9 cards in 4 matches; sendings-off: 1x red, 1x yellow-red
         zeige();
         await geladen();
 
@@ -193,7 +193,7 @@ describe('DashboardPage - Kennzahlen', () => {
         expect(zusatz).toBe('9 Karten, davon 2 Platzverweise');
     });
 
-    // Wie ueberall in der App mit deutschem Komma, nicht "2.3"
+    // With a German comma like everywhere in the app, not "2.3"
     it('schreibt den Kartenschnitt mit deutschem Komma', async () => {
         zeige();
         await geladen();
@@ -270,7 +270,7 @@ describe('DashboardPage - Naechste Ansetzungen', () => {
         expect(karte.getByText('29.11.2026')).toBeInTheDocument();
         expect(karte.getByText('Kreisoberliga · Herren')).toBeInTheDocument();
         expect(karte.getByText('Sportplatz am See')).toBeInTheDocument();
-        // Die erste Person mit Rolle UND Name
+        // The first person with a role AND a name
         expect(karte.getByText('SRA 1')).toBeInTheDocument();
     });
 

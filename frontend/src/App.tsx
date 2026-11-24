@@ -23,9 +23,9 @@ function ProtectedRoute({children}: { children: React.ReactNode }) {
 }
 
 /**
- * Springt beim Seitenwechsel nach oben. Der BrowserRouter behaelt sonst die
- * Scrollposition, und ein Link von weit unten auf der Landingpage oeffnete
- * die Datenschutzerklaerung an ihrem Ende.
+ * Scrolls to the top on page change. The BrowserRouter otherwise keeps the
+ * scroll position, and a link from far down on the landing page opened
+ * the privacy policy at its end.
  */
 function NachObenBeiSeitenwechsel() {
     const {pathname} = useLocation();
@@ -67,7 +67,7 @@ function App() {
                     }
                 />
 
-                {/* Der Reiter hiess frueher "Spesen" - alte Lesezeichen fuehren weiter */}
+                {/* The tab used to be called "Spesen" - old bookmarks lead on */}
                 <Route path="/spesen" element={<Navigate to="/spiele" replace/>}/>
 
                 <Route

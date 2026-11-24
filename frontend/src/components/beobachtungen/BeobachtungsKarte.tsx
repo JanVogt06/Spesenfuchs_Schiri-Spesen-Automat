@@ -16,9 +16,9 @@ interface BeobachtungsKarteProps {
     titel: string;
     untertitel: string;
     beobachtungen: Beobachtung[];
-    /** false: die Saison ist für diese Quelle noch nicht abgerufen */
+    /** false: the season has not yet been fetched for this source */
     gelesen: boolean;
-    /** Zusätzliche Schnitte je Spielklasse (nur Herren) */
+    /** Additional averages per league (men only) */
     mitSpielklassen?: boolean;
 }
 
@@ -26,7 +26,7 @@ function anzahlText(n: number): string {
     return `${n} ${n === 1 ? 'Beobachtung' : 'Beobachtungen'}`;
 }
 
-/** Die Schnitte je Spielklasse - nur sinnvoll, wenn es mehr als eine gibt */
+/** The averages per league - only useful if there is more than one */
 function Spielklassen({beobachtungen}: {beobachtungen: Beobachtung[]}) {
     const staffeln = nachStaffel(beobachtungen).map((g) => ({...g, schnitte: schnitte(g.beobachtungen)}));
     const gruppen = ROLLEN_GRUPPEN.filter(({gruppe}) =>
@@ -82,7 +82,7 @@ function Einzelliste({beobachtungen}: {beobachtungen: Beobachtung[]}) {
                 </span>
             </summary>
 
-            {/* Breite Ansicht: Tabelle */}
+            {/* Wide view: table */}
             <div className="hidden overflow-x-auto border-t lg:block">
                 <table className="w-full text-sm">
                     <thead>
@@ -115,7 +115,7 @@ function Einzelliste({beobachtungen}: {beobachtungen: Beobachtung[]}) {
                 </table>
             </div>
 
-            {/* Schmale Ansicht: Karten */}
+            {/* Narrow view: cards */}
             <div className="space-y-2 border-t p-3 lg:hidden">
                 {beobachtungen.map((b) => (
                     <div key={b.id} className="rounded-lg border border-dashed p-3 text-sm">

@@ -28,7 +28,7 @@ export function LoginForm() {
                 message?: string;
                 response?: { data?: { error?: { message?: string } } };
             };
-            // Ohne Antwort hat der API-Client schon "Keine Verbindung ..." eingesetzt
+            // Without a response the API client has already set "Keine Verbindung ..."
             const errorMessage = axiosError.response
                 ? axiosError.response.data?.error?.message || 'Login fehlgeschlagen'
                 : axiosError.message || 'Login fehlgeschlagen';

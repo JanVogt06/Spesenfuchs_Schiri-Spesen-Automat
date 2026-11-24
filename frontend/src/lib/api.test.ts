@@ -2,12 +2,12 @@ import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {AxiosError, CanceledError, type AxiosAdapter, type AxiosResponse, type InternalAxiosRequestConfig} from 'axios';
 import {api} from './api';
 
-/** Antwort, wie ein echter Adapter sie liefern wuerde */
+/** Response as a real adapter would deliver it */
 function antwort(config: InternalAxiosRequestConfig, status: number, data: unknown = {}): AxiosResponse {
     return {data, status, statusText: '', headers: {}, config};
 }
 
-/** Adapter, der mit dem Status scheitert - wie axios' settle() bei 4xx/5xx */
+/** Adapter that fails with the status - like axios' settle() on 4xx/5xx */
 function scheitertMit(status: number, data: unknown = {}): AxiosAdapter {
     return (config) => Promise.reject(
         new AxiosError(`Request failed with status code ${status}`, 'ERR_BAD_REQUEST', config, null, antwort(config, status, data)),

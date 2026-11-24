@@ -15,7 +15,7 @@ export function SettingsPage() {
                 {/* DFB Credentials */}
                 <DFBCredentialsForm/>
 
-                {/* Passwort ändern */}
+                {/* Change password */}
                 <ChangePasswordForm/>
 
                 {/* Theme / Dark Mode */}

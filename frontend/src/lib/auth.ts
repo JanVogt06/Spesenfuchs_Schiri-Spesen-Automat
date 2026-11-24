@@ -11,14 +11,14 @@ export interface UserInfo {
     user_id: number;
     email: string;
     has_dfb_credentials: boolean;
-    /** Seit wann DFBnet die gespeicherten Zugangsdaten ablehnt (ISO, UTC) */
+    /** Since when DFBnet has rejected the stored credentials (ISO, UTC) */
     dfb_login_abgelehnt_seit?: string | null;
 }
 
 /**
- * Wird ausgeloest, wenn sich der Stand der DFBnet-Zugangsdaten geaendert
- * haben kann: ein Abruf ist fertig oder neue Zugangsdaten sind gespeichert.
- * Der Hinweis in der App-Huelle laedt daraufhin neu.
+ * Fired when the state of the DFBnet credentials may have changed:
+ * a run has finished or new credentials have been saved.
+ * The notice in the app shell then reloads.
  */
 export const DFB_STATUS_EVENT = 'spesenfuchs:dfb-status';
 

@@ -1,12 +1,12 @@
 import {type RefObject, useEffect, useState} from 'react';
 
 /**
- * Ob der Besucher in seinem System weniger Bewegung eingestellt hat.
+ * Whether the visitor has set reduced motion in their system.
  *
- * Jede Animation auf der Landingpage ist Dekoration - sie darf ausfallen,
- * ohne dass ein Inhalt verschwindet. Deshalb fragt jede der Hilfen hier
- * selbst nach, statt sich auf eine Medienabfrage im CSS zu verlassen: was
- * in JavaScript entsteht (Zahlenlauf, Parallaxe), erreicht das CSS nicht.
+ * Every animation on the landing page is decoration - it may be dropped
+ * without any content disappearing. That is why each of the helpers here asks
+ * for itself instead of relying on a media query in the CSS: what
+ * arises in JavaScript (number count-up, parallax) is not reached by the CSS.
  */
 export function magKeineBewegung(): boolean {
     return typeof window !== 'undefined'
@@ -14,20 +14,20 @@ export function magKeineBewegung(): boolean {
 }
 
 /**
- * Blendet alle Elemente mit `data-reveal` ein, sobald sie in den sichtbaren
- * Bereich scrollen - sie bekommen dann die Klasse `is-revealed`.
+ * Reveals all elements with `data-reveal` as soon as they scroll into the visible
+ * area - they then get the class `is-revealed`.
  *
- * Ein einziger Beobachter fuer die ganze Seite statt einer Ref je Element:
- * die Landingpage ist statisch, ihre Knoten stehen also schon beim ersten
- * Effekt fest. Nachtraeglich eingehaengte Elemente erfasst der Beobachter
- * nicht - auf dieser Seite gibt es keine.
+ * A single observer for the whole page instead of one ref per element:
+ * the landing page is static, so its nodes are already fixed at the first
+ * effect. The observer does not pick up elements attached later
+ * - there are none on this page.
  */
 export function useRevealOnScroll(): void {
     useEffect(() => {
         const elemente = Array.from(document.querySelectorAll<HTMLElement>('[data-reveal]'));
 
-        // Ohne Beobachter (oder ohne Wunsch nach Bewegung) ist sofort alles
-        // sichtbar. Der Text darf nie an einer Animation haengen.
+        // Without an observer (or without a wish for motion) everything is immediately
+        // visible. The text must never depend on an animation.
         if (magKeineBewegung() || !('IntersectionObserver' in window)) {
             elemente.forEach((element) => element.classList.add('is-revealed'));
             return;
@@ -40,8 +40,8 @@ export function useRevealOnScroll(): void {
                         return;
                     }
                     eintrag.target.classList.add('is-revealed');
-                    // Einmal eingeblendet bleibt eingeblendet - beim
-                    // Zurueckscrollen soll nichts wieder verschwinden.
+                    // Once revealed stays revealed - when
+                    // scrolling back nothing should disappear again.
                     beobachter.unobserve(eintrag.target);
                 });
             },
@@ -54,13 +54,13 @@ export function useRevealOnScroll(): void {
 }
 
 /**
- * Ob ein Element gerade im Fenster steht.
+ * Whether an element is currently in the window.
  *
- * `rand` verschiebt die Grenze wie rootMargin beim IntersectionObserver,
- * z.B. '-56px 0px 0px 0px', damit eine feste Kopfzeile nicht mitzaehlt. Mit
- * `einmal` bleibt der Wert nach dem ersten Sichtbarwerden auf true stehen.
- * Ohne Beobachter im Browser gilt das Element als sichtbar - was davon
- * abhaengt, soll dann lieber einfach da sein.
+ * `rand` shifts the boundary like rootMargin on the IntersectionObserver,
+ * e.g. '-56px 0px 0px 0px', so that a fixed header does not count. With
+ * `einmal` the value stays true after first becoming visible.
+ * Without an observer in the browser the element counts as visible - whatever
+ * depends on it should rather simply be there.
  */
 export function useImBild<T extends Element>(
     ref: RefObject<T | null>,
@@ -92,15 +92,15 @@ export function useImBild<T extends Element>(
 }
 
 /**
- * Wie weit ein Bereich durch das Fenster gewandert ist, von 0 bis 1.
+ * How far a section has travelled through the window, from 0 to 1.
  *
- * 0, solange seine Oberkante noch im unteren Fuenftel steht, 1, sobald seine
- * Unterkante die obere Bildschirmhaelfte erreicht hat. Damit laesst sich eine
- * Linie oder ein Fortschritt an das Scrollen koppeln.
+ * 0 as long as its top edge is still in the lower fifth, 1 as soon as its
+ * bottom edge has reached the upper half of the screen. This allows a
+ * line or a progress indicator to be coupled to scrolling.
  */
 export function useScrollProgress<T extends HTMLElement>(ref: RefObject<T | null>): number {
-    // Ohne Bewegung gilt der Weg von vornherein als zurueckgelegt, sonst
-    // bliebe eine Fortschrittslinie fuer immer leer.
+    // Without motion the path counts as covered from the start, otherwise
+    // a progress line would stay empty forever.
     const [ruhig] = useState(magKeineBewegung);
     const [fortschritt, setFortschritt] = useState(ruhig ? 1 : 0);
 
@@ -124,7 +124,7 @@ export function useScrollProgress<T extends HTMLElement>(ref: RefObject<T | null
             setFortschritt(Math.min(1, Math.max(0, (beginn - kasten.top) / strecke)));
         };
 
-        // Beim Scrollen hoechstens einmal je Bild rechnen.
+        // While scrolling compute at most once per frame.
         const anstossen = () => {
             if (!bild) {
                 bild = requestAnimationFrame(messen);
@@ -147,8 +147,8 @@ export function useScrollProgress<T extends HTMLElement>(ref: RefObject<T | null
 }
 
 /**
- * Zaehlt von 0 auf `ziel` hoch, sobald ein Ziel vorliegt. Solange `ziel`
- * null ist (die Zahl also noch geladen wird), bleibt der Wert bei 0.
+ * Counts up from 0 to `ziel` as soon as a target is available. As long as `ziel`
+ * is null (i.e. the number is still loading), the value stays at 0.
  */
 export function useCountUp(ziel: number | null, dauer = 1400): number {
     const [ruhig] = useState(magKeineBewegung);
@@ -164,7 +164,7 @@ export function useCountUp(ziel: number | null, dauer = 1400): number {
 
         const schritt = (jetzt: number) => {
             const anteil = Math.min(1, (jetzt - beginn) / dauer);
-            // Kubisch ausrollen, damit die Zahl am Ende weich stehen bleibt.
+            // Ease out cubically so that the number comes to rest softly at the end.
             setWert(Math.round(ziel * (1 - Math.pow(1 - anteil, 3))));
             if (anteil < 1) {
                 bild = requestAnimationFrame(schritt);
@@ -175,6 +175,6 @@ export function useCountUp(ziel: number | null, dauer = 1400): number {
         return () => cancelAnimationFrame(bild);
     }, [ziel, dauer, ruhig]);
 
-    // Ohne Bewegung steht die Zahl sofort auf ihrem Ziel.
+    // Without motion the number immediately stands at its target.
     return ruhig ? (ziel ?? 0) : wert;
 }

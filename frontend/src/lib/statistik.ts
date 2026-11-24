@@ -11,7 +11,7 @@ export interface StatistikMonat {
 
 export interface Statistik {
     saisons: string[];
-    /** Die ausgewertete Saison - ohne Daten zur gefragten die neueste */
+    /** The evaluated season - without data for the requested one, the newest */
     saison: string | null;
     spiele: number;
     ohne_rolle: number;
@@ -29,7 +29,7 @@ export interface Statistik {
     gesamt: number;
     monate: StatistikMonat[];
     rollen: {rolle: string; spiele: number; spesen: number}[];
-    /** Adressen oder Strecken, die noch nachgeschlagen werden */
+    /** Addresses or routes that are still being looked up */
     offen: number;
 }
 

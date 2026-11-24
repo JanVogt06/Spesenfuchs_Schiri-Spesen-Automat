@@ -1,7 +1,7 @@
 /*
-  Instagram-Slides: eine Flaeche von 540 x 720 CSS-Pixeln (3:4), exportiert
-  mit doppelter Pixeldichte als 1080 x 1440. Bewegung gibt es im Standbild
-  nicht - alles steht so, wie es ohne Animation aussieht.
+  Instagram slides: a surface of 540 x 720 CSS pixels (3:4), exported
+  at double pixel density as 1080 x 1440. There is no motion in the still image
+  - everything stands as it looks without animation.
 */
 html {
   font-size: 16px;

@@ -57,7 +57,7 @@
   --input: oklch(0.922 0 0);
   --ring: oklch(0.62 0.11 155);
 
-  /* Zwei Reihen der Spesen-Statistik, gegen die Flaeche geprueft (Farbsehschwaeche, Kontrast) */
+  /* Two series of the expense statistics, checked against the surface (color vision deficiency, contrast) */
   --diagramm-spesen: #2e7d4f;
   --diagramm-fahrt: #3570b5;
 
@@ -101,12 +101,12 @@
     @apply bg-background text-foreground font-sans;
   }
 
-  /* Mobile: Leicht kleinere Basis-Schriftgröße */
+  /* Mobile: slightly smaller base font size */
   html {
     font-size: 14px;
   }
 
-  /* Ab sm (640px): Normale Schriftgröße */
+  /* From sm (640px): normal font size */
   @media (min-width: 640px) {
     html {
       font-size: 16px;
@@ -130,7 +130,7 @@
   background: var(--muted);
 }
 
-/* Popup und Attribution an die Flaechen der Anwendung angleichen */
+/* Match popup and attribution to the surfaces of the application */
 .leaflet-popup-content-wrapper,
 .leaflet-popup-tip {
   background: var(--popover);
@@ -146,27 +146,27 @@
   color: var(--muted-foreground);
 }
 
-/* Der divIcon-Container von Leaflet bringt eigene Flaechen mit, die hier stoeren */
+/* Leaflet's divIcon container brings its own surfaces, which get in the way here */
 .leaflet-container .spesen-pin {
   background: transparent;
   border: 0;
 }
 
 /* ============================================================
-   Landingpage
+   Landing page
 
-   Die oeffentliche Startseite ist die einzige Seite mit einem dunklen
-   Block und mit Bewegung. Der Block sieht in beiden Themes gleich aus:
-   die naechtlichen Laeufe sind das Versprechen der Anwendung, das Bild
-   dazu soll nicht davon abhaengen, wie der Besucher sein System
-   eingestellt hat.
+   The public start page is the only page with a dark
+   block and with motion. The block looks the same in both themes:
+   the nightly runs are the promise of the application, and the image
+   for it should not depend on how the visitor has configured
+   their system.
 
-   Alles hier ist Dekoration. Unter prefers-reduced-motion steht jede
-   Animation still, und die Seite bleibt vollstaendig lesbar - siehe den
-   Block ganz am Ende.
+   Everything here is decoration. Under prefers-reduced-motion every
+   animation stands still, and the page stays fully legible - see the
+   block at the very end.
    ============================================================ */
 
-/* Grundflaeche des Nacht-Blocks: Grundton plus zwei weiche Lichtkegel */
+/* Base surface of the night block: base tone plus two soft cones of light */
 .spesen-nacht {
   background-color: var(--nacht);
   background-image:
@@ -189,8 +189,8 @@
   transform-origin: 50% 100%;
   -webkit-mask-image: linear-gradient(to top, black 12%, transparent 88%);
   mask-image: linear-gradient(to top, black 12%, transparent 88%);
-  /* Der Rasen ragt oben ueber die Ebene hinaus (siehe .spesen-rasen); ohne
-     no-repeat wiederholte sich die Maske dort und liesse ihn durchscheinen. */
+  /* The turf extends above the plane at the top (see .spesen-rasen); without
+     no-repeat the mask would repeat there and let it show through. */
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
 }
@@ -256,7 +256,7 @@
   );
 }
 
-/* Flutlicht, das ganz langsam heller und wieder dunkler wird */
+/* Floodlight that very slowly gets brighter and darker again */
 .spesen-flutlicht {
   animation: spesen-flutlicht 7s ease-in-out infinite;
 }
@@ -276,7 +276,7 @@
   mix-blend-mode: overlay;
 }
 
-/* Die Beispiel-Abrechnung schwebt leicht auf und ab */
+/* The sample statement floats gently up and down */
 .spesen-schweben {
   animation: spesen-schweben 6s ease-in-out infinite;
 }
@@ -313,7 +313,7 @@
   to   { transform: translateX(-50%); }
 }
 
-/* Ringe wie ein Pfiff, der sich ausbreitet */
+/* Rings like a whistle blast spreading out */
 .spesen-ring {
   animation: spesen-ring 7s ease-out infinite;
 }
@@ -324,7 +324,7 @@
   100% { transform: scale(1.35); opacity: 0; }
 }
 
-/* Pulsierender Ring am Live-Punkt */
+/* Pulsing ring on the live dot */
 .spesen-puls {
   animation: spesen-puls 2.6s ease-out infinite;
 }
@@ -380,8 +380,8 @@
   );
 }
 
-/* Im dunklen Theme laeuft der Nacht-Ton selbst weich aus - ein heller
-   Schein darunter machte die Kante erst sichtbar. */
+/* In the dark theme the night tone itself fades out softly - a bright
+   glow underneath would make the edge visible in the first place. */
 .dark .spesen-uebergang {
   background-image: linear-gradient(
     to bottom,
@@ -446,14 +446,14 @@
   am Handy ihre 14px.
 */
 html.spesen-startseite {
-  /* 100 % statt 16px: eine im Browser groesser gestellte Schrift gilt weiter */
+  /* 100 % instead of 16px: a font size set larger in the browser still applies */
   font-size: 100%;
   background-color: var(--nacht);
-  /* Beim Tabben landet das Ziel nicht unter der festen Kopfzeile */
+  /* When tabbing, the target does not end up under the fixed header */
   scroll-padding-top: 4.5rem;
 }
 
-/* ... und am Handy nicht unter der Anpfiff-Leiste */
+/* ... and on mobile not under the kickoff bar */
 @media (width < 40rem) {
   html.spesen-startseite {
     scroll-padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
@@ -500,7 +500,7 @@ html.spesen-startseite {
   background-color: color-mix(in oklab, var(--nacht) 55%, var(--background));
 }
 
-/* Ziffern und Wort mit leichtem Flutlicht-Schein */
+/* Digits and word with a slight floodlight glow */
 .spesen-leuchtziffer {
   text-shadow: 0 0 28px oklch(0.8 0.16 158 / 0.35);
 }
@@ -509,21 +509,21 @@ html.spesen-startseite {
   text-shadow: 0 0 44px oklch(0.8 0.16 158 / 0.4);
 }
 
-/* Der Ball am Kopf der Bahn im Spielablauf */
+/* The ball at the head of the track in the match flow */
 .spesen-ball {
   box-shadow:
     0 0 0 4px oklch(0.8 0.16 158 / 0.25),
     0 0 18px 2px oklch(0.8 0.16 158 / 0.6);
 }
 
-/* Spielfeld als Wasserzeichen: ganz zu sehen, zum Rand hin ausgeblendet */
+/* Pitch as a watermark: fully visible, fading out toward the edge */
 .spesen-wasserzeichen {
   -webkit-mask-image: radial-gradient(closest-side, black 70%, transparent 135%);
   mask-image: radial-gradient(closest-side, black 70%, transparent 135%);
 }
 
-/* Im Abschluss laeuft das Feld vor der Fusszeile aus, statt mit seiner
-   vorderen Linie eine zweite Kante ueber ihr zu ziehen. */
+/* In the closing section the field fades out before the footer, instead of drawing
+   a second edge across it with its front line. */
 .spesen-feld-auslauf > * {
   -webkit-mask-image: linear-gradient(to top, transparent 0, black 22%, transparent 88%);
   mask-image: linear-gradient(to top, transparent 0, black 22%, transparent 88%);
@@ -556,7 +556,7 @@ html.spesen-startseite {
   }
 }
 
-/* Zeile der Ueberschrift, die aus ihrer Zeile heraus nach oben faehrt */
+/* Heading row that moves up out of its row */
 .spesen-zeile {
   animation: spesen-zeile 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -566,7 +566,7 @@ html.spesen-startseite {
   to   { transform: none; opacity: 1; }
 }
 
-/* Einblenden beim Laden (Hero) */
+/* Fade in on load (hero) */
 .spesen-aufsteigen {
   animation: spesen-aufsteigen 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -576,7 +576,7 @@ html.spesen-startseite {
   to   { opacity: 1; transform: none; }
 }
 
-/* Antwort einer aufgeklappten Frage */
+/* Answer of an expanded question */
 details[open] > .spesen-antwort {
   animation: spesen-aufsteigen 0.4s ease both;
 }
@@ -624,8 +624,8 @@ details[open] > .spesen-antwort {
     transition: none;
   }
 
-  /* Das Laufband steht still - dann umbrechen statt abschneiden, und die
-     zweite Kopie samt Randverlaeufen entfaellt. */
+  /* The marquee stands still - then wrap instead of clip, and the
+     second copy including the edge fades is dropped. */
   .spesen-laufband {
     width: auto;
     flex-wrap: wrap;

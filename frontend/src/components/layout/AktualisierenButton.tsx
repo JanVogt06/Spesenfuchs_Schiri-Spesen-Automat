@@ -4,15 +4,15 @@ import type {ScrapeRun} from '@/hooks/useScrapeRun';
 import {formatStand, letzterStand} from '@/lib/stand';
 
 interface AktualisierenButtonProps {
-    /** Der juengste Abruf - liefert den Stand neben dem Knopf */
+    /** The latest fetch - supplies the status next to the button */
     run: ScrapeRun | null;
     laeuft: boolean;
     onClick: () => void;
 }
 
 /**
- * Kopfzeilen-Aktion: liest alles neu aus DFBnet - Ansetzungen, Saison,
- * Stammdaten, Beobachtungen. Daneben steht, wann das zuletzt geklappt hat.
+ * Header action: re-reads everything from DFBnet - assignments, season,
+ * master data, observations. Next to it is when that last succeeded.
  */
 export function AktualisierenButton({run, laeuft, onClick}: AktualisierenButtonProps) {
     const stand = letzterStand(run);

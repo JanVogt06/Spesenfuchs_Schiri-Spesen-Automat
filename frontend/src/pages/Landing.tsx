@@ -47,9 +47,9 @@ import {
 } from 'lucide-react';
 
 /**
- * Spesensaetze der TFV-Spesenordnung §2 Abs. 2a (Maenner, Punktspiele) und
- * ein paar Zeilen daneben. Sie stehen hier nur als Schaufenster - gerechnet
- * wird ausschliesslich im Backend, siehe generator/spesen_calculator.py.
+ * Expense rates of the TFV expense regulations §2 para. 2a (men, league matches) and
+ * a few rows next to them. They appear here only as a showcase - calculation
+ * happens exclusively in the backend, see generator/spesen_calculator.py.
  */
 const SPESENSAETZE = [
     {klasse: 'Verbandsliga', sr: '50,00 €', sra: '40,00 €'},
@@ -63,9 +63,9 @@ const SPESENSAETZE = [
 ];
 
 /*
- * Quelle der Saetze; der Stand bricht nur als Ganzes um. Das umschliessende
- * span haelt den Text zusammen, wenn er in einem Flex-Element steht - dort
- * fiele sonst das Leerzeichen vor "Stand" weg.
+ * Source of the rates; the date wraps only as a whole. The enclosing
+ * span keeps the text together when it sits in a flex element - there
+ * the space before "Stand" would otherwise be lost.
  */
 const QUELLE = (
     <span>
@@ -74,9 +74,9 @@ const QUELLE = (
 );
 
 /**
- * Innenrahmen aller Abschnitte, damit die Kanten untereinander fluchten. Den
- * seitlichen Rand setzt .spesen-rahmen (1rem, ab sm 1.5rem, ab lg 2.5rem),
- * am iPhone quer mindestens so breit wie die sicheren Raender.
+ * Inner frame of all sections so the edges line up. The side margin
+ * is set by .spesen-rahmen (1rem, from sm 1.5rem, from lg 2.5rem),
+ * on a landscape iPhone at least as wide as the safe-area insets.
  */
 const RAHMEN = 'spesen-rahmen mx-auto w-full max-w-[90rem]';
 
@@ -84,11 +84,11 @@ interface Funktion {
     icon: LucideIcon;
     title: string;
     description: string;
-    /** Der kleine Beleg ueber dem Text - ein Ausschnitt aus der Anwendung */
+    /** The small voucher above the text - an excerpt of the application */
     bild: ReactNode;
 }
 
-/** Die hellen Kacheln der Aufstellung. Die zwei dunklen stehen darunter einzeln. */
+/** The light tiles of the lineup. The two dark ones stand below individually. */
 const FUNKTIONEN: Funktion[] = [
     {
         icon: Route,
@@ -170,10 +170,10 @@ const FAIRPLAY = [
     },
 ];
 
-/** Verweise in einer Antwort: im Fliesstext unterstrichen, damit sie auch ohne Farbe auffallen */
+/** Links in an answer: underlined in running text so they stand out even without color */
 const ANTWORT_LINK = 'font-medium text-primary underline underline-offset-2 hover:no-underline';
 
-/** Eine Antwort ist Fliesstext oder, wo sie aufzaehlt, eine kurze Liste */
+/** An answer is running text or, where it enumerates, a short list */
 const FAQS: { question: string; answer: ReactNode | string[] }[] = [
     {
         question: 'Ist Spesenfuchs wirklich kostenlos?',
@@ -245,16 +245,16 @@ const FAQS: { question: string; answer: ReactNode | string[] }[] = [
     },
 ];
 
-/** Inline-Style fuer die gestaffelte Verzoegerung eines [data-reveal]-Elements */
+/** Inline style for the staggered delay of a [data-reveal] element */
 function verzoegerung(millisekunden: number): CSSProperties {
     return {'--reveal-delay': `${millisekunden}ms`} as CSSProperties;
 }
 
 /**
- * Spielfeld-Markierungen in Originalmassen (105 x 68 Meter). Die Strichstaerke
- * skaliert bewusst mit: in der gekippten Ebene werden die nahen Linien dadurch
- * breiter als die fernen, so wie auf einem echten Platz. Als Wasserzeichen
- * stoeren die gefuellten Punkte - sie sehen dort wie Flecken aus.
+ * Pitch markings in original dimensions (105 x 68 meters). The stroke width
+ * deliberately scales along: in the tilted plane the near lines become
+ * wider than the far ones, as on a real pitch. As a watermark the filled
+ * dots would be disturbing - they look like blotches there.
  */
 export function Spielfeld({className, proportional, ohnePunkte}: {
     className?: string;
@@ -274,15 +274,15 @@ export function Spielfeld({className, proportional, ohnePunkte}: {
             <rect x="0.2" y="0.2" width="104.6" height="67.6"/>
             <line x1="52.5" y1="0.2" x2="52.5" y2="67.8"/>
             <circle cx="52.5" cy="34" r="9.15"/>
-            {/* Strafraum, Torraum und Torraumbogen, links */}
+            {/* Penalty area, goal area and penalty arc, left */}
             <rect x="0.2" y="13.84" width="16.5" height="40.32"/>
             <rect x="0.2" y="24.84" width="5.5" height="18.32"/>
             <path d="M16.7 26.69 A 9.15 9.15 0 0 1 16.7 41.31"/>
-            {/* dieselben Markierungen gespiegelt, rechts */}
+            {/* the same markings mirrored, right */}
             <rect x="88.3" y="13.84" width="16.5" height="40.32"/>
             <rect x="99.3" y="24.84" width="5.5" height="18.32"/>
             <path d="M88.3 41.31 A 9.15 9.15 0 0 1 88.3 26.69"/>
-            {/* Anstoss- und Elfmeterpunkte */}
+            {/* Kick-off and penalty spots */}
             {!ohnePunkte && (
                 <g fill="currentColor" stroke="none">
                     <circle cx="52.5" cy="34" r="0.5"/>
@@ -290,7 +290,7 @@ export function Spielfeld({className, proportional, ohnePunkte}: {
                     <circle cx="94" cy="34" r="0.5"/>
                 </g>
             )}
-            {/* Eckviertel */}
+            {/* Corner arcs */}
             <path d="M1.2 0.2 A 1 1 0 0 1 0.2 1.2"/>
             <path d="M0.2 66.8 A 1 1 0 0 1 1.2 67.8"/>
             <path d="M103.8 67.8 A 1 1 0 0 1 104.8 66.8"/>
@@ -299,7 +299,7 @@ export function Spielfeld({className, proportional, ohnePunkte}: {
     );
 }
 
-/** Das Zeichen: eine Schiedsrichterpfeife, passend zu Anpfiff und Abpfiff */
+/** The mark: a referee whistle, fitting for kick-off and final whistle */
 function Pfeife({className}: { className?: string }) {
     return (
         <svg
@@ -319,7 +319,7 @@ function Pfeife({className}: { className?: string }) {
     );
 }
 
-/** Zeichen und Wortmarke, oben und unten gleich */
+/** Mark and wordmark, identical at top and bottom */
 export function Marke({hell}: { hell: boolean }) {
     return (
         <span className="flex items-center gap-2.5">
@@ -341,16 +341,16 @@ export function Marke({hell}: { hell: boolean }) {
     );
 }
 
-/** Hoehe der Kopfzeile in px (h-14) */
+/** Height of the header in px (h-14) */
 const KOPFHOEHE = 56;
 
 /**
- * Ob unter der Kopfzeile gerade ein Nacht-Abschnitt liegt (alles mit
- * data-nacht). Beobachtet wird nur der Streifen hinter der Kopfzeile: der
- * untere Rand des Beobachters rueckt dafuer bis auf KOPFHOEHE an den oberen
- * heran. Der Wert haengt an der Fensterhoehe und wird deshalb bei jeder
- * Groessenaenderung neu gesetzt - am Handy auch, wenn die Adressleiste
- * ein- oder ausfaehrt.
+ * Whether a night section currently lies below the header (anything with
+ * data-nacht). Only the strip behind the header is observed: the
+ * bottom edge of the observer moves up to KOPFHOEHE from the top
+ * for that. The value depends on the window height and is therefore reset on
+ * every resize - on phones also when the address bar
+ * slides in or out.
  */
 function useUnterKopfNacht(): boolean {
     const [nacht, setNacht] = useState(true);
@@ -395,13 +395,13 @@ function useUnterKopfNacht(): boolean {
 }
 
 /**
- * Kopfzeile. Ganz oben ist sie durchsichtig. Liegt ein Nacht-Abschnitt
- * unter ihr (Hero, Spielablauf, Abschluss), wird sie dunkles Glas - ein
- * heller Balken ueber dem dunklen Grund braeche Stimmung und Kontrast. Ueber
- * den hellen Abschnitten legt sie sich auf die Flaeche der Anwendung.
+ * Header. At the very top it is transparent. When a night section lies
+ * below it (hero, match flow, closing), it becomes dark glass - a
+ * light bar above the dark background would break mood and contrast. Over
+ * the light sections it settles onto the application's surface.
  *
- * Am Handy steht rechts nur "Anmelden": die Hauptaktion hat dort der Hero
- * und danach die Leiste am unteren Rand, in Reichweite des Daumens.
+ * On phones only "Anmelden" is on the right: the main action lives in the hero
+ * there, and afterwards in the bar at the bottom edge, within thumb reach.
  */
 function Kopfzeile({angemeldet}: { angemeldet: boolean }) {
     const [gescrollt, setGescrollt] = useState(false);
@@ -423,8 +423,8 @@ function Kopfzeile({angemeldet}: { angemeldet: boolean }) {
     return (
         <header className={`fixed inset-x-0 top-0 z-50 border-b transition-colors duration-300 ${flaeche} ${dunkel ? 'spesen-dunkel' : ''}`}>
             <div className={`${RAHMEN} flex h-14 items-center justify-between`}>
-                {/* Die Kopfzeile steht nur hier; ein Link auf dieselbe Seite taete
-                    nichts, also fuehrt er nach oben */}
+                {/* The header exists only here; a link to the same page would do
+                    nothing, so it leads to the top */}
                 <Link
                     to="/"
                     aria-label="Spesenfuchs, zur Startseite"
@@ -478,17 +478,17 @@ function Kopfzeile({angemeldet}: { angemeldet: boolean }) {
 }
 
 /**
- * Die Buehne rechts im Hero, ab md: hinten das Fenster mit den Ansetzungen,
- * vorne die fertige Abrechnung, daneben die Karte zur Anfahrt. Die Ebenen
- * verschieben sich leicht gegeneinander, wenn der Mauszeiger sich bewegt -
- * gesteuert ueber --zx/--zy am Rahmen, damit React dafuer nicht neu rendert.
+ * The stage on the right of the hero, from md: at the back the window with the assignments,
+ * in front the finished statement, beside it the map of the route. The layers
+ * shift slightly against each other when the mouse pointer moves -
+ * driven via --zx/--zy on the frame so React does not re-render for it.
  *
- * Die Abrechnung haengt oben an einer festen Hoehe statt unten am Rahmen:
- * ihre Oberkante liegt so knapp unter der Trennlinie nach der zweiten
- * Ansetzung (Kopf 38 px, Zeilen je 54 px, also bei 146 px), dass sie auch
- * beim Schweben keine Zeile mitten durch den Text schneidet. Zwischen lg und
- * xl ist die Spalte zu schmal fuer drei Ebenen - dort entfaellt die Karte
- * und die Abrechnung wird breiter.
+ * The statement hangs from a fixed height at the top instead of from the frame bottom:
+ * its top edge lies just below the divider after the second
+ * assignment (header 38 px, rows 54 px each, so at 146 px), so that even
+ * while floating it cuts no row through the middle of the text. Between lg and
+ * xl the column is too narrow for three layers - there the map is dropped
+ * and the statement becomes wider.
  */
 function Buehne({rahmen}: { rahmen: RefObject<HTMLDivElement | null> }) {
     const ebene = (tiefe: number): CSSProperties => ({
@@ -525,9 +525,9 @@ function Buehne({rahmen}: { rahmen: RefObject<HTMLDivElement | null> }) {
 }
 
 /**
- * Die Kennzahlen als Anzeigetafel am Fuss des Hero. Die Zahl der erfassten
- * Spiele erscheint nur, wenn es eine gibt - ein Strich oder eine Null saehe
- * nach kaputt aus. Gezaehlt wird erst, wenn die Tafel im Bild ist.
+ * The key figures as a scoreboard at the foot of the hero. The number of recorded
+ * matches only appears if there is one - a dash or a zero would look
+ * broken. Counting only starts once the board is in view.
  */
 function Anzeigetafel() {
     const tafel = useRef<HTMLDivElement>(null);
@@ -589,33 +589,33 @@ function Satzchip({satz}: { satz: (typeof SPESENSAETZE)[number] }) {
 }
 
 /**
- * Ob der Besucher die Bewegung der Seite angehalten hat. Laufband-Knopf und
- * Fusszeile schalten denselben Zustand, die Klasse spesen-still am
- * Wurzelelement haelt damit jede Endlos-Animation an (siehe index.css) -
- * nicht nur das Laufband. Wer "Bewegung reduzieren" eingestellt hat, sieht
- * ohnehin nichts laufen und bekommt die Schalter gar nicht erst.
+ * Whether the visitor has paused the page's motion. The ticker button and
+ * footer switch the same state; the class spesen-still on the
+ * root element stops every endless animation (see index.css) -
+ * not just the ticker. Whoever has set "reduce motion" sees
+ * nothing running anyway and does not get the switches at all.
  */
 const BewegungKontext = createContext({still: false, umschalten: () => {}});
 
 /**
- * Die Saetze der Spesenordnung. Am Handy eine Reihe zum Wischen - ein
- * Laufband liesse sich dort weder anhalten noch in Ruhe lesen. Ab sm laeuft
- * es als Band mit fester Quellenangabe links und einem Knopf, der alle
- * Bewegung der Seite anhaelt.
- * Die zweite Kopie des Bandes gibt es nur fuers Auge, Screenreader lesen die
- * Liste einmal. Ohne Bewegung bricht das Band um, statt abgeschnitten
- * stehen zu bleiben (siehe index.css).
+ * The rates of the expense regulations. On phones a row to swipe - a
+ * ticker could be neither paused nor read in peace there. From sm it runs
+ * as a band with a fixed source note on the left and a button that stops all
+ * motion of the page.
+ * The second copy of the band exists only for the eye, screen readers read the
+ * list once. Without motion the band wraps instead of staying cut
+ * off (see index.css).
  */
 function Satzband() {
     const {still, umschalten} = useContext(BewegungKontext);
 
     return (
         <div className="relative border-t border-white/10 bg-[oklch(0.145_0.026_158/0.88)]">
-            {/* Handy */}
+            {/* Phone */}
             <div className="py-3 sm:hidden">
                 <p className="px-4 text-[11px] font-medium tracking-wide text-white/60">{QUELLE}</p>
-                {/* tabIndex: Safari macht einen Scroller nicht von selbst fokussierbar,
-                    per Tastatur kaeme dort niemand an die hinteren Saetze */}
+                {/* tabIndex: Safari does not make a scroller focusable by itself,
+                    so keyboard users could not reach the later rates */}
                 <ul
                     tabIndex={0}
                     aria-label="Spesensätze"
@@ -629,7 +629,7 @@ function Satzband() {
                 </ul>
             </div>
 
-            {/* ab sm */}
+            {/* from sm */}
             <div className="hidden items-stretch pr-[env(safe-area-inset-right)] sm:flex">
                 <p className="flex shrink-0 items-center border-r border-white/10 pr-6 pl-[max(1.5rem,env(safe-area-inset-left))] text-xs font-medium text-white/60 lg:pr-10 lg:pl-10">
                     {QUELLE}
@@ -666,15 +666,15 @@ function Satzband() {
     );
 }
 
-/** Der dunkle Block ganz oben: Versprechen, Beispiel, Zahlen, Spesensaetze */
+/** The dark block at the very top: promise, example, numbers, expense rates */
 function Hero({angemeldet, ctaRef}: {
     angemeldet: boolean;
     ctaRef: RefObject<HTMLDivElement | null>;
 }) {
     const buehne = useRef<HTMLDivElement>(null);
 
-    // Die Buehne neigt sich ein Stueck zum Mauszeiger. Auf Touchgeraeten
-    // kommt kein mousemove an, dort bleibt sie schlicht stehen.
+    // The stage tilts a bit towards the mouse pointer. On touch devices
+    // no mousemove arrives, there it simply stays put.
     const zeigerBewegt = (ereignis: React.MouseEvent<HTMLElement>) => {
         const element = buehne.current;
         if (!element || magKeineBewegung()) {
@@ -697,7 +697,7 @@ function Hero({angemeldet, ctaRef}: {
             onMouseMove={zeigerBewegt}
             onMouseLeave={zeigerWeg}
         >
-            {/* Spielfeld, in die Tiefe gekippt */}
+            {/* Pitch, tilted into depth */}
             <div aria-hidden className="spesen-feld pointer-events-none absolute inset-x-0 bottom-0 h-[65%]">
                 <div className="absolute inset-0">
                     <div className="spesen-rasen absolute inset-0"/>
@@ -705,13 +705,13 @@ function Hero({angemeldet, ctaRef}: {
                 </div>
             </div>
 
-            {/* Flutlicht von oben und Filmkorn darueber */}
+            {/* Floodlight from above and film grain over it */}
             <div aria-hidden className="spesen-strahl spesen-flutlicht pointer-events-none absolute inset-0"/>
             <div aria-hidden className="spesen-koerner pointer-events-none absolute inset-0"/>
 
-            {/* grid-cols-1 haelt die Spalte auf Bildschirmbreite; ein Raster ohne
-                Spalten waechst sonst mit dem breitesten Inhalt und schneidet bei
-                320 px den Text ab. */}
+            {/* grid-cols-1 keeps the column at screen width; a grid without
+                columns otherwise grows with the widest content and cuts off the text at
+                320 px. */}
             <div className={`${RAHMEN} relative grid flex-1 grid-cols-1 items-center gap-12 pt-24 pb-12 sm:pt-32 md:gap-14 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.02fr)] lg:content-center lg:gap-10 lg:pt-20 lg:pb-10 xl:gap-16`}>
                 <div className="text-center lg:text-left">
                     <p
@@ -727,9 +727,9 @@ function Hero({angemeldet, ctaRef}: {
                     </p>
 
                     <h1 className="text-[clamp(2.4rem,1rem+3.9vw,5.75rem)] leading-[1.02] font-semibold tracking-[-0.035em]">
-                        {/* Jede Zeile faehrt aus ihrer eigenen Zeile herauf, deshalb
-                            der Ausschnitt je Zeile statt einer Animation auf der
-                            ganzen Ueberschrift. */}
+                        {/* Each line slides up from its own line, hence
+                            the clip per line instead of one animation on the
+                            whole heading. */}
                         <span className="block overflow-hidden pb-2 -mb-2">
                             <span className="spesen-zeile block" style={{animationDelay: '120ms'}}>
                                 Abpfiff für den
@@ -799,7 +799,7 @@ function Hero({angemeldet, ctaRef}: {
                 </div>
 
                 <div className="spesen-aufsteigen relative w-full" style={{animationDelay: '520ms'}}>
-                    {/* Handy: nur die Abrechnung, die Buehne waere dort zu klein */}
+                    {/* Phone: only the statement, the stage would be too small there */}
                     <div className="mx-auto w-full max-w-md md:hidden">
                         <div className="spesen-schweben">
                             <Abrechnungskarte/>
@@ -813,13 +813,13 @@ function Hero({angemeldet, ctaRef}: {
 
             <Anzeigetafel/>
             <Satzband/>
-            {/* Leuchtende Seitenlinie als Grenze zum hellen Teil */}
+            {/* Glowing touchline as the border to the light part */}
             <div aria-hidden className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-flutlicht/50 to-transparent"/>
         </section>
     );
 }
 
-/** Rahmen einer dunklen Kachel, mit dem Rasen des Hero als Grund */
+/** Frame of a dark tile, with the hero turf as background */
 function NachtFlaeche({children, className = ''}: { children: ReactNode; className?: string }) {
     return (
         <div className={`spesen-nacht relative isolate h-full overflow-hidden rounded-2xl border border-white/10 p-5 text-white sm:p-6 ${className}`}>
@@ -849,9 +849,9 @@ function Kachelkopf({icon: Icon, title, hell}: { icon: LucideIcon; title: string
 }
 
 /**
- * Die Nacht-Kachel mit der Uhr: der Lauf um 3 Uhr. Am Handy steht die Uhr
- * klein neben der Ueberschrift, damit der Text die ganze Breite bekommt -
- * daneben gequetscht brach er bei 320 px in acht Zeilen um.
+ * The night tile with the clock: the run at 3 a.m. On phones the clock sits
+ * small next to the heading so the text gets the full width -
+ * squeezed next to it, it wrapped into eight lines at 320 px.
  */
 function LaufKachel() {
     return (
@@ -874,7 +874,7 @@ function LaufKachel() {
     );
 }
 
-/** Die Nacht-Kachel mit der Saison */
+/** The night tile with the season */
 function SaisonKachel() {
     return (
         <NachtFlaeche className="grid gap-5 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] md:items-center md:gap-8">
@@ -892,7 +892,7 @@ function SaisonKachel() {
     );
 }
 
-/** Eine helle Kachel mit Beleg oben und Text darunter */
+/** A light tile with a voucher on top and text below */
 function Funktionskachel({funktion}: { funktion: Funktion }) {
     const zeigerBewegt = (ereignis: React.MouseEvent<HTMLDivElement>) => {
         const kasten = ereignis.currentTarget.getBoundingClientRect();
@@ -905,8 +905,8 @@ function Funktionskachel({funktion}: { funktion: Funktion }) {
             onMouseMove={zeigerBewegt}
             className="spesen-glanz spesen-kachel group relative isolate flex h-full flex-col overflow-hidden rounded-2xl border bg-card p-4 transition duration-300 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5 motion-safe:hover:-translate-y-1 sm:p-5"
         >
-            {/* @container: die Belege richten sich nach der Breite der Kachel,
-                nicht nach der des Fensters (siehe SCHMAL in Schaufenster.tsx) */}
+            {/* @container: the vouchers adapt to the width of the tile,
+                not to that of the window (see SCHMAL in Schaufenster.tsx) */}
             <div className="@container relative flex h-44 items-center justify-center overflow-hidden rounded-xl border bg-muted/40 p-3 dark:bg-white/[0.025]">
                 {funktion.bild}
             </div>
@@ -921,12 +921,12 @@ function Funktionskachel({funktion}: { funktion: Funktion }) {
 }
 
 /**
- * Die Funktionen als Aufstellung. Ab xl ein Raster in 2 + 1 + 1 und
- * 1 + 1 + 2, dunkel oben links und unten rechts; zwischen sm und xl zwei
- * Spalten, in vier waeren die hellen Kacheln dort zu schmal fuer ihre Belege. Am Handy stehen die zwei
- * dunklen Kacheln breit, die vier hellen dazwischen in einer Reihe zum
- * Wischen - sechs gestapelte Kaesten waeren fast zwei Bildschirme Scrollen.
- * Ab sm loest sich die Reihe per display: contents ins Raster auf.
+ * The features as a lineup. From xl a grid in 2 + 1 + 1 and
+ * 1 + 1 + 2, dark at top left and bottom right; between sm and xl two
+ * columns, in four the light tiles would be too narrow for their vouchers there. On phones the two
+ * dark tiles are wide, the four light ones between them in a row to
+ * swipe - six stacked boxes would be almost two screens of scrolling.
+ * From sm the row dissolves into the grid via display: contents.
  */
 const NUR_HANDY = '(max-width: 639px)';
 
@@ -934,8 +934,8 @@ function Aufstellung() {
     const reihe = useRef<HTMLDivElement>(null);
     const [aktiv, setAktiv] = useState(0);
 
-    // Ein Scroller ist die Reihe nur am Handy. Nur dann bekommt sie einen
-    // eigenen Tabstopp - Safari macht Scroller nicht von selbst fokussierbar.
+    // The row is a scroller only on phones. Only then does it get its
+    // own tab stop - Safari does not make scrollers focusable by itself.
     const [wischbar, setWischbar] = useState(() => window.matchMedia(NUR_HANDY).matches);
     useEffect(() => {
         const abfrage = window.matchMedia(NUR_HANDY);
@@ -964,7 +964,7 @@ function Aufstellung() {
                             Mehr als eine Abrechnung
                         </h2>
                     </div>
-                    {/* foreground/70 statt muted: auf dem grauen Band kaeme muted nur auf 4,3:1 */}
+                    {/* foreground/70 instead of muted: on the gray band muted would only reach 4.3:1 */}
                     <p className="max-w-xl text-[15px] leading-relaxed text-foreground/70 sm:text-base lg:justify-self-end">
                         Rund um jede Ansetzung liegt alles an einem Ort: Anfahrt, Einstufung, Dokumente, deine
                         Stammdaten und die ganze Saison – aus deinen DFBnet-Daten, ohne Abtippen.
@@ -1018,9 +1018,9 @@ function Aufstellung() {
 }
 
 /**
- * Ein Stueck der Bahn zwischen zwei Ziffern, senkrecht oder waagerecht. Am
- * Kopf der Fuellung laeuft ein Ball mit, damit zu sehen ist, wo die Bahn
- * gerade steht.
+ * A piece of the track between two digits, vertical or horizontal. At the
+ * head of the fill a ball runs along so one can see where the track
+ * currently is.
  */
 function Bahnstueck({fuellung, senkrecht, className}: { fuellung: number; senkrecht?: boolean; className: string }) {
     return (
@@ -1044,12 +1044,12 @@ function Bahnstueck({fuellung, senkrecht, className}: { fuellung: number; senkre
 }
 
 /**
- * Die vier Schritte auf einer Bahn, die beim Scrollen mitlaeuft: untereinander
- * senkrecht, ab lg waagerecht zwischen den Ziffern. Jeder Schritt zeichnet
- * sein Stueck bis zur naechsten Ziffer selbst - so endet die Bahn genau an
- * der letzten statt irgendwo unter deren Text. Der Abschnitt ist ein
- * Nacht-Band: hell, dunkel, hell, dunkel statt dreier heller Bloecke
- * hintereinander.
+ * The four steps on a track that runs along while scrolling: stacked
+ * vertically, from lg horizontally between the digits. Each step draws
+ * its own piece up to the next digit - so the track ends exactly at
+ * the last one instead of somewhere below its text. The section is a
+ * night band: light, dark, light, dark instead of three light blocks
+ * in a row.
  */
 function Spielablauf() {
     const bereich = useRef<HTMLOListElement>(null);
@@ -1073,9 +1073,9 @@ function Spielablauf() {
 
                 <ol ref={bereich} className="relative grid gap-9 lg:grid-cols-4 lg:gap-8">
                     {SCHRITTE.map((schritt, index) => {
-                        // Die Ziffer leuchtet auf, wenn der Ball des Stuecks davor
-                        // bei ihr ankommt (das Stueck fuellt sich von index - 0.5
-                        // bis index + 0.5).
+                        // The digit lights up when the ball of the preceding piece
+                        // reaches it (the piece fills from index - 0.5
+                        // to index + 0.5).
                         const erreicht = stufe > index + 0.45;
                         const fuellung = Math.min(1, Math.max(0, stufe - (index + 0.5)));
                         const letzter = index === SCHRITTE.length - 1;
@@ -1087,9 +1087,9 @@ function Spielablauf() {
                                 style={verzoegerung(index * 90)}
                                 className="relative pl-16 lg:pl-0"
                             >
-                                {/* Senkrecht, solange die Schritte untereinander stehen:
-                                    von der Ziffer bis zur naechsten, ueber den Abstand
-                                    gap-9 hinweg. */}
+                                {/* Vertical while the steps are stacked:
+                                    from the digit to the next one, across the gap
+                                    gap-9. */}
                                 {!letzter && (
                                     <Bahnstueck
                                         senkrecht
@@ -1098,8 +1098,8 @@ function Spielablauf() {
                                     />
                                 )}
                                 <div className="absolute top-0 left-0 lg:static lg:mb-5 lg:flex lg:items-center lg:gap-3">
-                                    {/* Deckend, damit Bahn und Ball hinter der Ziffer verschwinden.
-                                        Die Nummer traegt die Liste, die Ziffer ist nur fuers Auge. */}
+                                    {/* Opaque, so track and ball disappear behind the digit.
+                                        The number is carried by the list, the digit is only for the eye. */}
                                     <span
                                         aria-hidden
                                         className={`relative grid size-11 shrink-0 place-items-center rounded-full border font-mono text-sm font-semibold transition-all duration-500 ${
@@ -1136,7 +1136,7 @@ function Spielablauf() {
     );
 }
 
-/** Was mit den Daten passiert - die groesste Huerde vor der Registrierung */
+/** What happens with the data - the biggest hurdle before registering */
 function Fairplay() {
     return (
         <section className="relative isolate overflow-hidden py-16 sm:py-24">
@@ -1184,13 +1184,13 @@ function Fairplay() {
 
 function Fragen() {
     return (
-        // overflow-clip statt overflow-hidden: schneidet das Wasserzeichen
-        // genauso ab, macht den Abschnitt aber nicht zum Scroll-Container -
-        // sonst griffe das sticky der linken Spalte nicht.
+        // overflow-clip instead of overflow-hidden: cuts off the watermark
+        // the same way, but does not make the section a scroll container -
+        // otherwise the sticky of the left column would not work.
         <section className="spesen-band relative isolate overflow-clip border-y py-16 sm:py-24 lg:py-28">
-            {/* Spielfeld als Wasserzeichen, sehr blass und erst ab lg - schmal
-                blieben davon nur einzelne Striche, die wie verrutschte Linien
-                aussehen. */}
+            {/* Pitch as a watermark, very pale and only from lg - narrow,
+                only single strokes would remain of it that look like
+                misplaced lines. */}
             <div aria-hidden className="pointer-events-none absolute inset-0 hidden place-items-center lg:grid">
                 <Spielfeld
                     proportional
@@ -1218,7 +1218,7 @@ function Fragen() {
                     </a>
                 </div>
 
-                {/* Eine Liste statt einzelner Karten: die Fragen gehoeren zusammen */}
+                {/* A list instead of single cards: the questions belong together */}
                 <div data-reveal className="divide-y overflow-hidden rounded-2xl border bg-card">
                     {FAQS.map((faq, index) => (
                         <details key={faq.question} className="group">
@@ -1252,7 +1252,7 @@ function Fragen() {
     );
 }
 
-/** Abschluss, wieder im Nacht-Block wie ganz oben */
+/** Closing, again in the night block like at the very top */
 function Abschluss({angemeldet, abschlussRef}: {
     angemeldet: boolean;
     abschlussRef: RefObject<HTMLElement | null>;
@@ -1266,7 +1266,7 @@ function Abschluss({angemeldet, abschlussRef}: {
                 </div>
             </div>
 
-            {/* Ringe wie ein Pfiff, der sich ueber den Platz ausbreitet */}
+            {/* Rings like a whistle blast spreading across the pitch */}
             <div aria-hidden className="pointer-events-none absolute inset-0 grid place-items-center">
                 {[0, 2.3, 4.6].map((verzug) => (
                     <div
@@ -1340,10 +1340,10 @@ function Fusszeile() {
 }
 
 /**
- * Die Anpfiff-Leiste am unteren Rand, nur am Handy. Sie erscheint, sobald
- * die Hauptaktion des Hero aus dem Bild ist, und geht wieder, wenn der
- * Abschluss mit seiner eigenen Aktion auftaucht. Ohne Bewegung erscheint
- * sie ohne Hereingleiten.
+ * The kick-off bar at the bottom edge, phones only. It appears as soon as
+ * the hero's main action is out of view, and leaves when the
+ * closing with its own action shows up. Without motion it appears
+ * without sliding in.
  */
 function Anpfiffleiste({angemeldet, sichtbar}: { angemeldet: boolean; sichtbar: boolean }) {
     return (
@@ -1368,17 +1368,17 @@ function Anpfiffleiste({angemeldet, sichtbar}: { angemeldet: boolean; sichtbar: 
 }
 
 /*
- * Die Landingpage bekommt ein paar Eigenheiten am html-Element, solange sie
- * offen ist: 16px Grundschrift auch am Handy (die Anwendung nutzt dort 14px,
- * fuer eine Seite, die einladen soll, ist das zu klein), der Nacht-Ton als
- * Grund hinter der Seite (sonst blitzt beim Ueberscrollen auf iOS Weiss ueber
- * dem dunklen Hero auf) und die passende Farbe fuer die Browserleiste.
+ * The landing page gets a few peculiarities on the html element while it is
+ * open: 16px base font on phones too (the application uses 14px there,
+ * for a page meant to invite that is too small), the night tone as
+ * background behind the page (otherwise white flashes above the dark hero
+ * on iOS overscroll) and the matching color for the browser bar.
  *
- * Dazu viewport-fit=cover: erst damit meldet das iPhone seine sicheren
- * Raender (env(safe-area-inset-*)), und die Anpfiff-Leiste rueckt ueber den
- * Home-Balken. Nur hier, nicht in index.html - die Anwendung rechnet nicht
- * mit diesen Raendern und liefe quer sonst unter die Kamera-Aussparung. Die
- * Landingpage selbst haelt sie ueber .spesen-rahmen frei.
+ * Plus viewport-fit=cover: only then does the iPhone report its safe
+ * insets (env(safe-area-inset-*)), and the kick-off bar moves above the
+ * home indicator. Only here, not in index.html - the application does not
+ * account for these insets and would otherwise run under the camera cutout in landscape. The
+ * landing page itself keeps clear of them via .spesen-rahmen.
  */
 const THEMEFARBE = '#05130b';
 
@@ -1387,8 +1387,8 @@ function useStartseitenRahmen() {
         const wurzel = document.documentElement;
         wurzel.classList.add('spesen-startseite');
 
-        // index.html bringt je eine Farbe fuer hell und dunkel mit (media);
-        // die Startseite ist in beiden Faellen dunkel, also werden alle umgefaerbt
+        // index.html ships one color each for light and dark (media);
+        // the start page is dark in both cases, so all of them are recolored
         const metas = [...document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')];
         const vorher = metas.map((meta) => meta.content);
         let eigene: HTMLMetaElement | null = null;

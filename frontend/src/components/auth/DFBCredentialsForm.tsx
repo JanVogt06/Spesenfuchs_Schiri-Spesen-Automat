@@ -19,7 +19,7 @@ export function DFBCredentialsForm() {
     const [success, setSuccess] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
-    // Prüfe beim Laden ob Credentials bereits gespeichert sind
+    // On load, check whether credentials are already stored
     useEffect(() => {
         const checkCredentials = async () => {
             try {
@@ -33,7 +33,7 @@ export function DFBCredentialsForm() {
         checkCredentials();
     }, []);
 
-    // Aus dem Hinweis oben kommend: direkt zur Karte und ins erste Feld
+    // Coming from the notice at the top: straight to the card and into the first field
     const location = useLocation();
     const karteRef = useRef<HTMLDivElement>(null);
     useEffect(() => {

@@ -7,18 +7,18 @@ import {AlertCircle, Loader2, MapPin, RotateCw} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 
 /**
- * Farben der Pins.
+ * Colors of the pins.
  *
- * Drei Farben für die drei Angesetzten, der Spielort dagegen neutral und in
- * anderer Form. Das ist kein Geschmack, sondern eine Konsequenz aus der
- * Prüfung auf Farbfehlsichtigkeit: vier kategoriale Farben, die auf einer
- * Karte alle gleichzeitig und in beliebiger Nachbarschaft liegen, halten den
- * nötigen Abstand nicht mehr ein - drei tun es in beiden Themes. Der
- * Spielort ist ohnehin keine vierte Person, sondern das Ziel, und trägt
- * deshalb eine eigene Form statt einer eigenen Farbe.
+ * Three colors for the three assigned officials, the venue on the other hand neutral and in
+ * a different shape. This is not a matter of taste but a consequence of the
+ * color-blindness check: four categorical colors that all appear on a
+ * map at the same time and in any neighborhood no longer keep the
+ * required distance - three do, in both themes. The
+ * venue is not a fourth person anyway, but the destination, and therefore carries
+ * its own shape instead of its own color.
  *
- * Zusätzlich steht in jedem Pin sein Kürzel: die Zuordnung hängt damit nie
- * allein an der Farbe.
+ * In addition, each pin contains its abbreviation: the assignment never depends
+ * on color alone.
  */
 const FARBEN = {
     light: {
@@ -44,7 +44,7 @@ function farbeFuer(rolle: string, modus: 'light' | 'dark'): string {
     return palette[rolle as keyof typeof palette] ?? FALLBACK_FARBE[modus];
 }
 
-/** "SRA 1" -> "A1"; hält den Pin schmal genug, um lesbar zu bleiben */
+/** "SRA 1" -> "A1"; keeps the pin narrow enough to stay legible */
 function kuerzel(rolle: string): string {
     const treffer = rolle.match(/^SRA\s*(\d+)$/i);
     if (treffer) return `A${treffer[1]}`;
@@ -62,12 +62,12 @@ function escapeHtml(text: string): string {
 }
 
 /**
- * Aussehen eines Pins - einmal beschrieben, von Karte und Legende benutzt.
+ * Appearance of a pin - described once, used by the map and the legend.
  *
- * Der Pin ist auf der Karte HTML für Leaflet und in der Legende JSX. Ohne
- * diese gemeinsame Quelle liefen die beiden Darstellungen früher oder später
- * auseinander, und dann zeigte die Legende eine Farbe, die auf der Karte
- * nirgends steht.
+ * On the map the pin is HTML for Leaflet and in the legend it is JSX. Without
+ * this shared source the two representations would sooner or later
+ * drift apart, and then the legend would show a color that appears
+ * nowhere on the map.
  */
 function darstellung(punkt: GeoPunkt, modus: 'light' | 'dark') {
     const istSpielort = punkt.typ === 'spielstaette';
@@ -84,15 +84,15 @@ function darstellung(punkt: GeoPunkt, modus: 'light' | 'dark') {
     };
 }
 
-/** Das Fahnen-Symbol des Spielorts (identisch mit lucide "flag") */
+/** The flag symbol of the venue (identical to lucide "flag") */
 const FAHNE_PFAD = 'M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z';
 
-/** Pin als HTML: Kreis mit Kürzel für Personen, Quadrat mit Fahne für den Spielort */
+/** Pin as HTML: circle with abbreviation for people, square with flag for the venue */
 function icon(punkt: GeoPunkt, modus: 'light' | 'dark'): L.DivIcon {
     const {istSpielort, text, farbe, ring, radius} = darstellung(punkt, modus);
 
-    // Ungenaue Punkte (nur Ortsmittelpunkt) bekommen einen gestrichelten
-    // Hof - sonst sähe eine grobe Näherung aus wie eine exakte Anschrift.
+    // Imprecise points (only the center of a town) get a dashed
+    // halo - otherwise a rough approximation would look like an exact address.
     const hof = punkt.genauigkeit === 'ort'
         ? `<span style="position:absolute;inset:-6px;border:2px dashed ${farbe};border-radius:${radius + 2}px;opacity:.55"></span>`
         : '';
@@ -115,7 +115,7 @@ function icon(punkt: GeoPunkt, modus: 'light' | 'dark'): L.DivIcon {
     });
 }
 
-/** Derselbe Pin, verkleinert, für die Legende */
+/** The same pin, scaled down, for the legend */
 function PinBadge({punkt, modus}: { punkt: GeoPunkt; modus: 'light' | 'dark' }) {
     const {istSpielort, text, farbe, ring, radius} = darstellung(punkt, modus);
 
@@ -159,19 +159,19 @@ interface MatchMapProps {
 }
 
 /**
- * Karte mit den Anschriften der Angesetzten und dem Spielort.
+ * Map with the addresses of the assigned officials and the venue.
  *
- * Wird erst geladen, wenn sie gebraucht wird - die Komponente hängt im
- * aufgeklappten Bereich einer Spielkarte und wird sonst nicht gerendert.
+ * Only loaded when it is needed - the component sits in the
+ * expanded area of a match card and is not rendered otherwise.
  */
 export function MatchMap({matchId}: MatchMapProps) {
     const {resolvedTheme} = useTheme();
     const [versuch, setVersuch] = useState(0);
 
-    // Das Ergebnis trägt den Schlüssel, zu dem es gehört. Daraus ergibt sich
-    // der Ladezustand, statt ihn getrennt zu führen: ein erneuter Versuch
-    // zeigt damit zwangsläufig wieder den Spinner, und eine Antwort, die zu
-    // einer überholten Anfrage gehört, kann nicht mehr angezeigt werden.
+    // The result carries the key it belongs to. The loading state follows
+    // from that instead of being tracked separately: a retry
+    // inevitably shows the spinner again, and a response that belongs to
+    // a superseded request can no longer be displayed.
     const schluessel = `${matchId}#${versuch}`;
     const [ergebnis, setErgebnis] = useState<
         { schluessel: string; daten: GeoDaten | null; fehler: string } | null
@@ -205,15 +205,15 @@ export function MatchMap({matchId}: MatchMapProps) {
         };
     }, [matchId, schluessel]);
 
-    // Karte aufbauen, sobald Punkte da sind. Theme-Wechsel baut sie neu auf -
-    // die Pins tragen ihre Farben fest im Markup.
+    // Build the map as soon as points are available. A theme change rebuilds it -
+    // the pins carry their colors fixed in the markup.
     useEffect(() => {
         const container = containerRef.current;
         if (!container || !daten || daten.punkte.length === 0) return;
 
         const map = L.map(container, {
-            // Das Mausrad gehört der Seite: sonst bliebe der Blick beim
-            // Scrollen an der Karte hängen, statt weiterzulaufen.
+            // The mouse wheel belongs to the page: otherwise the view would stay
+            // stuck on the map while scrolling instead of moving on.
             scrollWheelZoom: false,
             attributionControl: true,
         });
@@ -232,22 +232,22 @@ export function MatchMap({matchId}: MatchMapProps) {
                 .bindPopup(popup(punkt));
         }
 
-        // Alles im Bild: genau das ist der Zweck der Karte. maxZoom deckelt
-        // den Fall, dass alle Anschriften dicht beieinander liegen - ohne
-        // das stünde man bei einem einzigen Punkt auf der höchsten Stufe.
+        // Everything in view: that is exactly the purpose of the map. maxZoom caps
+        // the case where all addresses are close together - without
+        // it a single point would be shown at the highest zoom level.
         //
-        // Der Rand ist großzügiger, als er aussehen muss: fitBounds kennt nur
-        // die Koordinaten, nicht die Pins, die darüber sitzen. Ein Pin mit
-        // zwei Kürzeln ragt gut 25 Pixel nach jeder Seite, dazu der Hof bei
-        // ungenauer Lage - ohne diesen Abstand klebte er am Rand.
+        // The padding is more generous than it looks like it needs to be: fitBounds only knows
+        // the coordinates, not the pins sitting on top of them. A pin with
+        // two abbreviations extends a good 25 pixels to each side, plus the halo for
+        // imprecise locations - without this margin it would stick to the edge.
         map.fitBounds(
             L.latLngBounds(daten.punkte.map(p => [p.lat, p.lon] as [number, number])),
             {padding: [40, 40], maxZoom: 14},
         );
 
-        // Die Karte entsteht in einem gerade erst aufgeklappten Bereich.
-        // Ohne diesen Nachschlag kennt Leaflet die endgültige Größe noch
-        // nicht und lädt Kacheln für ein zu kleines Feld.
+        // The map is created in an area that has only just been expanded.
+        // Without this follow-up call Leaflet does not yet know the final size
+        // and loads tiles for a field that is too small.
         const nachmessen = requestAnimationFrame(() => map.invalidateSize());
 
         return () => {
@@ -304,9 +304,9 @@ export function MatchMap({matchId}: MatchMapProps) {
     return (
         <div className="space-y-2">
             {/*
-              isolate: Leaflet vergibt intern z-index bis 800. Ohne eigenen
-              Stapelkontext schöbe sich die Karte beim Scrollen über die
-              Kopfzeile der Anwendung.
+              isolate: Leaflet assigns z-index values up to 800 internally. Without its own
+              stacking context the map would slide over the header of the application
+              while scrolling.
             */}
             <div
                 ref={containerRef}
@@ -314,10 +314,10 @@ export function MatchMap({matchId}: MatchMapProps) {
             />
 
             {/*
-              Legende - eine Zeile je Pin, nicht je Person. Teilen sich zwei
-              Angesetzte eine Anschrift, gibt es auf der Karte auch nur einen
-              Pin; eine Zeile je Person würde diesen Pin zweimal auflisten und
-              beim zweiten Mal eine Farbe zeigen, die dort gar nicht steht.
+              Legend - one line per pin, not per person. If two assigned officials share an address,
+              there is only one pin on the map; one line per person would list this pin twice
+              and the second time show a color that is not there at all.
+              This way the legend reads as what it is: the map in text form.
               So liest sich die Legende als das, was sie ist: die Karte in Text.
             */}
             <ul className="grid gap-1.5 text-xs sm:grid-cols-2">

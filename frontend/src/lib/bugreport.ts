@@ -1,7 +1,7 @@
 import {api} from './api';
 
 export interface BugReportStatus {
-    /** Ob auf diesem Server überhaupt Post verschickt werden kann */
+    /** Whether mail can be sent at all on this server */
     verfuegbar: boolean;
     empfaenger: string;
 }
@@ -13,13 +13,13 @@ export interface BugReport {
     schritte: string;
 }
 
-/** Ob ein Postausgang eingerichtet ist - das Formular fragt vorher */
+/** Whether an outbox is set up - the form asks first */
 export async function getBugReportStatus(): Promise<BugReportStatus> {
     const response = await api.get<BugReportStatus>('/api/bugreport/status');
     return response.data;
 }
 
-/** Schickt einen Fehlerbericht an die hinterlegte Adresse */
+/** Sends a bug report to the configured address */
 export async function sendeBugReport(bericht: BugReport): Promise<void> {
     await api.post('/api/bugreport', bericht);
 }

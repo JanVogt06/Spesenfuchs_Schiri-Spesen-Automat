@@ -73,7 +73,7 @@ describe('ChangePasswordForm - Server', () => {
     });
 
     it('zeigt "Aktuelles Passwort ist falsch" aus der 400-Antwort', async () => {
-        // Der Server antwortet bewusst mit 400 statt 401 - ein 401 wuerde abmelden
+        // The server deliberately answers with 400 instead of 401 - a 401 would log out
         apiPost.mockRejectedValue(apiFehler(400, 'Aktuelles Passwort ist falsch'));
         render(<ChangePasswordForm/>);
 
@@ -151,7 +151,7 @@ describe('ChangePasswordForm - Anzeigen', () => {
         render(<ChangePasswordForm/>);
         const aktuell = screen.getByLabelText('Aktuelles Passwort');
         const neu = screen.getByLabelText('Neues Passwort');
-        // Die Augen-Knoepfe stehen direkt hinter ihrem Feld
+        // The eye buttons sit directly behind their field
         const augeAktuell = aktuell.nextElementSibling as HTMLButtonElement;
         const augeNeu = neu.nextElementSibling as HTMLButtonElement;
 
@@ -165,9 +165,9 @@ describe('ChangePasswordForm - Anzeigen', () => {
         await userEvent.click(augeAktuell);
         expect(aktuell).toHaveAttribute('type', 'password');
 
-        // Die Bestaetigung bleibt immer verdeckt
+        // The confirmation always stays hidden
         expect(screen.getByLabelText('Neues Passwort bestätigen')).toHaveAttribute('type', 'password');
-        // Die Augen sind keine Absende-Knoepfe
+        // The eyes are not submit buttons
         expect(apiPost).not.toHaveBeenCalled();
     });
 

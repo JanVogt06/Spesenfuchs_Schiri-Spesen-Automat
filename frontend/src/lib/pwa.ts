@@ -1,10 +1,10 @@
 import {useSyncExternalStore} from 'react';
 
 /**
- * Chrome, Edge und Samsung Internet melden per `beforeinstallprompt`, dass
- * sich die Seite installieren laesst. Das Ereignis kommt einmal kurz nach dem
- * Laden - deshalb haengt der Listener hier auf Modulebene und dieses Modul wird
- * in main.tsx vor dem ersten Rendern importiert.
+ * Chrome, Edge and Samsung Internet report via `beforeinstallprompt` that
+ * the page can be installed. The event comes once shortly after
+ * loading - that is why the listener sits at module level here and this module is
+ * imported in main.tsx before the first render.
  */
 interface BeforeInstallPromptEvent extends Event {
     prompt(): Promise<void>;
@@ -20,7 +20,7 @@ function melden() {
 }
 
 window.addEventListener('beforeinstallprompt', (e) => {
-    // Unterdrueckt Chromes eigene Leiste; angeboten wird ueber unseren Button
+    // Suppresses Chrome's own bar; installation is offered through our button
     e.preventDefault();
     wartend = e as BeforeInstallPromptEvent;
     melden();
@@ -33,25 +33,25 @@ window.addEventListener('appinstalled', () => {
 });
 
 export function registriereServiceWorker() {
-    // Im Dev-Server wuerde ein Worker veraltete Module ausliefern
+    // In the dev server a worker would serve stale modules
     if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return;
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js').catch(() => {
-            // Ohne Worker laeuft die Seite normal weiter, nur nicht offline
+            // Without a worker the page keeps running normally, just not offline
         });
     });
 }
 
-/** Ob die Seite gerade als installierte App laeuft */
+/** Whether the page is currently running as an installed app */
 function laeuftAlsApp(): boolean {
     return window.matchMedia('(display-mode: standalone)').matches
         || (navigator as Navigator & {standalone?: boolean}).standalone === true;
 }
 
 /**
- * iPhone und iPad. Dort gibt es kein `beforeinstallprompt`, installiert wird nur
- * von Hand ueber "Teilen > Zum Home-Bildschirm". iPadOS meldet sich als Mac,
- * verraet sich aber durch den Touchscreen.
+ * iPhone and iPad. There is no `beforeinstallprompt` there, installation only
+ * happens by hand via "Share > Add to Home Screen". iPadOS identifies as a Mac,
+ * but gives itself away through the touchscreen.
  */
 function istIos(): boolean {
     const ua = navigator.userAgent;
@@ -66,11 +66,11 @@ function abonnieren(h: () => void) {
 }
 
 export interface Installation {
-    /** Laeuft bereits als App oder wurde gerade installiert */
+    /** Already runs as an app or has just been installed */
     installiert: boolean;
-    /** Der Browser bietet einen Installationsdialog an */
+    /** The browser offers an installation dialog */
     kannInstallieren: boolean;
-    /** Installation nur von Hand ueber das Teilen-Menue */
+    /** Installation only by hand via the share menu */
     ios: boolean;
     installieren: () => Promise<void>;
 }
@@ -87,7 +87,7 @@ export function useInstallation(): Installation {
             if (!wartend) return;
             const ereignis = wartend;
             await ereignis.prompt();
-            // Ein Ereignis laesst sich nur einmal zeigen, danach ist es verbraucht
+            // An event can only be shown once, after that it is consumed
             wartend = null;
             melden();
         },

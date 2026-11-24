@@ -11,17 +11,17 @@ import {Loader2, MapPinned} from 'lucide-react';
 const MAX_NACHFRAGEN = 20;
 const NACHFRAGE_MS = 1500;
 
-// Dieselbe Farbe wie die Spesen in der Statistik, gegen beide Flächen geprüft
+// Same color as the expenses in the statistics, checked against both surfaces
 const FARBE = {light: {fuellung: '#2e7d4f', ring: '#ffffff'}, dark: {fuellung: '#3fa86e', ring: '#1a1a19'}} as const;
 
 interface SpielstaettenKarteProps {
-    /** Die im Reiter gewählte Saison - der Umschalter kann auf sie eingrenzen */
+    /** The season selected in the tab - the switcher can narrow down to it */
     saison: string | null;
 }
 
 /**
- * Karte aller Plätze, an denen man selbst schon im Einsatz war - über alle
- * gelesenen Saisons oder nur die gewählte. Künftige Spiele stehen nie drauf.
+ * Map of all venues where one has already officiated - across all
+ * read seasons or just the selected one. Future matches never appear on it.
  */
 export function SpielstaettenKarte({saison}: SpielstaettenKarteProps) {
     const {resolvedTheme} = useTheme();
@@ -37,7 +37,7 @@ export function SpielstaettenKarte({saison}: SpielstaettenKarteProps) {
         let ohneFortschritt = 0;
         let vorherOffen = Infinity;
 
-        // Neue Plätze schlägt der Server je Aufruf nur ein paar Sekunden lang nach
+        // The server only looks up new venues for a few seconds per call
         const laden = () => {
             getSpielstaetten()
                 .then((antwort) => {
@@ -74,7 +74,7 @@ export function SpielstaettenKarte({saison}: SpielstaettenKarteProps) {
         L.tileLayer(daten.kacheln.url, {attribution: daten.kacheln.attribution, maxZoom: 19}).addTo(map);
 
         const farbe = FARBE[resolvedTheme];
-        // Häufig besuchte Plätze zuletzt zeichnen, damit sie oben liegen
+        // Draw frequently visited venues last so they lie on top
         for (const ort of [...orte].reverse()) {
             L.circleMarker([ort.lat, ort.lon], {
                 radius: 5 + Math.min(9, Math.sqrt(ort.anzahl) * 2),
@@ -146,7 +146,7 @@ export function SpielstaettenKarte({saison}: SpielstaettenKarteProps) {
                             : 'Noch kein vergangenes Spiel mit bekannter Spielstätte.'}
                     </p>
                 ) : (
-                    // isolate: Leaflet vergibt z-index bis 800 - sonst läge die Karte über der Kopfzeile
+                    // isolate: Leaflet assigns z-index up to 800 - otherwise the map would lie above the header
                     <div ref={containerRef} className="isolate h-72 w-full overflow-hidden rounded-lg border sm:h-96"/>
                 )}
 

@@ -1,14 +1,14 @@
 import {api} from './api';
 import type {SpielberichtKurz} from './spielberichte';
 
-/** Eine Person im Gespann eines geleiteten Spiels */
+/** A person on the crew of a refereed match */
 export interface SaisonGespann {
     rolle: string;
     name: string;
     ist_selbst: boolean;
 }
 
-/** Ein geleitetes Spiel aus dem DFBnet-Reiter "Spiele & Statistiken" */
+/** A refereed match from the DFBnet tab "Spiele & Statistiken" */
 export interface SaisonSpiel {
     id: number;
     saison: string;
@@ -18,7 +18,7 @@ export interface SaisonSpiel {
     heim: string;
     gast: string;
     ergebnis: string;
-    /** null, wenn DFBnet zu diesem Spiel nichts erfasst hat */
+    /** null if DFBnet has recorded nothing for this match */
     heim_gelb: number | null;
     heim_gelbrot: number | null;
     heim_rot: number | null;
@@ -27,11 +27,11 @@ export interface SaisonSpiel {
     gast_rot: number | null;
     eigene_rolle: string;
     gespann: SaisonGespann[];
-    /** Der zugeordnete Spielbericht aus DFBnet, falls schon gelesen */
+    /** The assigned match report from DFBnet, if already read */
     spielbericht?: SpielberichtKurz | null;
 }
 
-/** Eine Zeile der Einsatzbilanz (SR, SRA 1, ..., Summe) */
+/** A row of the appearance balance (SR, SRA 1, ..., total) */
 export interface SaisonEinsatz {
     rolle: string;
     geleitet: string;
@@ -53,7 +53,7 @@ export interface SaisonDetails {
     lehrgaenge: SaisonLehrgaenge | null;
 }
 
-/** Übersichtszeile pro gespeicherter Saison */
+/** Overview row per stored season */
 export interface SaisonUebersicht {
     saison: string;
     spiele: number;
@@ -61,29 +61,29 @@ export interface SaisonUebersicht {
     scraped_at: string;
 }
 
-/** Alle Saisons, zu denen etwas gespeichert ist - neueste zuerst */
+/** All seasons for which something is stored - newest first */
 export async function getSaisons(): Promise<SaisonUebersicht[]> {
     const response = await api.get<SaisonUebersicht[]>('/api/saison');
     return response.data;
 }
 
 /**
- * Eine Saison mit allen Spielen, Einsatzbilanz und Lehrgängen.
+ * A season with all matches, appearance balance and courses.
  *
- * Der Name wird bewusst NICHT kodiert: Saisons heißen bei DFBnet "26/27", und
- * der Endpunkt nimmt den Schrägstrich als Teil des Pfades entgegen.
+ * The name is deliberately NOT encoded: seasons are called "26/27" at DFBnet, and
+ * the endpoint accepts the slash as part of the path.
  */
 export async function getSaison(saison: string): Promise<SaisonDetails> {
     const response = await api.get<SaisonDetails>(`/api/saison/${saison}`);
     return response.data;
 }
 
-/** "-" für nicht erfasste Werte, sonst die Zahl */
+/** "-" for values not recorded, otherwise the number */
 export function formatKarte(wert: number | null): string {
     return wert === null || wert === undefined ? '–' : String(wert);
 }
 
-/** Summiert eine Kartenspalte über alle Spiele; null zählt als 0 */
+/** Sums a card column over all matches; null counts as 0 */
 export function summeKarten(spiele: SaisonSpiel[], feld: keyof SaisonSpiel): number {
     return spiele.reduce((summe, spiel) => {
         const wert = spiel[feld];

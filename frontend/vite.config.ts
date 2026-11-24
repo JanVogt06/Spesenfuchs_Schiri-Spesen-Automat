@@ -11,11 +11,11 @@ export default defineConfig({
         },
     },
     server: {
-        host: '0.0.0.0', // Macht Server im Netzwerk verfügbar
+        host: '0.0.0.0', // Makes the server available on the network
         port: 5173,
         proxy: {
             '/api': {
-                target: 'http://localhost:8001',  // ← 8001 statt 8000!
+                target: 'http://localhost:8001',  // ← 8001 instead of 8000!
                 changeOrigin: true,
             }
         }

@@ -1,8 +1,8 @@
-// Service Worker der installierbaren App. Er haelt nur die Huelle vor
-// (index.html und die gebauten Dateien unter /assets), damit die App ohne Netz
-// startet. Antworten der API werden nie zwischengespeichert: sie enthalten
-// Anschriften und Telefonnummern, und veraltete Spiele waeren schlimmer als
-// eine Fehlermeldung.
+// Service worker of the installable app. It only keeps the shell
+// (index.html and the built files under /assets) so that the app starts
+// without a network. API responses are never cached: they contain
+// addresses and phone numbers, and stale matches would be worse than
+// an error message.
 
 const CACHE = 'spesenfuchs-v1';
 const HUELLE = '/index.html';
@@ -20,9 +20,9 @@ self.addEventListener('activate', (event) => {
 });
 
 /**
- * Wirft Skripte und Stylesheets weg, die die aktuelle index.html nicht mehr
- * nennt - jedes Release bringt neue. Schriften und Bilder bleiben: sie werden
- * aus dem CSS geladen, stehen also nie in der index.html, und aendern sich kaum.
+ * Discards scripts and stylesheets that the current index.html no longer
+ * mentions - every release brings new ones. Fonts and images stay: they are
+ * loaded from the CSS, so they never appear in index.html, and rarely change.
  */
 async function aufraeumen(html) {
     const cache = await caches.open(CACHE);
@@ -34,8 +34,8 @@ async function aufraeumen(html) {
     }
 }
 
-// Seitenaufrufe: immer zuerst das Netz, damit ein Update sofort ankommt.
-// Die Huelle aus dem Cache gibt es nur, wenn das Netz fehlt.
+// Page requests: network first, so that an update arrives immediately.
+// The shell from the cache is only used when the network is missing.
 async function seite(request) {
     try {
         const antwort = await fetch(request);
@@ -53,7 +53,7 @@ async function seite(request) {
     }
 }
 
-// Dateien unter /assets tragen einen Hash im Namen und aendern sich nie.
+// Files under /assets carry a hash in their name and never change.
 async function asset(request) {
     const gespeichert = await caches.match(request);
     if (gespeichert) return gespeichert;

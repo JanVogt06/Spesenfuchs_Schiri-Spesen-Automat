@@ -1,12 +1,12 @@
 import {api} from './api';
 import {triggerBrowserDownload} from './matches';
 
-/** Was die Saison- und Spesenlisten je Spiel vom Bericht kennen */
+/** What the season and expense lists know of the report per match */
 export interface SpielberichtKurz {
     id: number;
-    /** Fahrtkosten des ganzen Gespanns laut DFBnet, in Euro */
+    /** Travel costs of the whole crew according to DFBnet, in euros */
     fahrtkosten: number | null;
-    /** SR-/SRA-Spesen des ganzen Gespanns laut DFBnet, in Euro */
+    /** Referee/assistant expenses of the whole crew according to DFBnet, in euros */
     spesen: number | null;
     dokumente: number;
 }
@@ -22,11 +22,11 @@ export interface Ereignis {
     seite: 'heim' | 'gast' | '';
     person: string;
     nummer: number | null;
-    /** Bei Teamoffiziellen: Trainer, Co-Trainer, ... */
+    /** For team officials: coach, assistant coach, ... */
     funktion: string | null;
     grund: string;
     sonderbericht: boolean;
-    /** Nur bei Wechseln: der ausgewechselte Spieler */
+    /** Only for substitutions: the player who was substituted */
     person_raus?: string;
     nummer_raus?: number | null;
 }
@@ -122,10 +122,10 @@ export interface Spielbericht {
     dokumente: SpielberichtDokument[];
 }
 
-/** Von wo ein Bericht geöffnet wurde - landet im Nutzungsprotokoll */
+/** From where a report was opened - ends up in the usage log */
 export type BerichtQuelle = 'saison' | 'spesen';
 
-/** Pfad der Detailseite; die Herkunft reist als ?von= mit */
+/** Path of the detail page; the origin travels along as ?von= */
 export function spielberichtPfad(id: number, von: BerichtQuelle): string {
     return `/spielbericht/${id}?von=${von}`;
 }
@@ -145,10 +145,10 @@ export async function downloadDokument(berichtId: number, dokument: Spielbericht
     triggerBrowserDownload(response.data, dokument.dateiname);
 }
 
-/** Öffnet ein PDF im neuen Tab statt es herunterzuladen */
+/** Opens a PDF in a new tab instead of downloading it */
 export async function oeffneDokument(berichtId: number, dokument: SpielberichtDokument): Promise<void> {
-    // Das Fenster sofort öffnen: nach dem await gilt es nicht mehr als Klick
-    // des Nutzers, und Safari blockt es dann als Pop-up.
+    // Open the window immediately: after the await it no longer counts as a click
+    // by the user, and Safari then blocks it as a pop-up.
     const fenster = window.open('', '_blank');
     try {
         const response = await api.get(`/api/spielberichte/${berichtId}/dokumente/${dokument.id}`, {
@@ -161,7 +161,7 @@ export async function oeffneDokument(berichtId: number, dokument: SpielberichtDo
         } else {
             triggerBrowserDownload(response.data, dokument.dateiname);
         }
-        // Das Fenster braucht die URL noch eine Weile
+        // The window still needs the URL for a while
         window.setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
     } catch (err) {
         fenster?.close();

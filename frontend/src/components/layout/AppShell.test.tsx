@@ -33,7 +33,7 @@ function zeige(pfad = '/dashboard', abgelehntSeit: string | null = null) {
     );
 }
 
-/** Die roten Punkte an den Reitern - nicht das runde Symbol im Hinweis */
+/** The red dots on the tabs - not the round icon in the notice */
 const warnpunkte = (container: HTMLElement) => container.querySelectorAll('span.size-2.bg-destructive');
 
 const kopfzeile = () => within(screen.getByRole('banner'));
@@ -64,7 +64,7 @@ describe('AppShell - DFBnet-Hinweis', () => {
         const {container} = zeige('/dashboard', SEIT);
 
         expect(await screen.findByRole('alert')).toHaveTextContent('Seit dem 20.11.2026');
-        // Die Einstellungen liegen auf beiden Breiten hinter "Mehr"
+        // Settings sit behind "Mehr" at both widths
         expect(warnpunkte(container)).toHaveLength(2);
         expect(kopfzeile().getByRole('button', {name: /Mehr/}).querySelector('span.size-2.bg-destructive')).not.toBeNull();
         const mehr = tabLeiste().getByRole('button', {name: /Mehr/});
@@ -157,7 +157,7 @@ describe('AppShell - Navigation', () => {
         zeige('/beobachtungen');
         await waitFor(() => expect(apiGet).toHaveBeenCalled());
 
-        // Am Handy reicht der Platz nur fuer die kurze Beschriftung
+        // On phones there is only room for the short label
         expect(tabLeiste().getByRole('button', {name: 'Noten'})).toHaveAttribute('aria-current', 'page');
         expect(tabLeiste().getByRole('button', {name: 'Noten'})).toHaveClass('text-primary');
         expect(tabLeiste().getByRole('button', {name: 'Übersicht'})).not.toHaveAttribute('aria-current');
@@ -195,7 +195,7 @@ describe('AppShell - Navigation', () => {
         await userEvent.click(within(screen.getByRole('navigation', {name: 'Weitere Seiten'}))
             .getByRole('button', {name: 'Fehler melden'}));
         expect(screen.getByTestId('ort')).toHaveTextContent('/fehler-melden');
-        // Nach der Auswahl klappt das Menue wieder zu
+        // After a selection the menu closes again
         expect(screen.queryByRole('navigation', {name: 'Weitere Seiten'})).not.toBeInTheDocument();
     });
 

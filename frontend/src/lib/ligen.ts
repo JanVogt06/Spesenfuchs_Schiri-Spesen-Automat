@@ -1,6 +1,6 @@
 import {api} from './api';
 
-/** Eine Zeile einer Ligatabelle */
+/** A row of a league table */
 export interface Tabellenplatz {
     platz: number;
     mannschaft: string;
@@ -14,13 +14,13 @@ export interface Tabellenplatz {
     punkte: number;
 }
 
-/** Eine Staffel samt ihrer Tabelle */
+/** A league group together with its table */
 export interface Staffel {
     staffel_id: string;
     anzeigename: string;
     spielklasse: string;
     verband: string;
-    /** Rangfolge der Spielklasse, kleiner ist höher */
+    /** Rank of the league class, smaller is higher */
     rang: number;
     aktualisiert_at: string;
     mannschaften: number;
@@ -38,13 +38,13 @@ export interface LigenAntwort {
     staffeln: Staffel[];
 }
 
-/** Alle abgeglichenen Ligatabellen, höchste Spielklasse zuerst */
+/** All reconciled league tables, highest league class first */
 export async function getLigen(): Promise<LigenAntwort> {
     const response = await api.get<LigenAntwort>('/api/ligen');
     return response.data;
 }
 
-/** Tordifferenz, mit Vorzeichen wie in gedruckten Tabellen */
+/** Goal difference, with a sign as in printed tables */
 export function tordifferenz(platz: Tabellenplatz): string {
     const differenz = platz.tore - platz.gegentore;
     return differenz > 0 ? `+${differenz}` : String(differenz);

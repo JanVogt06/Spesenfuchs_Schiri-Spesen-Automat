@@ -14,7 +14,7 @@ const LEHRGANG_NAMEN: Record<keyof Omit<SaisonLehrgaenge, 'scraped_at'>, string>
     leistungspruefung: 'Leistungsprüfung',
 };
 
-/** DFBnet schreibt "-" für "nichts erfasst" - das bleibt so stehen */
+/** DFBnet writes "-" for "nothing recorded" - that stays as it is */
 function wert(text: string): string {
     return text && text.trim() ? text : '–';
 }
@@ -44,7 +44,7 @@ export function SaisonBilanz({einsaetze, lehrgaenge}: SaisonBilanzProps) {
                                         <th className="px-4 py-2 text-left font-medium sm:px-6">Rolle</th>
                                         <th className="px-2 py-2 text-right font-medium sm:px-3">Geleitet</th>
                                         <th className="px-2 py-2 text-right font-medium sm:px-3">
-                                            {/* Am Handy passen die vollen Spaltennamen nicht nebeneinander */}
+                                            {/* On phones the full column names do not fit side by side */}
                                             <abbr title="Zurückgegeben" className="no-underline sm:hidden">Zurück</abbr>
                                             <span className="hidden sm:inline">Zurückgegeben</span>
                                         </th>

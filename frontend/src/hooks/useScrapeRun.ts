@@ -26,19 +26,19 @@ export function isRunActive(run: ScrapeRun | null): boolean {
 }
 
 /**
- * Verfolgt den aktuellen Scrape-Lauf des Users.
+ * Tracks the current scrape run of the user.
  *
- * Ersetzt useSessions/useSessionPolling: es gibt keine Session-Objekte mehr,
- * sondern genau einen Lauf-Zustand aus der Datenbank. Sobald ein Lauf fertig
- * ist, wird einmalig onFinished aufgerufen, damit die Spiele neu geladen
- * werden.
+ * Replaces useSessions/useSessionPolling: there are no session objects anymore,
+ * just exactly one run state from the database. As soon as a run is finished,
+ * onFinished is called once so that the matches
+ * are reloaded.
  */
 export function useScrapeRun(onFinished?: () => void) {
     const [run, setRun] = useState<ScrapeRun | null>(null);
     const [isStarting, setIsStarting] = useState(false);
     const [error, setError] = useState('');
 
-    // Ohne Ref wuerde jede neue Callback-Identitaet das Polling neu aufsetzen
+    // Without a ref every new callback identity would restart the polling
     const onFinishedRef = useRef(onFinished);
     onFinishedRef.current = onFinished;
     const warRunning = useRef(false);
@@ -49,11 +49,11 @@ export function useScrapeRun(onFinished?: () => void) {
             const aktuell = response.data;
             setRun(aktuell);
 
-            // Flanke von "laeuft" nach "fertig": genau einmal nachladen
+            // Edge from "running" to "finished": reload exactly once
             const laeuft = RUNNING_STATUS.includes(aktuell.status);
             if (warRunning.current && !laeuft) {
                 onFinishedRef.current?.();
-                // Der Lauf hat die Zugangsdaten geprueft - angenommen oder abgelehnt
+                // The run has checked the credentials - accepted or rejected
                 meldeDfbStatusGeaendert();
             }
             warRunning.current = laeuft;
@@ -69,7 +69,7 @@ export function useScrapeRun(onFinished?: () => void) {
         loadStatus();
     }, [loadStatus]);
 
-    // Nur pollen, solange wirklich etwas laeuft
+    // Only poll while something is actually running
     useEffect(() => {
         if (!isRunActive(run)) return;
 
@@ -82,9 +82,9 @@ export function useScrapeRun(onFinished?: () => void) {
         setError('');
         try {
             await api.post('/api/generate', {});
-            // Vor dem ersten Status setzen: ist der Lauf da schon vorbei
-            // (Prozess sofort gescheitert), erkennt loadStatus so die Flanke
-            // und ruft onFinished - statt dass es nie oder verspaetet kommt.
+            // Set before the first status: if the run is already over by then
+            // (process failed immediately), loadStatus detects the edge this way
+            // and calls onFinished - instead of it never or belatedly coming.
             warRunning.current = true;
             await loadStatus();
         } catch (err: unknown) {

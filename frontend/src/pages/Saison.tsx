@@ -31,8 +31,8 @@ export function SaisonPage() {
             setSaisons(liste);
             setLadeFehler('');
 
-            // Beim ersten Laden die neueste Saison zeigen; nach einem Abruf die
-            // gewaehlte beibehalten, solange es sie noch gibt.
+            // On first load show the latest season; after a fetch keep the
+            // selected one as long as it still exists.
             setGewaehlt((bisher) => {
                 if (bisher && liste.some((s) => s.saison === bisher)) return bisher;
                 return liste.length > 0 ? liste[0].saison : null;
@@ -44,8 +44,8 @@ export function SaisonPage() {
         }
     }, []);
 
-    // Die Saisondaten werden beim regulaeren Abruf mitgelesen, die Seite haengt
-    // also am selben Lauf wie das Dashboard
+    // The season data is read along with the regular fetch, so the page
+    // hangs on the same run as the dashboard
     const {run, isRunning, isStarting, error, startGeneration} = useScrapeRun(loadSaisons);
 
     useEffect(() => {
@@ -63,8 +63,8 @@ export function SaisonPage() {
 
         getSaison(gewaehlt)
             .then((daten) => {
-                // Ein schneller Klick auf eine andere Saison darf nicht von der
-                // langsameren aelteren Antwort ueberschrieben werden.
+                // A quick click on another season must not be overwritten by the
+                // slower, older response.
                 if (!abgebrochen) setDetails(daten);
             })
             .catch((err: unknown) => {

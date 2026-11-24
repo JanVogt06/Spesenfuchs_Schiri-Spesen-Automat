@@ -12,14 +12,14 @@ type Ansicht = 'kommend' | 'vergangen';
 
 interface MatchListProps {
     matches: MatchData[];
-    /** Lädt die Spiele neu, nachdem Fahrtkosten gespeichert wurden */
+    /** Reloads the matches after travel costs have been saved */
     onReload?: () => void;
 }
 
 export function MatchList({matches, onReload}: MatchListProps) {
-    // Schlüssel "<matchId>:<format>": PDFs entstehen jetzt erst beim Klick und
-    // dauern Sekunden, deshalb können mehrere Downloads gleichzeitig laufen.
-    // Ein einzelner gemeinsamer Zustand würde den jeweils anderen zurücksetzen.
+    // Key "<matchId>:<format>": PDFs are now only created on click and
+    // take seconds, so several downloads can run at the same time.
+    // A single shared state would reset the other one each time.
     const [laufendeDownloads, setLaufendeDownloads] = useState<string[]>([]);
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [isBulkDownloading, setIsBulkDownloading] = useState(false);
@@ -31,19 +31,19 @@ export function MatchList({matches, onReload}: MatchListProps) {
         () => teileSpiele(matches.filter((m) => passtZurSuche(m, suche)), heute),
         [matches, suche, heute],
     );
-    // Bis zur ersten Wahl: ohne kommende Ansetzung gleich die vergangenen Spiele
+    // Until the first choice: without an upcoming assignment, go straight to the past matches
     const [gewaehlteAnsicht, setAnsicht] = useState<Ansicht | null>(null);
     const gibtKommende = useMemo(() => teileSpiele(matches, heute).kommend.length > 0, [matches, heute]);
     const ansicht: Ansicht = gewaehlteAnsicht ?? (gibtKommende ? 'kommend' : 'vergangen');
     const sichtbar = ansicht === 'kommend' ? kommend : vergangen;
     const gruppen = useMemo(() => nachMonat(sichtbar), [sichtbar]);
 
-    // "Spiel 3" als Ersatztitel haengt an der Stelle in der ganzen Liste,
-    // nicht an der in der gefilterten
+    // "Spiel 3" as a fallback title depends on the position in the whole list,
+    // not on the one in the filtered list
     const position = useMemo(() => new Map(matches.map((m, i) => [m._id, i])), [matches]);
 
     const handleDownload = async (match: MatchData, fileFormat: 'docx' | 'pdf') => {
-        // 'docx' heißt "die bearbeitbare Datei" - bei NOFV-Spielen eine Excel-Mappe
+        // 'docx' means "the editable file" - for NOFV matches an Excel workbook
         const originalName = match._filename || `spiel_${match._id}.docx`;
         const filename = fileFormat === 'pdf' ? originalName.replace(/\.(docx|xlsx)$/i, '.pdf') : originalName;
         const key = `${match._id}:${fileFormat}`;

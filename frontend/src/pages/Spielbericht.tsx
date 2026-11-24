@@ -44,7 +44,7 @@ function Abschnitt({titel, icon: Icon, rechts, children, className}: {
     );
 }
 
-/** Das Symbol eines Ereignisses: Karten als kleine Karte, sonst ein Icon */
+/** The symbol of an event: cards as a small card, otherwise an icon */
 function EreignisSymbol({typ}: {typ: string}) {
     if (typ === 'gelb') return <span className="inline-block h-4 w-3 rounded-[2px] bg-yellow-400" aria-hidden/>;
     if (typ === 'rot') return <span className="inline-block h-4 w-3 rounded-[2px] bg-red-600" aria-hidden/>;
@@ -95,7 +95,7 @@ function EreignisZeile({e}: {e: Ereignis}) {
                     )}
                 </p>
             </div>
-            {/* Am Handy steht die Mannschaft dabei - die Seiten-Anordnung gibt es erst ab sm */}
+            {/* On phones the team is shown alongside - the side-by-side layout only exists from sm */}
             <span className="shrink-0 text-xs text-muted-foreground sm:hidden">{gast ? 'Gast' : 'Heim'}</span>
         </li>
     );
@@ -281,7 +281,7 @@ export function SpielberichtPage() {
             {zurueck}
 
             <div className="space-y-4">
-                {/* Kopf */}
+                {/* Header */}
                 <Card className="gap-0 py-0">
                     <CardContent className="space-y-3 p-4 sm:p-6">
                         <p className="text-xs text-muted-foreground break-words">

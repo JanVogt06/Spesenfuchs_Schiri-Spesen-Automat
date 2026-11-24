@@ -4,8 +4,8 @@ import {act, renderHook} from '@testing-library/react';
 type PwaModul = typeof import('./pwa');
 
 /**
- * pwa.ts haelt seinen Zustand auf Modulebene und haengt die Listener beim
- * Import an window. Jeder Test holt sich deshalb ein frisches Modul.
+ * pwa.ts keeps its state at module level and attaches the listeners on
+ * import to window. Each test therefore gets a fresh module.
  */
 async function frischesModul(): Promise<PwaModul> {
     vi.resetModules();
@@ -15,13 +15,13 @@ async function frischesModul(): Promise<PwaModul> {
 let standalone = false;
 
 function setzeUserAgent(ua: string, touchPunkte = 0) {
-    // jsdom kennt maxTouchPoints nicht; beide Werte als eigene Eigenschaften,
-    // die afterEach wieder entfernt
+    // jsdom does not know maxTouchPoints; both values as own properties,
+    // which afterEach removes again
     Object.defineProperty(navigator, 'userAgent', {configurable: true, value: ua});
     Object.defineProperty(navigator, 'maxTouchPoints', {configurable: true, value: touchPunkte});
 }
 
-/** Ein beforeinstallprompt, wie Chrome es schickt */
+/** A beforeinstallprompt, as Chrome sends it */
 function installAngebot() {
     const prompt = vi.fn(async () => {});
     const ereignis = Object.assign(new Event('beforeinstallprompt', {cancelable: true}), {
@@ -162,8 +162,8 @@ describe('useInstallation - Installationsdialog', () => {
 
 describe('registriereServiceWorker', () => {
     /**
-     * Faengt den load-Listener ab, statt ihn an window zu haengen - sonst
-     * liefe er in spaeteren Tests mit, wenn deren Seite "laedt".
+     * Intercepts the load listener instead of attaching it to window - otherwise
+     * it would run along in later tests when their page "loads".
      */
     function ladeListener(): {laden: () => void; angemeldet: () => boolean} {
         const listener: EventListener[] = [];

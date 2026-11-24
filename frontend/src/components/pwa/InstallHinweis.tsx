@@ -6,13 +6,13 @@ import {Smartphone, Share, SquarePlus, Download, X, CheckCircle2} from 'lucide-r
 
 const AUSGEBLENDET_KEY = 'installHinweisAusgeblendet';
 
-/** Die drei Handgriffe in Safari - einen Button dafuer laesst Apple nicht zu */
+/** The three steps in Safari - Apple does not allow a button for this */
 function IosSchritte() {
     return (
         <ol className="space-y-1.5 text-sm text-muted-foreground">
             <li className="flex items-start gap-2">
                 <span className="w-4 shrink-0 text-center font-medium text-foreground">1.</span>
-                {/* Seit iOS 26 steckt "Teilen" in Safari hinter dem Drei-Punkte-Menue */}
+                {/* Since iOS 26 "Teilen" in Safari sits behind the three-dot menu */}
                 <span>
                     Auf <Share className="inline size-4 align-text-bottom text-foreground"/> „Teilen“
                     tippen, in neueren Safari-Versionen zuerst auf „•••“
@@ -34,9 +34,9 @@ function IosSchritte() {
 }
 
 /**
- * Derselbe Knopf auf jedem Geraet. Wo der Browser einen Installationsdialog
- * hat, oeffnet er ihn; auf dem iPhone klappt er stattdessen die Handgriffe auf,
- * damit die Anleitung erst auf Wunsch erscheint.
+ * The same button on every device. Where the browser has an install dialog,
+ * it opens it; on the iPhone it instead unfolds the steps,
+ * so the instructions only appear on request.
  */
 function InstallKnopf({klein}: {klein?: boolean}) {
     const {kannInstallieren, installieren} = useInstallation();
@@ -61,7 +61,7 @@ function InstallKnopf({klein}: {klein?: boolean}) {
     );
 }
 
-/** Karte in den Einstellungen - erklaert den Weg auf jedem Geraet */
+/** Card in the settings - explains the way on every device */
 export function InstallCard() {
     const {installiert, kannInstallieren, ios} = useInstallation();
 
@@ -108,9 +108,9 @@ function istAusgeblendet(): boolean {
 }
 
 /**
- * Hinweis auf dem Dashboard, nur auf Touch-Geraeten und nur, solange es etwas
- * zu tun gibt. Weggeklickt bleibt er weg - in den Einstellungen steht derselbe
- * Weg dauerhaft.
+ * Notice on the dashboard, only on touch devices and only as long as there is something
+ * to do. Once dismissed it stays away - in the settings the same
+ * way is permanently available.
  */
 export function InstallBanner() {
     const {installiert, kannInstallieren, ios} = useInstallation();
@@ -124,7 +124,7 @@ export function InstallBanner() {
         try {
             localStorage.setItem(AUSGEBLENDET_KEY, '1');
         } catch {
-            // Ohne Speicher erscheint der Hinweis beim naechsten Laden eben wieder
+            // Without storage the notice simply reappears on the next load
         }
     };
 

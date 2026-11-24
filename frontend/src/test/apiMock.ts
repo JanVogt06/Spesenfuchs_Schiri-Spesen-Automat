@@ -1,13 +1,13 @@
 import {vi} from 'vitest';
 
 /**
- * Ersatz fuer '@/lib/api' in Tests, die nur die Antworten des Servers
- * brauchen. Einbinden mit:
+ * Replacement for '@/lib/api' in tests that only need the server's
+ * responses. Include with:
  *
  *     vi.mock('@/lib/api', async () => (await import('@/test/apiMock')).apiModul);
  *
- * Der Test importiert apiGet/apiPost aus diesem Modul und bekommt dieselben
- * Instanzen wie der Code unter Test.
+ * The test imports apiGet/apiPost from this module and gets the same
+ * instances as the code under test.
  */
 export interface Antwort {
     data: unknown;
@@ -18,7 +18,7 @@ export const apiPost = vi.fn<(url: string, body?: unknown, config?: unknown) => 
 
 export const apiModul = {api: {get: apiGet, post: apiPost}};
 
-/** Ein Fehler, wie axios ihn mit Serverantwort wirft */
+/** An error as axios throws it with a server response */
 export function apiFehler(status: number, message?: string): Error & {response: {status: number; data: unknown}} {
     return Object.assign(new Error(`Request failed with status code ${status}`), {
         response: {status, data: message ? {error: {message}} : {}},
@@ -26,8 +26,8 @@ export function apiFehler(status: number, message?: string): Error & {response: 
 }
 
 /**
- * Beantwortet GET-Anfragen je URL. Ein Error als Wert wird geworfen, eine
- * Funktion wird bei jedem Aufruf neu ausgewertet. Unbekannte URLs scheitern.
+ * Answers GET requests per URL. An Error as a value is thrown, a
+ * function is re-evaluated on every call. Unknown URLs fail.
  */
 export function getRouten(routen: Record<string, unknown>): void {
     apiGet.mockImplementation(async (url: string) => {
@@ -39,7 +39,7 @@ export function getRouten(routen: Record<string, unknown>): void {
     });
 }
 
-/** Setzt beide Mocks vollstaendig zurueck (Aufrufe und Implementierung) */
+/** Resets both mocks completely (calls and implementation) */
 export function apiZuruecksetzen(): void {
     apiGet.mockReset();
     apiPost.mockReset();

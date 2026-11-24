@@ -33,8 +33,8 @@ interface KennzahlProps {
 function Kennzahl({icon: Icon, label, wert, zusatz, className}: KennzahlProps) {
     return (
         <Card className={`gap-0 py-0 ${className ?? ''}`}>
-            {/* Am Handy stehen zwei nebeneinander - dort rueckt das Icon klein
-                vor die Beschriftung, damit der Wert die volle Breite hat */}
+            {/* On phones two sit side by side - there the icon shrinks in front
+                of the label so the value gets the full width */}
             <CardContent className="flex items-start gap-3 p-3 sm:p-4">
                 <span className="hidden size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary sm:grid">
                     <Icon className="size-4"/>
@@ -61,8 +61,8 @@ export function DashboardPage() {
 
     const loadAlles = useCallback(async () => {
         try {
-            // Beide Quellen parallel; die Saisondaten sind optional, das
-            // Dashboard soll auch ohne sie etwas zeigen.
+            // Both sources in parallel; the season data is optional, the
+            // dashboard should show something even without it.
             const [spiele, saisons] = await Promise.all([
                 getAllMatches(),
                 getSaisons().catch(() => []),
@@ -101,7 +101,7 @@ export function DashboardPage() {
         [matches, heute],
     );
 
-    /** Karten pro Spiel in der laufenden Saison, über beide Mannschaften */
+    /** Cards per match in the current season, across both teams */
     const kartenSchnitt = useMemo(() => {
         const spiele = saison?.spiele ?? [];
         if (spiele.length === 0) return null;
@@ -152,7 +152,7 @@ export function DashboardPage() {
                 </div>
             ) : (
                 <div className="space-y-4">
-                    {/* Am Handy zwei nebeneinander, das naechste Spiel darunter ueber die volle Breite */}
+                    {/* On phones two side by side, the next match below across the full width */}
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                         <Kennzahl
                             icon={Trophy}

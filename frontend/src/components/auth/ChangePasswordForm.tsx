@@ -21,7 +21,7 @@ export function ChangePasswordForm() {
         setError('');
         setSuccess('');
 
-        // Client-seitige Validierung
+        // Client-side validation
         if (newPassword.length < 8) {
             setError('Neues Passwort muss mindestens 8 Zeichen lang sein');
             return;
@@ -53,7 +53,7 @@ export function ChangePasswordForm() {
             const err = fehler as {
                 response?: {status?: number; data?: {error?: {message?: string}; detail?: string}};
             };
-            // Detaillierte Fehlermeldung extrahieren
+            // Extract detailed error message
             const errorData = err.response?.data;
             let message = 'Unbekannter Fehler beim Ändern des Passworts';
 
@@ -90,7 +90,7 @@ export function ChangePasswordForm() {
             </CardHeader>
             <CardContent className="px-4 sm:px-6">
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    {/* Aktuelles Passwort */}
+                    {/* Current password */}
                     <div className="space-y-2">
                         <Label htmlFor="currentPassword" className="text-sm sm:text-base">
                             Aktuelles Passwort
@@ -121,7 +121,7 @@ export function ChangePasswordForm() {
                         </div>
                     </div>
 
-                    {/* Neues Passwort */}
+                    {/* New password */}
                     <div className="space-y-2">
                         <Label htmlFor="newPassword" className="text-sm sm:text-base">
                             Neues Passwort
@@ -152,7 +152,7 @@ export function ChangePasswordForm() {
                         </div>
                     </div>
 
-                    {/* Passwort bestätigen */}
+                    {/* Confirm password */}
                     <div className="space-y-2">
                         <Label htmlFor="confirmPassword" className="text-sm sm:text-base">
                             Neues Passwort bestätigen
@@ -168,14 +168,14 @@ export function ChangePasswordForm() {
                         />
                     </div>
 
-                    {/* Fehler-Anzeige */}
+                    {/* Error display */}
                     {error && (
                         <div className="rounded-lg bg-destructive/10 px-3 py-2 ring-1 ring-destructive/20">
                             <p className="text-sm break-words text-destructive">{error}</p>
                         </div>
                     )}
 
-                    {/* Erfolgs-Anzeige */}
+                    {/* Success display */}
                     {success && (
                         <div className="rounded-lg bg-success/10 px-3 py-2 ring-1 ring-success/20">
                             <p className="text-sm break-words text-success">✓ {success}</p>

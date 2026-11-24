@@ -11,18 +11,18 @@ import {
 import {ADRESSE, Beitrag, Etikett, Folie, Kachel, Leucht, STORY, Titel} from './Rahmen';
 
 /*
- * Instagram-Beitrag zur Vorstellung von Spesenfuchs: fuenf Slides im Format
- * 3:4, gebaut aus denselben Bausteinen wie die Landingpage, mit deren
- * ausgedachten Beispieldaten. ?s=1 bis ?s=5 zeigt eine einzelne Slide fuer
- * den Export, ohne Parameter stehen alle untereinander.
+ * Instagram post introducing Spesenfuchs: five slides in 3:4
+ * format, built from the same building blocks as the landing page, with its
+ * made-up sample data. ?s=1 to ?s=5 shows a single slide for
+ * the export, without a parameter all are shown one below the other.
  *
- * Mit ?f=story entstehen dieselben Slides als Story im Format 9:16 (siehe
- * Rahmen.tsx). Auf der letzten Slide bleibt eine Luecke fuer den Link-Sticker.
+ * With ?f=story the same slides are produced as a story in 9:16 format (see
+ * Rahmen.tsx). On the last slide a gap is left for the link sticker.
  */
 
 const ANZAHL = 5;
 
-/* 1 - Aufhaenger: das Versprechen und die Anwendung dazu */
+/* 1 - Hook: the promise and the application that goes with it */
 function Ankuendigung() {
     return (
         <Folie anzahl={ANZAHL} nummer={1} feld>
@@ -34,7 +34,7 @@ function Ankuendigung() {
                 Deine Spesenabrechnungen entstehen jede Nacht aus deinen DFBnet-Ansetzungen – automatisch.
             </p>
 
-            {/* Die Abrechnung liegt unter der ersten Ansetzung - sie ist deren Beleg */}
+            {/* The statement lies under the first assignment - it is its receipt */}
             <div className={`relative flex-1 ${STORY ? 'mt-8 [zoom:0.88]' : 'mt-5 [zoom:0.75]'}`}>
                 <div className="absolute top-0 right-[-2rem] w-[86%]">
                     <Spieleliste/>
@@ -56,7 +56,7 @@ const AUFGABEN: { text: string; selbst?: boolean }[] = [
     {text: 'Kilometer eintragen', selbst: true},
 ];
 
-/* 2 - Das Problem: was nach jedem Spiel ansteht und was davon wegfaellt */
+/* 2 - The problem: what is due after every match and what of it drops away */
 function Problem() {
     return (
         <Folie anzahl={ANZAHL} nummer={2}>
@@ -104,7 +104,7 @@ const SCHRITTE = [
     {phase: 'Abpfiff', titel: 'Herunterladen', chip: 'Word · PDF', text: 'Laden, unterschreiben, einreichen. Fertig.'},
 ];
 
-/* 3 - So geht's: der Spielablauf in vier Schritten */
+/* 3 - How it works: the match flow in four steps */
 function Ablauf() {
     return (
         <Folie anzahl={ANZAHL} nummer={3}>
@@ -142,7 +142,7 @@ function Ablauf() {
     );
 }
 
-/* 4 - Was drinsteckt: vier Belege aus der Anwendung */
+/* 4 - What is inside: four receipts from the application */
 function Funktionen() {
     return (
         <Folie anzahl={ANZAHL} nummer={4}>
@@ -168,7 +168,7 @@ function Funktionen() {
     );
 }
 
-/* 5 - Aufruf: die Adresse, gross genug zum Abtippen */
+/* 5 - Call to action: the address, big enough to type in */
 function Aufruf() {
     return (
         <Folie anzahl={ANZAHL} nummer={5} feld>
@@ -199,7 +199,7 @@ function Aufruf() {
                 </div>
             </div>
 
-            {/* Frei fuer den Link-Sticker, der erst in Instagram dazukommt */}
+            {/* Left free for the link sticker, which is only added in Instagram */}
             {STORY && <div className="h-[88px] shrink-0"/>}
 
             <ul className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[14px] text-white/70">

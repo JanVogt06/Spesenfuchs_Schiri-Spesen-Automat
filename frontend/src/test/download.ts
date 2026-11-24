@@ -3,14 +3,14 @@ import {vi} from 'vitest';
 export interface DownloadAttrappe {
     createObjectURL: ReturnType<typeof vi.fn<(blob: Blob) => string>>;
     revokeObjectURL: ReturnType<typeof vi.fn<(url: string) => void>>;
-    /** Die angeklickten Links, mit Zustand zum Zeitpunkt des Klicks */
+    /** The clicked links, with their state at the time of the click */
     klicks: {href: string; download: string | null; imDokument: boolean}[];
     aufraeumen: () => void;
 }
 
 /**
- * jsdom kennt weder URL.createObjectURL noch Downloads. Ersetzt beides und
- * merkt sich, welche Links geklickt wurden, statt zu navigieren.
+ * jsdom knows neither URL.createObjectURL nor downloads. Replaces both and
+ * remembers which links were clicked instead of navigating.
  */
 export function downloadAttrappe(): DownloadAttrappe {
     let zaehler = 0;

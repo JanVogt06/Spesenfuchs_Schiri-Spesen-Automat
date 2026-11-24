@@ -1,15 +1,15 @@
 import {api} from './api';
 
 /**
- * Die eigenen Stammdaten aus DFBnet.
+ * The own master data from DFBnet.
  *
- * Alle Felder sind optional: der Scraper liefert nur, was er auf der Seite
- * findet, und alte Datensätze kennen neu hinzugekommene Felder noch nicht.
- * Die Index-Signatur sorgt dafür, dass ein Feld, das DFBnet später ergänzt,
- * bis in die Anzeige durchkommt, ohne dass dieser Typ nachgezogen werden muss.
+ * All fields are optional: the scraper delivers only what it
+ * finds on the page, and old records do not yet know newly added fields.
+ * The index signature ensures that a field that DFBnet adds later
+ * makes it through to the display without this type having to be updated.
  */
 export interface Stammdaten {
-    // Kontaktdaten
+    // Contact data
     name_vorname?: string;
     strasse?: string;
     plz_ort?: string;
@@ -19,13 +19,13 @@ export interface Stammdaten {
     telefon_geschaeftlich?: string;
     telefon_mobil?: string;
 
-    // Ausweis & Foto
+    // ID card & photo
     ausweisnummer?: string;
     ausweisgueltigkeit?: string;
     foto_status?: string;
     foto_gueltigkeit?: string;
 
-    // Meldedaten und Status
+    // Registration data and status
     sr_gebiet?: string;
     schiedsrichter_seit?: string;
     verein?: string;
@@ -39,13 +39,13 @@ export interface Stammdaten {
     fussball_de_hinweis?: string;
     bemerkung?: string;
 
-    // Qualifikations-Maximum
+    // Qualification maximum
     qmax_sr?: string;
     qmax_sra1?: string;
     qmax_sra2?: string;
     qmax_beobachter?: string;
 
-    // Metadaten vom Backend
+    // Metadata from the backend
     user_id?: number;
     first_seen_at?: string;
     scraped_at?: string;
@@ -54,10 +54,10 @@ export interface Stammdaten {
 }
 
 /**
- * Lädt die Stammdaten des angemeldeten Users.
+ * Loads the master data of the logged-in user.
  *
- * Vor dem ersten Abruf antwortet das Backend mit 200 und null - das ist ein
- * Leerzustand, kein Fehler.
+ * Before the first run the backend answers with 200 and null - that is an
+ * empty state, not an error.
  */
 export async function getStammdaten(): Promise<Stammdaten | null> {
     const response = await api.get<Stammdaten | null>('/api/stammdaten');

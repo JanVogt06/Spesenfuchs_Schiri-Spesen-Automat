@@ -3,10 +3,10 @@ import {ArrowRight, Link2, Route} from 'lucide-react';
 import {Marke, Spielfeld} from '@/pages/Landing';
 
 /*
- * Gemeinsamer Rahmen aller Instagram-Beitraege: Nacht-Grund, Flutlicht, Korn,
- * Marke oben, Fortschritt unten. Format 3:4 (540 x 720), mit ?f=story 9:16
- * (540 x 960) - dort bleibt oben und unten Platz fuer die Leisten von
- * Instagram, Wisch-Hinweis und Punkte entfallen.
+ * Shared frame of all Instagram posts: night background, floodlight, grain,
+ * brand at the top, progress at the bottom. Format 3:4 (540 x 720), with ?f=story 9:16
+ * (540 x 960) - there space is left at the top and bottom for the bars of
+ * Instagram, swipe hint and dots are omitted.
  */
 
 export const ADRESSE = 'spesenfuchs.jan-vogt.dev';
@@ -110,7 +110,7 @@ export function Kachel({icon: Icon, titel, text, children}: {
     );
 }
 
-/** Alle Slides untereinander, mit ?s=n nur die n-te - fuer den Export */
+/** All slides one below the other, with ?s=n only the n-th - for the export */
 export function Beitrag({folien}: { folien: (() => ReactNode)[] }) {
     const gewaehlt = Number(new URLSearchParams(window.location.search).get('s'));
     const auswahl = gewaehlt >= 1 && gewaehlt <= folien.length ? [folien[gewaehlt - 1]] : folien;

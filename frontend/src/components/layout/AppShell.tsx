@@ -11,23 +11,23 @@ import {DfbLoginHinweis} from '@/components/layout/DfbLoginHinweis';
 
 interface AppShellProps {
     children: ReactNode;
-    /** Ueberschrift der Seite; steht auch im Browser-Tab */
+    /** Page heading; also appears in the browser tab */
     titel?: string;
-    /** Eine Zeile unter der Ueberschrift, wozu die Seite da ist */
+    /** One line below the heading saying what the page is for */
     beschreibung?: ReactNode;
-    /** Optionale Aktions-Elemente rechts in der Navbar (z.B. der Aktualisieren-Knopf) */
+    /** Optional action elements on the right of the navbar (e.g. the refresh button) */
     actions?: ReactNode;
 }
 
 interface NavItem {
     label: string;
-    /** Kuerzere Beschriftung fuer die schmale Tab-Leiste am Handy */
+    /** Shorter label for the narrow tab bar on phones */
     kurz?: string;
     path: string;
     icon: typeof LayoutDashboard;
 }
 
-// Die vier Hauptreiter: in der Kopfzeile und am Handy direkt in der Tab-Leiste
+// The four main tabs: in the header and, on phones, directly in the tab bar
 const hauptItems: NavItem[] = [
     {label: 'Übersicht', path: '/dashboard', icon: LayoutDashboard},
     {label: 'Spiele', path: '/spiele', icon: CalendarDays},
@@ -35,7 +35,7 @@ const hauptItems: NavItem[] = [
     {label: 'Beobachtungen', kurz: 'Noten', path: '/beobachtungen', icon: ClipboardCheck},
 ];
 
-// ... und die, die auf beiden Breiten hinter "Mehr" liegen
+// ... and those that sit behind "Mehr" at both widths
 const mehrItems: NavItem[] = [
     {label: 'Ligen', path: '/ligen', icon: Table2},
     {label: 'Stammdaten', path: '/stammdaten', icon: IdCard},
@@ -43,7 +43,7 @@ const mehrItems: NavItem[] = [
     {label: 'Fehler melden', path: '/fehler-melden', icon: Bug},
 ];
 
-/** Roter Punkt an einem Reiter, der Aufmerksamkeit braucht */
+/** Red dot on a tab that needs attention */
 function Warnpunkt({className}: {className?: string}) {
     return (
         <span
@@ -54,9 +54,9 @@ function Warnpunkt({className}: {className?: string}) {
 }
 
 /**
- * viewport-fit=cover, solange die Anwendung offen ist: erst damit meldet das
- * iPhone seine sicheren Raender, und die Tab-Leiste rueckt ueber den
- * Home-Balken. Kopfzeile und Inhalt halten sie ueber .app-rahmen frei.
+ * viewport-fit=cover while the application is open: only then does the
+ * iPhone report its safe-area insets, and the tab bar moves above the
+ * home indicator. Header and content keep clear of them via .app-rahmen.
  */
 function useSichereRaender() {
     useLayoutEffect(() => {
@@ -71,7 +71,7 @@ function useSichereRaender() {
     }, []);
 }
 
-/** Seitentitel im Browser-Tab und im App-Umschalter, solange die Seite offen ist */
+/** Page title in the browser tab and the app switcher while the page is open */
 function useDokumentTitel(titel?: string) {
     useEffect(() => {
         if (!titel) return;
@@ -105,8 +105,8 @@ export function AppShell({children, titel, beschreibung, actions}: AppShellProps
         navigate(path);
     };
 
-    // Welcher Reiter leuchtet: ein Spielbericht gehoert zu der Liste, aus der
-    // er geoeffnet wurde, alles andere ausserhalb der Hauptreiter zu "Mehr"
+    // Which tab lights up: a match report belongs to the list it was opened
+    // from, everything else outside the main tabs belongs to "Mehr"
     const aktiverPfad = location.pathname.startsWith('/spielbericht/')
         ? (new URLSearchParams(location.search).get('von') === 'saison' ? '/saison' : '/spiele')
         : location.pathname;
@@ -184,8 +184,8 @@ export function AppShell({children, titel, beschreibung, actions}: AppShellProps
                 {children}
             </main>
 
-            {/* "Mehr" klappt am Handy ueber der Tab-Leiste auf, am Desktop
-                unter dem Knopf rechts in der Kopfzeile */}
+            {/* "Mehr" opens above the tab bar on phones, on desktop
+                below the button on the right of the header */}
             {mehrOffen && (
                 <div className="fixed inset-0 z-40">
                     <button
@@ -238,7 +238,7 @@ export function AppShell({children, titel, beschreibung, actions}: AppShellProps
                 </div>
             )}
 
-            {/* Tab-Leiste am Handy, schwebend ueber dem Inhalt wie unter iOS */}
+            {/* Tab bar on phones, floating above the content like on iOS */}
             <nav
                 aria-label="Hauptnavigation"
                 className="app-rahmen pointer-events-none fixed inset-x-0 bottom-0 z-50 pb-[max(0.5rem,env(safe-area-inset-bottom))] lg:hidden"

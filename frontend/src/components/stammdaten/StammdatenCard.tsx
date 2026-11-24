@@ -7,7 +7,7 @@ interface StammdatenCardProps {
     daten: Stammdaten;
 }
 
-/** Deutsche Beschriftung je Feld; unbekannte Schlüssel werden aufgehübscht */
+/** German label per field; unknown keys are prettified */
 const FELD_NAMEN: Record<string, string> = {
     name_vorname: 'Name, Vorname',
     strasse: 'Straße, Nr.',
@@ -39,10 +39,10 @@ const FELD_NAMEN: Record<string, string> = {
 };
 
 /**
- * Abschnitte in der Reihenfolge, in der DFBnet sie selbst zeigt.
+ * Sections in the order in which DFBnet itself shows them.
  *
- * Die Schlüssel stehen bewusst ausgeschrieben da: sie bestimmen Reihenfolge
- * und Gruppierung, die sich aus einem Objekt nicht ablesen lassen.
+ * The keys are deliberately spelled out: they determine order
+ * and grouping, which cannot be read from an object.
  */
 const ABSCHNITTE: {titel: string; icon: typeof Contact; felder: string[]}[] = [
     {
@@ -76,7 +76,7 @@ const ABSCHNITTE: {titel: string; icon: typeof Contact; felder: string[]}[] = [
     },
 ];
 
-/** Spalten der Tabelle, die keine Stammdaten sind */
+/** Columns of the table that are not master data */
 const METAFELDER = ['user_id', 'first_seen_at', 'scraped_at', 'fussball_de_hinweis'];
 
 const sectionHeaderClass = 'flex items-center gap-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase';
@@ -87,12 +87,12 @@ function formatFieldName(key: string): string {
 }
 
 /**
- * Ob ein Wert angezeigt wird.
+ * Whether a value is displayed.
  *
- * DFBnet schreibt "-" in Felder, die es nicht gibt. Der Scraper übernimmt das
- * im Wortlaut, weil "-" (wirklich leer) und "" (nichts gelesen) beim
- * Speichern auseinandergehalten werden müssen - erst hier fallen beide
- * zusammen und werden weggelassen.
+ * DFBnet writes "-" into fields that do not exist. The scraper takes it over
+ * verbatim because "-" (really empty) and "" (nothing read) must be
+ * told apart when saving - only here do both
+ * collapse and get omitted.
  */
 function hatWert(wert: unknown): wert is string {
     return typeof wert === 'string' && wert.trim() !== '' && wert.trim() !== '-';
@@ -113,7 +113,7 @@ function formatZeitpunkt(iso?: string): string {
 export function StammdatenCard({daten}: StammdatenCardProps) {
     const bekannteFelder = new Set([...ABSCHNITTE.flatMap((a) => a.felder), ...METAFELDER]);
 
-    // Alles, was DFBnet künftig ergänzt, landet hier statt unter den Tisch zu fallen
+    // Anything DFBnet adds in the future ends up here instead of being dropped
     const weitereFelder = Object.keys(daten)
         .filter((key) => !bekannteFelder.has(key) && hatWert(daten[key]));
 

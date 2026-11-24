@@ -2,7 +2,7 @@ import {useLocation, useNavigate} from 'react-router-dom';
 import {KeyRound} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 
-/** Der Anker der Zugangsdaten-Karte in den Einstellungen */
+/** The anchor of the credentials card in the settings */
 export const DFB_ZUGANG_ANKER = 'dfb-zugangsdaten';
 
 function formatSeit(iso: string): string {
@@ -12,10 +12,10 @@ function formatSeit(iso: string): string {
 }
 
 /**
- * Steht auf jeder Seite ganz oben, solange DFBnet die gespeicherten
- * Zugangsdaten ablehnt. Ohne ihn fiele das erst auf, wenn Ansetzungen
- * fehlen - DFBnet verlangt regelmaessig ein neues Passwort, und der
- * naechtliche Abruf scheitert danach still.
+ * Sits at the very top of every page while DFBnet rejects the stored
+ * credentials. Without it this would only be noticed once assignments
+ * are missing - DFBnet regularly demands a new password, and the
+ * nightly fetch silently fails after that.
  */
 export function DfbLoginHinweis({abgelehntSeit}: {abgelehntSeit: string}) {
     const navigate = useNavigate();
@@ -51,8 +51,8 @@ export function DfbLoginHinweis({abgelehntSeit}: {abgelehntSeit: string}) {
                     Passwort verlangt.
                 </p>
             </div>
-            {/* Voll ausgefuellt statt der blassen destructive-Variante: das ist
-                der eine Knopf, den man hier druecken soll */}
+            {/* Solid fill instead of the pale destructive variant: this is
+                the one button to press here */}
             <Button
                 className="shrink-0 bg-destructive text-white hover:bg-destructive/90 sm:self-center"
                 onClick={zumFormular}

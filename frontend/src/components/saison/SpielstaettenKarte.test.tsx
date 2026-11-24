@@ -27,7 +27,7 @@ vi.mock('leaflet', () => {
     return {default: L};
 });
 
-/** Die Zeile "2 Spielstätten · 3 Einsätze" - ihr Text steht in mehreren Teilen */
+/** The line "2 Spielstätten · 3 Einsätze" - its text is split into several parts */
 const zaehlzeile = (text: string) => (_: string, element: Element | null) =>
     element?.tagName === 'P' && element.textContent === text;
 
@@ -56,7 +56,7 @@ describe('SpielstaettenKarte', () => {
         expect(await screen.findByText(zaehlzeile('2 Spielstätten · 3 Einsätze'))).toBeInTheDocument();
         expect(marker).toHaveLength(2);
         expect(screen.getByText(/Ohne Position: 1 Platz/)).toBeInTheDocument();
-        // Ungefaehre Lage gestrichelt
+        // Approximate location dashed
         expect(marker.find((m) => m.punkt[0] === 51)?.optionen.dashArray).toBe('3 3');
 
         marker.length = 0;
