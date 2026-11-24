@@ -1253,6 +1253,29 @@ def _migration_025_strecken_cache(conn: sqlite3.Connection) -> None:
     """)
 
 
+def _migration_026_ortsnamen_cache(conn: sqlite3.Connection) -> None:
+    """
+    Cache for the place name around a coordinate (reverse geocoding).
+
+    Mileage suggestions may propose meeting somewhere on the way. A bare
+    coordinate means nothing to a referee, "near Kahla" does - so the
+    meeting point is looked up once at the geocoder and kept here. The key
+    is rounded to three decimals (about a hundred metres); the name is that
+    of the village or town, not of a street. name NULL means "nothing
+    found", like in geocode_cache.
+    """
+    _run_script(conn, """
+        CREATE TABLE ortsnamen_cache (
+            lat REAL NOT NULL,
+            lon REAL NOT NULL,
+            provider TEXT NOT NULL,
+            name TEXT,
+            resolved_at TEXT NOT NULL,
+            PRIMARY KEY (lat, lon, provider)
+        );
+    """)
+
+
 MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "baseline schema", _migration_001_baseline),
     (2, "wal journal mode", _migration_002_wal),
@@ -1279,6 +1302,7 @@ MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (23, "identify matches by their dfbnet id", _migration_023_dfb_spiel_id),
     (24, "venue coordinates and the own role per match", _migration_024_platz_und_eigene_rolle),
     (25, "cache road distances for mileage suggestions", _migration_025_strecken_cache),
+    (26, "cache place names of meeting points", _migration_026_ortsnamen_cache),
 ]
 
 

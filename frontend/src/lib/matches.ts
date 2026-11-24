@@ -120,11 +120,24 @@ export async function getMatchGeo(matchId: number): Promise<GeoDaten> {
 /** Formular-Praefix einer Rolle: sr, sra1, sra2 */
 export type RollenPraefix = 'sr' | 'sra1' | 'sra2';
 
+/** An approximate point on the driver's way where the others join */
+export interface Treffpunkt {
+    lat: number;
+    lon: number;
+    /** Village or town nearby, if the geocoder knew one */
+    name: string | null;
+}
+
 export interface Fahrt {
     fahrer: RollenPraefix;
-    /** In Abholreihenfolge */
+    /** In pick-up order; with a meeting point: the ones driving there */
     mitfahrer: RollenPraefix[];
+    /** Kilometres of the driver, round trip */
     km: number;
+    /** Set if the others drive to a meeting point instead of being picked up */
+    treffpunkt: Treffpunkt | null;
+    /** With a meeting point: each passenger's own kilometres there and back */
+    zubringer?: Partial<Record<RollenPraefix, number>>;
 }
 
 export interface Fahrgemeinschaft {

@@ -420,3 +420,63 @@ class TestGeocodeBekannt:
         conn.close()
 
         assert geocoder.geocode_bekannt("Waldweg 1, 99999 Irgendwo") == (None, True)
+
+
+# ===== Place names around a coordinate (meeting points) =====
+
+class RueckwaertsDienst:
+    """Stand-in for urlopen on /reverse: answers with a fixed address."""
+
+    def __init__(self, adresse=None, fehler=None):
+        self.adresse = adresse or {}
+        self.fehler = fehler
+        self.anfragen = []
+
+    def __call__(self, request, timeout=None):
+        self.anfragen.append(request.full_url)
+        if self.fehler:
+            raise self.fehler
+        return _Antwort(json.dumps({"address": self.adresse}).encode())
+
+
+@pytest.fixture
+def rueckwaerts(db, monkeypatch):
+    monkeypatch.setattr(geocoder, "_letzte_anfrage", 0.0)
+    monkeypatch.setenv("GEOCODER_MIN_INTERVAL", "0")
+    monkeypatch.delenv("NOMINATIM_URL", raising=False)
+
+    def setzen(dienst):
+        monkeypatch.setattr(geocoder, "urlopen", dienst)
+        return dienst
+    return setzen
+
+
+class TestOrtsname:
+    def test_dorf_vor_ortsteil_und_anfrage_auf_ortsebene(self, rueckwaerts):
+        dienst = rueckwaerts(RueckwaertsDienst({"suburb": "Lobeda", "village": "Kahla", "road": "B 88"}))
+
+        assert geocoder.ortsname(50.80761, 11.58561) == "Kahla"
+        query = parse_qs(urlparse(dienst.anfragen[0]).query)
+        assert dienst.anfragen[0].startswith(f"{STANDARD_URL}/reverse?")
+        assert (query["lat"], query["lon"], query["zoom"]) == (["50.808"], ["11.586"], ["14"])
+
+    def test_wird_gespeichert_auch_ohne_treffer(self, rueckwaerts):
+        dienst = rueckwaerts(RueckwaertsDienst({"road": "Feldweg"}))
+
+        assert geocoder.ortsname(50.8, 11.5) is None
+        assert geocoder.ortsname(50.8001, 11.5001) is None
+        assert len(dienst.anfragen) == 1
+
+    def test_treffer_aus_dem_speicher(self, rueckwaerts):
+        dienst = rueckwaerts(RueckwaertsDienst({"town": "Pößneck"}))
+        geocoder.ortsname(50.69, 11.59)
+        assert geocoder.ortsname(50.69, 11.59) == "Pößneck"
+        assert len(dienst.anfragen) == 1
+
+    def test_ausfall_liefert_none_und_wird_nicht_gespeichert(self, rueckwaerts):
+        rueckwaerts(RueckwaertsDienst(fehler=URLError("weg")))
+        assert geocoder.ortsname(50.69, 11.59) is None
+
+        dienst = rueckwaerts(RueckwaertsDienst({"city": "Jena"}))
+        assert geocoder.ortsname(50.69, 11.59) == "Jena"
+        assert len(dienst.anfragen) == 1

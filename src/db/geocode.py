@@ -60,3 +60,35 @@ def store(anfrage: str, provider: str, lat: Optional[float], lon: Optional[float
         conn.commit()
     finally:
         conn.close()
+
+
+def get_ortsname(lat: float, lon: float, provider: str) -> Optional[Dict]:
+    """The cached place name for a (rounded) coordinate: {"name", "resolved_at"}, or None if never asked."""
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            "SELECT name, resolved_at FROM ortsnamen_cache WHERE lat = ? AND lon = ? AND provider = ?",
+            (lat, lon, provider),
+        ).fetchone()
+    finally:
+        conn.close()
+    return {"name": row["name"], "resolved_at": row["resolved_at"]} if row else None
+
+
+def store_ortsname(lat: float, lon: float, provider: str, name: Optional[str]) -> None:
+    """Keeps the result of a reverse lookup - including "nothing found" (name None)."""
+    conn = get_connection()
+    try:
+        conn.execute(
+            """
+            INSERT INTO ortsnamen_cache (lat, lon, provider, name, resolved_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT (lat, lon, provider) DO UPDATE SET
+                name = excluded.name,
+                resolved_at = excluded.resolved_at
+            """,
+            (lat, lon, provider, name, datetime.now(UTC).isoformat()),
+        )
+        conn.commit()
+    finally:
+        conn.close()

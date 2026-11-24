@@ -1,18 +1,18 @@
 import {useEffect, useState} from 'react';
 import {Button} from '@/components/ui/button';
 import {getFahrtVorschlaege, type FahrtVorschlaege as Vorschlaege, type RollenPraefix} from '@/lib/matches';
-import {beschreibeFahrgemeinschaft, rollenName} from '@/lib/fahrten';
-import {Car, Loader2, Route, Users} from 'lucide-react';
+import {beschreibeFahrgemeinschaft, rollenName, treffpunktLink} from '@/lib/fahrten';
+import {Car, Loader2, MapPin, Route, Users} from 'lucide-react';
 
 interface FahrtVorschlaegeProps {
     matchId: number;
-    /** Traegt die Kilometer in die Eingabefelder ein - gespeichert wird erst mit "Speichern" */
+    /** Fills the kilometres into the input fields - saved only with "Speichern" */
     onUebernehmen: (km: Partial<Record<RollenPraefix, number>>) => void;
 }
 
 /**
- * Kilometer-Vorschläge für die Fahrtkosten: jede Person allein und als
- * Fahrgemeinschaft. Ein Klick auf "Übernehmen" füllt die Felder darunter.
+ * Mileage suggestions for the travel costs: everyone alone, and carpools by
+ * pick-up or meeting point. "Übernehmen" fills the fields below.
  */
 export function FahrtVorschlaege({matchId, onUebernehmen}: FahrtVorschlaegeProps) {
     const [daten, setDaten] = useState<Vorschlaege | null>(null);
@@ -90,7 +90,23 @@ export function FahrtVorschlaege({matchId, onUebernehmen}: FahrtVorschlaegeProps
                             <span className="text-xs font-normal text-primary">spart {vorschlag.ersparnis} km</span>
                         </p>
                         {beschreibeFahrgemeinschaft(vorschlag, daten.selbst).map((zeile) => (
-                            <p key={zeile} className="text-xs text-muted-foreground">{zeile}</p>
+                            <p key={zeile.text} className="text-xs text-muted-foreground">
+                                {zeile.text}
+                                {zeile.treffpunkt && (
+                                    <>
+                                        {' '}
+                                        <a
+                                            href={treffpunktLink(zeile.treffpunkt)}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="inline-flex items-center gap-0.5 text-primary underline-offset-2 hover:underline"
+                                        >
+                                            <MapPin className="size-3"/>
+                                            Karte
+                                        </a>
+                                    </>
+                                )}
+                            </p>
                         ))}
                     </div>
                     <Button size="sm" variant="outline" onClick={() => onUebernehmen(vorschlag.km)}>

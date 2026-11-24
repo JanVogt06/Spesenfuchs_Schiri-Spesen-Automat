@@ -12,8 +12,13 @@ const VORSCHLAEGE: Vorschlaege = {
     selbst: 'sra1',
     einzeln: {km: {sr: 40, sra1: 42, sra2: 70}, gesamt: 152},
     fahrgemeinschaften: [{
-        fahrten: [{fahrer: 'sr', mitfahrer: ['sra1'], km: 46}, {fahrer: 'sra2', mitfahrer: [], km: 70}],
+        fahrten: [{fahrer: 'sr', mitfahrer: ['sra1'], km: 46, treffpunkt: null},
+            {fahrer: 'sra2', mitfahrer: [], km: 70, treffpunkt: null}],
         km: {sr: 46, sra1: 0, sra2: 70}, gesamt: 116, ersparnis: 36,
+    }, {
+        fahrten: [{fahrer: 'sr', mitfahrer: ['sra1', 'sra2'], km: 82,
+            treffpunkt: {lat: 50.8076, lon: 11.5856, name: 'Kahla'}, zubringer: {sra1: 6, sra2: 14}}],
+        km: {sr: 82, sra1: 6, sra2: 14}, gesamt: 102, ersparnis: 50,
     }],
     ohne_anschrift: [],
     ohne_spielort: false,
@@ -29,7 +34,7 @@ function zeige(antwort: unknown = VORSCHLAEGE) {
 beforeEach(() => apiZuruecksetzen());
 
 describe('FahrtVorschlaege', () => {
-    it('zeigt Einzelfahrten und Fahrgemeinschaft und uebernimmt die Kilometer', async () => {
+    it('zeigt Einzelfahrten, Fahrgemeinschaften und Treffpunkt und uebernimmt die Kilometer', async () => {
         const uebernehmen = zeige();
 
         expect(await screen.findByText('SR 40 km · SRA 1 (du) 42 km · SRA 2 70 km')).toBeInTheDocument();
@@ -37,7 +42,14 @@ describe('FahrtVorschlaege', () => {
         expect(screen.getByText('SR fährt und holt SRA 1 (du) ab (46 km)')).toBeInTheDocument();
         expect(screen.getByText('SRA 2 fährt allein (70 km)')).toBeInTheDocument();
 
+        expect(screen.getByText(/SR fährt \(82 km\), SRA 1 \(du\) \(6 km\) und SRA 2 \(14 km\) kommen zum Treffpunkt etwa bei Kahla/))
+            .toBeInTheDocument();
+        expect(screen.getByRole('link', {name: 'Karte'})).toHaveAttribute(
+            'href', 'https://www.openstreetmap.org/?mlat=50.8076&mlon=11.5856#map=13/50.8076/11.5856');
+
         const knoepfe = screen.getAllByRole('button', {name: 'Übernehmen'});
+        await userEvent.click(knoepfe[2]);
+        expect(uebernehmen).toHaveBeenCalledWith({sr: 82, sra1: 6, sra2: 14});
         await userEvent.click(knoepfe[1]);
         expect(uebernehmen).toHaveBeenCalledWith({sr: 46, sra1: 0, sra2: 70});
         await userEvent.click(knoepfe[0]);

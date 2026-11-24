@@ -27,7 +27,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from core.config import APP_VERSION
-from db.geocode import get_cached, store
+from db.geocode import get_cached, get_ortsname, store, store_ortsname
 from utils.logger import setup_logger
 
 logger = setup_logger("geocoder")
@@ -266,3 +266,48 @@ def _ort_aus_adresse(adresse: str) -> Optional[str]:
     # Kein Komma: wenigstens ab der Postleitzahl abschneiden
     treffer = re.search(r"\b\d{5}\b.*$", adresse)
     return treffer.group(0).strip() if treffer else None
+
+
+# Address parts that name a place, most specific first. Suburbs come after
+# villages and towns: "near Jena" helps more than "near Lobeda-West".
+_ORTSTEILE = ("village", "town", "city", "municipality", "suburb", "hamlet")
+
+
+def ortsname(lat: float, lon: float) -> Optional[str]:
+    """
+    Name of the village or town around a coordinate (reverse geocoding), or None.
+
+    Used to describe meeting points ("near Kahla"). The coordinate is not an
+    address of anyone - just a point on the way. Results, including "nothing
+    found", are kept in ortsnamen_cache; an unreachable service is not
+    cached and simply yields None, the suggestion is shown without a name.
+    """
+    global _letzte_anfrage
+
+    schluessel = (round(lat, 3), round(lon, 3))
+    provider = basis_url()
+    eintrag = get_ortsname(*schluessel, provider)
+    if eintrag and (eintrag["name"] is not None or not _fehlschlag_abgelaufen(eintrag["resolved_at"])):
+        return eintrag["name"]
+
+    parameter = urlencode({"lat": f"{schluessel[0]:.3f}", "lon": f"{schluessel[1]:.3f}",
+                           "format": "jsonv2", "zoom": "14", "addressdetails": "1"})
+    anfrage = Request(f"{provider}/reverse?{parameter}", headers={"User-Agent": USER_AGENT, "Accept-Language": "de"})
+
+    with _schloss:
+        wartezeit = _letzte_anfrage + _min_intervall() - time.monotonic()
+        if wartezeit > 0:
+            time.sleep(wartezeit)
+        try:
+            with urlopen(anfrage, timeout=TIMEOUT_SEKUNDEN) as antwort:
+                daten = json.loads(antwort.read().decode("utf-8"))
+        except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, OSError) as e:
+            logger.warning(f"Geocoder nicht erreichbar ({provider}): {e}")
+            return None
+        finally:
+            _letzte_anfrage = time.monotonic()
+
+    adresse = (daten.get("address") or {}) if isinstance(daten, dict) else {}
+    name = next((adresse[teil] for teil in _ORTSTEILE if adresse.get(teil)), None)
+    store_ortsname(*schluessel, provider, name)
+    return name
