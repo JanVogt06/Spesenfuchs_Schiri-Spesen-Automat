@@ -64,13 +64,12 @@ describe('AppShell - DFBnet-Hinweis', () => {
         const {container} = zeige('/dashboard', SEIT);
 
         expect(await screen.findByRole('alert')).toHaveTextContent('Seit dem 20.11.2026');
-        // Desktop: am Reiter Einstellungen; Handy: am "Mehr"-Knopf
+        // Die Einstellungen liegen auf beiden Breiten hinter "Mehr"
         expect(warnpunkte(container)).toHaveLength(2);
-        const einstellungen = kopfzeile().getByRole('button', {name: 'Einstellungen'});
-        expect(einstellungen.querySelector('span.size-2.bg-destructive')).not.toBeNull();
+        expect(kopfzeile().getByRole('button', {name: /Mehr/}).querySelector('span.size-2.bg-destructive')).not.toBeNull();
         const mehr = tabLeiste().getByRole('button', {name: /Mehr/});
         expect(mehr.querySelector('span.size-2.bg-destructive')).not.toBeNull();
-        expect(kopfzeile().getByRole('button', {name: 'Dashboard'}).querySelector('span.size-2')).toBeNull();
+        expect(kopfzeile().getByRole('button', {name: 'Übersicht'}).querySelector('span.size-2')).toBeNull();
     });
 
     it('markiert auch im aufgeklappten "Mehr"-Menue die Einstellungen', async () => {
@@ -119,18 +118,49 @@ describe('AppShell - Navigation', () => {
 
         const aktiv = kopfzeile().getByRole('button', {name: 'Saison'});
         expect(aktiv).toHaveClass('bg-primary/10', 'text-primary');
-        for (const name of ['Dashboard', 'Spiele', 'Ligen', 'Beobachtungen', 'Stammdaten', 'Fehler melden', 'Einstellungen']) {
+        expect(aktiv).toHaveAttribute('aria-current', 'page');
+        for (const name of ['Übersicht', 'Spiele', 'Beobachtungen', /Mehr/]) {
             expect(kopfzeile().getByRole('button', {name})).not.toHaveClass('text-primary');
         }
     });
 
-    it('markiert in der Tab-Leiste den Hauptreiter als aktuelle Seite', async () => {
-        zeige('/ligen');
+    it('fuehrt in der Kopfzeile nur die Hauptreiter, den Rest hinter "Mehr"', async () => {
+        zeige('/stammdaten');
         await waitFor(() => expect(apiGet).toHaveBeenCalled());
 
-        expect(tabLeiste().getByRole('button', {name: 'Ligen'})).toHaveAttribute('aria-current', 'page');
-        expect(tabLeiste().getByRole('button', {name: 'Ligen'})).toHaveClass('text-primary');
-        expect(tabLeiste().getByRole('button', {name: 'Dashboard'})).not.toHaveAttribute('aria-current');
+        for (const name of ['Ligen', 'Stammdaten', 'Einstellungen', 'Fehler melden', 'Abmelden']) {
+            expect(kopfzeile().queryByRole('button', {name})).not.toBeInTheDocument();
+        }
+        const mehr = kopfzeile().getByRole('button', {name: /Mehr/});
+        expect(mehr).toHaveClass('text-primary');
+
+        await userEvent.click(mehr);
+        const menue = within(screen.getByRole('navigation', {name: 'Weitere Seiten'}));
+        expect(menue.getByRole('button', {name: 'Stammdaten'})).toHaveAttribute('aria-current', 'page');
+        await userEvent.click(menue.getByRole('button', {name: 'Ligen'}));
+        expect(screen.getByTestId('ort')).toHaveTextContent('/ligen');
+    });
+
+    it.each([
+        ['/spielbericht/7?von=saison', 'Saison'],
+        ['/spielbericht/7?von=spesen', 'Spiele'],
+    ])('ordnet den Spielbericht %s dem Reiter %s zu', async (pfad, reiter) => {
+        zeige(pfad);
+        await waitFor(() => expect(apiGet).toHaveBeenCalled());
+
+        expect(kopfzeile().getByRole('button', {name: reiter})).toHaveAttribute('aria-current', 'page');
+        expect(tabLeiste().getByRole('button', {name: reiter})).toHaveAttribute('aria-current', 'page');
+        expect(tabLeiste().getByRole('button', {name: /Mehr/})).toHaveClass('text-muted-foreground');
+    });
+
+    it('markiert in der Tab-Leiste den Hauptreiter als aktuelle Seite', async () => {
+        zeige('/beobachtungen');
+        await waitFor(() => expect(apiGet).toHaveBeenCalled());
+
+        // Am Handy reicht der Platz nur fuer die kurze Beschriftung
+        expect(tabLeiste().getByRole('button', {name: 'Noten'})).toHaveAttribute('aria-current', 'page');
+        expect(tabLeiste().getByRole('button', {name: 'Noten'})).toHaveClass('text-primary');
+        expect(tabLeiste().getByRole('button', {name: 'Übersicht'})).not.toHaveAttribute('aria-current');
         expect(tabLeiste().getByRole('button', {name: /Mehr/})).toHaveClass('text-muted-foreground');
     });
 
@@ -138,7 +168,7 @@ describe('AppShell - Navigation', () => {
         zeige('/stammdaten');
         await waitFor(() => expect(apiGet).toHaveBeenCalled());
 
-        for (const name of ['Dashboard', 'Spiele', 'Saison', 'Ligen']) {
+        for (const name of ['Übersicht', 'Spiele', 'Saison', 'Noten']) {
             expect(tabLeiste().getByRole('button', {name})).not.toHaveAttribute('aria-current');
         }
         const mehr = tabLeiste().getByRole('button', {name: /Mehr/});
@@ -192,14 +222,16 @@ describe('AppShell - Navigation', () => {
         expect(kopfzeile().getByRole('link', {name: /Spesenfuchs/})).toHaveAttribute('href', '/dashboard');
     });
 
-    it('meldet ueber den Abmelden-Knopf ab', async () => {
+    it('meldet ueber den Abmelden-Knopf im Mehr-Menue ab', async () => {
         const ort = {href: 'http://localhost/dashboard'};
         vi.stubGlobal('location', ort);
         localStorage.setItem('token', 'jwt');
         zeige('/dashboard');
         await waitFor(() => expect(apiGet).toHaveBeenCalled());
 
-        await userEvent.click(kopfzeile().getByRole('button', {name: 'Abmelden'}));
+        await userEvent.click(kopfzeile().getByRole('button', {name: /Mehr/}));
+        await userEvent.click(within(screen.getByRole('navigation', {name: 'Weitere Seiten'}))
+            .getByRole('button', {name: 'Abmelden'}));
 
         expect(localStorage.getItem('token')).toBeNull();
         expect(ort.href).toBe('/login');

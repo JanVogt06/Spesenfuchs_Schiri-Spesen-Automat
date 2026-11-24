@@ -17,27 +17,27 @@ interface AppShellProps {
 
 interface NavItem {
     label: string;
+    /** Kuerzere Beschriftung fuer die schmale Tab-Leiste am Handy */
+    kurz?: string;
     path: string;
     icon: typeof LayoutDashboard;
 }
 
-// Die vier Reiter, die am Handy direkt in der Tab-Leiste stehen
+// Die vier Hauptreiter: in der Kopfzeile und am Handy direkt in der Tab-Leiste
 const hauptItems: NavItem[] = [
-    {label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard},
+    {label: 'Übersicht', path: '/dashboard', icon: LayoutDashboard},
     {label: 'Spiele', path: '/spiele', icon: CalendarDays},
     {label: 'Saison', path: '/saison', icon: Trophy},
-    {label: 'Ligen', path: '/ligen', icon: Table2},
+    {label: 'Beobachtungen', kurz: 'Noten', path: '/beobachtungen', icon: ClipboardCheck},
 ];
 
-// ... und die, die dort hinter "Mehr" liegen
+// ... und die, die auf beiden Breiten hinter "Mehr" liegen
 const mehrItems: NavItem[] = [
-    {label: 'Beobachtungen', path: '/beobachtungen', icon: ClipboardCheck},
+    {label: 'Ligen', path: '/ligen', icon: Table2},
     {label: 'Stammdaten', path: '/stammdaten', icon: IdCard},
-    {label: 'Fehler melden', path: '/fehler-melden', icon: Bug},
     {label: 'Einstellungen', path: '/settings', icon: Settings},
+    {label: 'Fehler melden', path: '/fehler-melden', icon: Bug},
 ];
-
-const navItems = [...hauptItems, ...mehrItems];
 
 /** Roter Punkt an einem Reiter, der Aufmerksamkeit braucht */
 function Warnpunkt({className}: {className?: string}) {
@@ -88,8 +88,12 @@ export function AppShell({children, actions}: AppShellProps) {
         navigate(path);
     };
 
-    // Die Markierung der Tab-Leiste: ein Hauptreiter, sonst "Mehr"
-    const hauptIndex = hauptItems.findIndex((item) => item.path === location.pathname);
+    // Welcher Reiter leuchtet: ein Spielbericht gehoert zu der Liste, aus der
+    // er geoeffnet wurde, alles andere ausserhalb der Hauptreiter zu "Mehr"
+    const aktiverPfad = location.pathname.startsWith('/spielbericht/')
+        ? (new URLSearchParams(location.search).get('von') === 'saison' ? '/saison' : '/spiele')
+        : location.pathname;
+    const hauptIndex = hauptItems.findIndex((item) => item.path === aktiverPfad);
     const aufMehrSeite = hauptIndex === -1;
     const markierung = mehrOffen || aufMehrSeite ? hauptItems.length : hauptIndex;
     const tabs = hauptItems.length + 1;
@@ -106,29 +110,23 @@ export function AppShell({children, actions}: AppShellProps) {
                     </span>
                 </Link>
 
-                <nav className="ml-4 hidden items-center gap-1 lg:flex">
-                    {navItems.map((item) => {
-                        const isActive = location.pathname === item.path;
+                <nav aria-label="Hauptreiter" className="ml-4 hidden items-center gap-1 lg:flex">
+                    {hauptItems.map((item, index) => {
+                        const isActive = index === hauptIndex;
                         return (
                             <Button
                                 key={item.path}
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => navigate(item.path)}
-                                aria-label={item.label}
-                                title={item.label}
+                                onClick={() => gehZu(item.path)}
+                                aria-current={isActive ? 'page' : undefined}
                                 className={cn(
                                     'text-muted-foreground',
                                     isActive && 'bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary'
                                 )}
                             >
-                                <span className="relative">
-                                    <item.icon className="size-4"/>
-                                    {dfbAbgelehntSeit && item.path === '/settings' && (
-                                        <Warnpunkt className="-top-1 -right-1"/>
-                                    )}
-                                </span>
-                                <span className="hidden xl:inline">{item.label}</span>
+                                <item.icon className="size-4"/>
+                                {item.label}
                             </Button>
                         );
                     })}
@@ -138,13 +136,20 @@ export function AppShell({children, actions}: AppShellProps) {
                     {actions}
                     <Button
                         variant="ghost"
-                        size="icon-sm"
-                        onClick={logout}
-                        className="hidden text-muted-foreground lg:inline-flex"
-                        aria-label="Abmelden"
-                        title="Abmelden"
+                        size="sm"
+                        onClick={() => setMehrOffen((offen) => !offen)}
+                        aria-expanded={mehrOffen}
+                        aria-controls="mehr-menue"
+                        className={cn(
+                            'hidden text-muted-foreground lg:inline-flex',
+                            (mehrOffen || aufMehrSeite) && 'bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary'
+                        )}
                     >
-                        <LogOut className="size-4"/>
+                        <span className="relative">
+                            <Ellipsis className="size-4"/>
+                            {dfbAbgelehntSeit && <Warnpunkt className="-top-1 -right-1"/>}
+                        </span>
+                        Mehr
                     </Button>
                 </div>
             </header>
@@ -154,12 +159,13 @@ export function AppShell({children, actions}: AppShellProps) {
                 {children}
             </main>
 
-            {/* Am Handy: "Mehr" klappt ueber der Tab-Leiste auf */}
+            {/* "Mehr" klappt am Handy ueber der Tab-Leiste auf, am Desktop
+                unter dem Knopf rechts in der Kopfzeile */}
             {mehrOffen && (
-                <div className="fixed inset-0 z-40 lg:hidden">
+                <div className="fixed inset-0 z-40">
                     <button
                         type="button"
-                        className="absolute inset-0 bg-black/30 animate-in fade-in duration-200"
+                        className="absolute inset-0 bg-black/30 animate-in fade-in duration-200 lg:bg-transparent"
                         onClick={() => setMehrOffen(false)}
                         aria-label="Menü schließen"
                         tabIndex={-1}
@@ -167,9 +173,9 @@ export function AppShell({children, actions}: AppShellProps) {
                     <nav
                         id="mehr-menue"
                         aria-label="Weitere Seiten"
-                        className="app-rahmen absolute inset-x-0 bottom-[calc(4.75rem+max(0.5rem,env(safe-area-inset-bottom)))] animate-in fade-in slide-in-from-bottom-4 duration-200"
+                        className="app-rahmen absolute inset-x-0 bottom-[calc(4.75rem+max(0.5rem,env(safe-area-inset-bottom)))] animate-in fade-in slide-in-from-bottom-4 duration-200 lg:top-15 lg:bottom-auto lg:left-auto lg:slide-in-from-top-2"
                     >
-                        <div className="mx-auto max-w-md rounded-2xl border bg-card p-2 shadow-xl">
+                        <div className="mx-auto max-w-md rounded-2xl border bg-card p-2 shadow-xl lg:mx-0 lg:w-60 lg:rounded-xl lg:p-1.5">
                             {mehrItems.map((item) => {
                                 const isActive = location.pathname === item.path;
                                 return (
@@ -179,7 +185,7 @@ export function AppShell({children, actions}: AppShellProps) {
                                         onClick={() => gehZu(item.path)}
                                         aria-current={isActive ? 'page' : undefined}
                                         className={cn(
-                                            'h-11 w-full justify-start text-muted-foreground',
+                                            'h-11 w-full justify-start text-muted-foreground lg:h-9',
                                             isActive && 'bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary'
                                         )}
                                     >
@@ -197,7 +203,7 @@ export function AppShell({children, actions}: AppShellProps) {
                             <Button
                                 variant="ghost"
                                 onClick={logout}
-                                className="h-11 w-full justify-start text-muted-foreground"
+                                className="h-11 w-full justify-start text-muted-foreground lg:h-9"
                             >
                                 <LogOut className="size-4"/>
                                 Abmelden
@@ -230,12 +236,12 @@ export function AppShell({children, actions}: AppShellProps) {
                                 onClick={() => gehZu(item.path)}
                                 aria-current={index === hauptIndex ? 'page' : undefined}
                                 className={cn(
-                                    'relative flex h-14 flex-1 flex-col items-center justify-center gap-0.5 rounded-full text-[0.6875rem] font-medium transition-colors',
+                                    'relative flex h-14 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-full text-[0.6875rem] font-medium transition-colors',
                                     isActive ? 'text-primary' : 'text-muted-foreground'
                                 )}
                             >
                                 <item.icon className="size-5"/>
-                                {item.label}
+                                {item.kurz ?? item.label}
                             </button>
                         );
                     })}
@@ -245,7 +251,7 @@ export function AppShell({children, actions}: AppShellProps) {
                         aria-expanded={mehrOffen}
                         aria-controls="mehr-menue"
                         className={cn(
-                            'relative flex h-14 flex-1 flex-col items-center justify-center gap-0.5 rounded-full text-[0.6875rem] font-medium transition-colors',
+                            'relative flex h-14 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-full text-[0.6875rem] font-medium transition-colors',
                             mehrOffen || aufMehrSeite ? 'text-primary' : 'text-muted-foreground'
                         )}
                     >
