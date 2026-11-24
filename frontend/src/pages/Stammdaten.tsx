@@ -1,6 +1,6 @@
 import {useState, useEffect, useCallback} from 'react';
 import {AppShell} from '@/components/layout/AppShell';
-import {GenerateButton} from '@/components/matches/GenerateButton';
+import {AktualisierenButton} from '@/components/layout/AktualisierenButton';
 import {StammdatenCard} from '@/components/stammdaten/StammdatenCard';
 import {useScrapeRun} from '@/hooks/useScrapeRun';
 import {getStammdaten, type Stammdaten} from '@/lib/stammdaten';
@@ -35,7 +35,7 @@ export function StammdatenPage() {
     const displayError = error || ladeFehler;
 
     return (
-        <AppShell actions={<GenerateButton isGenerating={isStarting || isRunning} onClick={startGeneration}/>}>
+        <AppShell actions={<AktualisierenButton run={run} laeuft={isStarting || isRunning} onClick={startGeneration}/>}>
             {displayError && (
                 <div className="mb-6 flex items-start gap-2 rounded-lg bg-destructive/10 px-4 py-3 ring-1 ring-destructive/20">
                     <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive"/>

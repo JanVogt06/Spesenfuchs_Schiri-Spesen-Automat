@@ -255,7 +255,7 @@ describe('useScrapeRun - startGeneration', () => {
             await result.current.startGeneration();
         });
 
-        expect(result.current.error).toBe('Die Generierung konnte nicht gestartet werden.');
+        expect(result.current.error).toBe('Die Aktualisierung konnte nicht gestartet werden.');
     });
 
     it('loescht einen alten Fehler beim naechsten Versuch', async () => {

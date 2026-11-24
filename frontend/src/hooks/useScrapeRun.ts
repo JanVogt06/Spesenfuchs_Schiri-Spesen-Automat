@@ -90,7 +90,7 @@ export function useScrapeRun(onFinished?: () => void) {
         } catch (err: unknown) {
             const detail = (err as { response?: { data?: { error?: { message?: string } } } })
                 ?.response?.data?.error?.message;
-            setError(detail || 'Die Generierung konnte nicht gestartet werden.');
+            setError(detail || 'Die Aktualisierung konnte nicht gestartet werden.');
         } finally {
             setIsStarting(false);
         }

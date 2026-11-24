@@ -55,7 +55,7 @@ export function DFBCredentialsForm() {
             });
 
             setSuccess(abgelehnt
-                ? 'Gespeichert. Ob DFBnet sie annimmt, zeigt der nächste Abruf – heute Nacht oder sofort über den Generieren-Knopf oben.'
+                ? 'Gespeichert. Ob DFBnet sie annimmt, zeigt der nächste Abruf – heute Nacht oder sofort über „Aktualisieren“ oben.'
                 : 'DFB-Credentials erfolgreich gespeichert!');
             setHasCredentials(true);
             setAbgelehnt(false);
@@ -80,7 +80,7 @@ export function DFBCredentialsForm() {
             <CardHeader className="px-4 sm:px-6">
                 <CardTitle className="text-base sm:text-lg">DFB-Zugangsdaten</CardTitle>
                 <CardDescription className="text-sm">
-                    Speichere deine DFBnet-Zugangsdaten für die automatische Generierung
+                    Speichere deine DFBnet-Zugangsdaten für den automatischen Abruf
                 </CardDescription>
             </CardHeader>
             <CardContent className="px-4 sm:px-6">

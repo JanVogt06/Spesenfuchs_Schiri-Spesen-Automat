@@ -5,7 +5,7 @@ import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import {Separator} from '@/components/ui/separator';
 import {Badge} from '@/components/ui/badge';
 import {AppShell} from '@/components/layout/AppShell';
-import {GenerateButton} from '@/components/matches/GenerateButton';
+import {AktualisierenButton} from '@/components/layout/AktualisierenButton';
 import {InstallBanner} from '@/components/pwa/InstallHinweis';
 import {useScrapeRun} from '@/hooks/useScrapeRun';
 import {getAllMatches, type MatchData} from '@/lib/matches';
@@ -132,7 +132,7 @@ export function DashboardPage() {
     const displayError = error || ladeFehler;
 
     return (
-        <AppShell actions={<GenerateButton isGenerating={isStarting || isRunning} onClick={startGeneration}/>}>
+        <AppShell actions={<AktualisierenButton run={run} laeuft={isStarting || isRunning} onClick={startGeneration}/>}>
             <InstallBanner/>
 
             {displayError && (

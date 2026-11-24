@@ -2,7 +2,7 @@ import {useState, useEffect, useCallback} from 'react';
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import {Separator} from '@/components/ui/separator';
 import {AppShell} from '@/components/layout/AppShell';
-import {GenerateButton} from '@/components/matches/GenerateButton';
+import {AktualisierenButton} from '@/components/layout/AktualisierenButton';
 import {MatchList} from '@/components/matches/MatchList';
 import {useScrapeRun} from '@/hooks/useScrapeRun';
 import {getAllMatches, type MatchData} from '@/lib/matches';
@@ -38,7 +38,7 @@ export function SpielePage() {
     const fortschritt = run?.progress;
 
     return (
-        <AppShell actions={<GenerateButton isGenerating={isStarting || isRunning} onClick={startGeneration}/>}>
+        <AppShell actions={<AktualisierenButton run={run} laeuft={isStarting || isRunning} onClick={startGeneration}/>}>
             {displayError && (
                 <div className="mb-6 flex items-start gap-2 rounded-lg bg-destructive/10 px-4 py-3 ring-1 ring-destructive/20 animate-in slide-in-from-top-2 duration-300">
                     <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive"/>

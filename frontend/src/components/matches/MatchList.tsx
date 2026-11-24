@@ -67,7 +67,7 @@ export function MatchList({matches, onReload}: MatchListProps) {
                 </span>
                 <p className="text-sm font-medium">Noch keine Spiele</p>
                 <p className="max-w-xs text-sm text-muted-foreground">
-                    Starte die erste Generierung mit dem Button oben.
+                    Hol die Ansetzungen über „Aktualisieren“ oben – oder warte auf den automatischen Abruf in der Nacht.
                 </p>
             </div>
         );

@@ -11,7 +11,7 @@ import {DfbLoginHinweis} from '@/components/layout/DfbLoginHinweis';
 
 interface AppShellProps {
     children: ReactNode;
-    /** Optionale Aktions-Elemente rechts in der Navbar (z.B. Generieren-Button) */
+    /** Optionale Aktions-Elemente rechts in der Navbar (z.B. der Aktualisieren-Knopf) */
     actions?: ReactNode;
 }
 

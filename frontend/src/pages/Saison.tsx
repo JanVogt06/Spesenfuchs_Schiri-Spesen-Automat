@@ -1,7 +1,7 @@
 import {useState, useEffect, useCallback} from 'react';
 import {Button} from '@/components/ui/button';
 import {AppShell} from '@/components/layout/AppShell';
-import {GenerateButton} from '@/components/matches/GenerateButton';
+import {AktualisierenButton} from '@/components/layout/AktualisierenButton';
 import {SaisonBilanz} from '@/components/saison/SaisonBilanz';
 import {SaisonSpiele} from '@/components/saison/SaisonSpiele';
 import {useScrapeRun} from '@/hooks/useScrapeRun';
@@ -80,7 +80,7 @@ export function SaisonPage() {
     const displayError = error || ladeFehler;
 
     return (
-        <AppShell actions={<GenerateButton isGenerating={isStarting || isRunning} onClick={startGeneration}/>}>
+        <AppShell actions={<AktualisierenButton run={run} laeuft={isStarting || isRunning} onClick={startGeneration}/>}>
             {displayError && (
                 <div className="mb-6 flex items-start gap-2 rounded-lg bg-destructive/10 px-4 py-3 ring-1 ring-destructive/20">
                     <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive"/>

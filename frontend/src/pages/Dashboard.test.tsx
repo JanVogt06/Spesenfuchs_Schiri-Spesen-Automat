@@ -336,7 +336,25 @@ describe('DashboardPage - Abruf', () => {
         await geladen();
 
         expect(await screen.findByText(/Lese Ansetzungen\.\.\. Die Übersicht aktualisiert sich/)).toBeInTheDocument();
-        expect(screen.getByRole('button', {name: /Starte/})).toBeDisabled();
+        expect(screen.getByRole('button', {name: /Aktualisiert/})).toBeDisabled();
+    });
+
+    it('zeigt neben dem Knopf, wann zuletzt aus DFBnet gelesen wurde', async () => {
+        const heute = new Date();
+        heute.setHours(3, 0, 0, 0);
+        zeige({run: {status: 'completed', finished_at: heute.toISOString(), progress: null}});
+        await geladen();
+
+        expect(await screen.findByText('heute, 03:00')).toBeInTheDocument();
+        expect(screen.getByText('Stand')).toBeInTheDocument();
+    });
+
+    it('zeigt keinen Stand, wenn der letzte Abruf scheiterte', async () => {
+        zeige({run: {status: 'failed', finished_at: new Date().toISOString(), progress: null}});
+        await geladen();
+        await waitFor(() => expect(apiGet).toHaveBeenCalledWith('/api/scrape/status'));
+
+        expect(screen.queryByText('Stand')).not.toBeInTheDocument();
     });
 
     it('startet einen Abruf und zeigt dessen Fehlermeldung', async () => {
@@ -344,7 +362,7 @@ describe('DashboardPage - Abruf', () => {
         zeige();
         await geladen();
 
-        await userEvent.click(screen.getByRole('button', {name: /Generieren/}));
+        await userEvent.click(screen.getByRole('button', {name: 'Aktualisieren'}));
 
         expect(apiPost).toHaveBeenCalledWith('/api/generate', {});
         expect(await screen.findByText('Bitte zuerst die DFB-Zugangsdaten hinterlegen.')).toBeInTheDocument();
