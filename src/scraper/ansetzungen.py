@@ -100,7 +100,7 @@ def hole_rohdaten(page: Page, schiri_id: str, von: date, bis: date) -> Dict:
         wettbewerbe[liga] = abruf(page, "GET", f"league/{liga}") or {}
 
     return {"ansetzungen": ansetzungen, "spiele": spiele, "teams": teams,
-            "staetten": staetten, "wettbewerbe": wettbewerbe}
+            "staetten": staetten, "wettbewerbe": wettbewerbe, "schiri_id": schiri_id}
 
 
 # ------------------------------------------------------------- Aufbereitung
@@ -119,7 +119,23 @@ def _adresse(adresse: Optional[Dict]) -> str:
     return ", ".join(t for t in (_text(adresse.get("street")), ort) if t)
 
 
-def _gespann(personen: List[Dict]) -> List[Dict]:
+def _koordinate(wert) -> Optional[float]:
+    """Breite oder Laenge aus der Schnittstelle; alles andere als eine Zahl gilt als fehlend."""
+    if isinstance(wert, bool) or not isinstance(wert, (int, float, str)):
+        return None
+    try:
+        zahl = float(wert)
+    except ValueError:
+        return None
+    # 0/0 liefert eine Schnittstelle gern statt "unbekannt" - in Deutschland liegt nichts dort
+    return zahl if zahl else None
+
+
+def _gespann(personen: List[Dict], schiri_id: Optional[str] = None) -> List[Dict]:
+    """
+    Das Gespann in Formularreihenfolge. "selbst" markiert die eigene Person -
+    die Ansetzung des Nutzers fuehrt ihn mit seiner Schiedsrichter-ID.
+    """
     gespann = []
     for person in personen or []:
         rolle = _ROLLEN.get(person.get("role"))
@@ -133,6 +149,7 @@ def _gespann(personen: List[Dict]) -> List[Dict]:
             "email": _text(person.get("email")),
             "strasse": _text(person.get("street")),
             "plz_ort": _adresse({"zipCode": person.get("zipCode"), "city": person.get("city")}),
+            "selbst": bool(schiri_id) and str(person.get("id") or "") == str(schiri_id),
         })
     # Stabil sortiert: bei Turnieren bleibt die Reihenfolge mehrerer SR erhalten
     return sorted(gespann, key=lambda p: _ROLLEN_FOLGE.index(p["rolle"]))
@@ -163,10 +180,14 @@ def aufbereiten(ansetzung: Dict, rohdaten: Dict) -> Dict:
             "staffel": _text(spiel.get("divisionName")),
             "spieltag": _text(spiel.get("matchDay")),
         },
-        "schiedsrichter": _gespann(ansetzung.get("referees")),
+        "schiedsrichter": _gespann(ansetzung.get("referees"), rohdaten.get("schiri_id")),
         "spielstaette": {
             "name": _text(staette.get("name")),
             "adresse": _adresse(staette.get("address")),
             "platz_typ": _PLATZARTEN.get(staette.get("type"), ""),
+            # Die Schnittstelle kennt den Platz genauer als jede Adresssuche:
+            # Spielstaetten stehen oft ohne Hausnummer da
+            "lat": _koordinate((staette.get("address") or {}).get("latitude")),
+            "lon": _koordinate((staette.get("address") or {}).get("longitude")),
         },
     }

@@ -140,6 +140,29 @@ class TestUpsert:
         assert _zeile(mid)["dfb_spiel_id"] == "031E47FI74000000VS5489BUVUR5FS5A"
         assert get_match(mid)["spiel_info"]["dfb_spiel_id"] == "031E47FI74000000VS5489BUVUR5FS5A"
 
+    def test_koordinaten_der_spielstaette_bleiben_bei_einem_abruf_ohne(self, user):
+        mit_ort = spiel()
+        mit_ort["spielstaette"].update(lat=50.65, lon=11.37)
+
+        mid = _upsert(user["id"], mit_ort)
+        assert (_zeile(mid)["staette_lat"], _zeile(mid)["staette_lon"]) == (50.65, 11.37)
+
+        _upsert(user["id"], spiel())
+        assert get_match(mid)["staette_lat"] == 50.65
+
+    def test_eigene_person_im_gespann(self, user):
+        daten = spiel()
+        daten["schiedsrichter"][1]["selbst"] = True
+
+        mid = _upsert(user["id"], daten)
+
+        assert get_match(mid)["selbst"] == {"rolle": "SRA 1", "seq": 0}
+        # Die Markierung steht nicht bei den Personen - die zeigt das Frontend Feld fuer Feld
+        assert all("selbst" not in p for p in get_match(mid)["schiedsrichter"])
+
+    def test_ohne_markierung_keine_eigene_person(self, user):
+        assert get_match(_upsert(user["id"], spiel()))["selbst"] is None
+
     def test_verlegung_aktualisiert_anpfiff(self, user):
         mid = _upsert(user["id"], spiel(zeit="13:00"))
         _upsert(user["id"], spiel(zeit="15:00", adresse="Neue Str. 2"))

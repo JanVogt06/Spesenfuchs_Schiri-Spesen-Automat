@@ -1203,6 +1203,27 @@ def _migration_023_dfb_spiel_id(conn: sqlite3.Connection) -> None:
 
 
 # (Version, Beschreibung, Funktion) - aufsteigend, Luecken sind nicht erlaubt.
+def _migration_024_platz_und_eigene_rolle(conn: sqlite3.Connection) -> None:
+    """
+    Koordinaten der Spielstaette und die eigene Rolle je Spiel.
+
+    Die Ansetzungs-Schnittstelle liefert zu jeder Spielstaette Breite und
+    Laenge - genauer als die Adresssuche, die bei "Auenweg, 07318 Saalfeld"
+    ohne Hausnummer nur raten kann. Kilometer-Vorschlaege, Statistik und die
+    Karte der besuchten Plaetze rechnen damit.
+
+    ist_selbst markiert die Zeile des Nutzers im Gespann (seine
+    Schiedsrichter-ID steht in der Ansetzung). Ohne sie liesse sich nicht
+    sagen, ob die SR- oder die SRA-Spesen die eigenen sind. Bestehende Spiele
+    bekommen beides beim naechsten Abruf, der die ganze Saison liest.
+    """
+    _run_script(conn, """
+        ALTER TABLE matches ADD COLUMN staette_lat REAL;
+        ALTER TABLE matches ADD COLUMN staette_lon REAL;
+        ALTER TABLE match_officials ADD COLUMN ist_selbst INTEGER NOT NULL DEFAULT 0;
+    """)
+
+
 MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "baseline schema", _migration_001_baseline),
     (2, "wal journal mode", _migration_002_wal),
@@ -1227,6 +1248,7 @@ MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (21, "lock the login after repeated failed attempts", _migration_021_login_sperren),
     (22, "remember since when dfbnet rejects the stored credentials", _migration_022_dfb_login_abgelehnt),
     (23, "identify matches by their dfbnet id", _migration_023_dfb_spiel_id),
+    (24, "venue coordinates and the own role per match", _migration_024_platz_und_eigene_rolle),
 ]
 
 

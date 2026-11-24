@@ -76,18 +76,41 @@ class TestAufbereiten:
             "name": "Kunstrasen An der Aue",
             "adresse": "Auenweg, 07318 Saalfeld/Saale",
             "platz_typ": "Kunstrasenplatz",
+            "lat": None,
+            "lon": None,
         }
+
+    def test_koordinaten_der_spielstaette(self):
+        adresse = {"street": "Auenweg", "zipCode": "07318", "city": "Saalfeld/Saale",
+                   "latitude": 50.6483, "longitude": "11.3659"}
+        roh = {**ROHDATEN, "staetten": {"PLATZ1": {**ROHDATEN["staetten"]["PLATZ1"], "address": adresse}}}
+
+        staette = aufbereiten(ANSETZUNG, roh)["spielstaette"]
+
+        assert (staette["lat"], staette["lon"]) == (50.6483, 11.3659)
+
+    @pytest.mark.parametrize("breite, laenge", [(0, 0), ("", None), ("kaputt", 11.0), (True, 11.0)])
+    def test_unbrauchbare_koordinaten_gelten_als_fehlend(self, breite, laenge):
+        adresse = {"zipCode": "07318", "city": "Saalfeld/Saale", "latitude": breite, "longitude": laenge}
+        roh = {**ROHDATEN, "staetten": {"PLATZ1": {**ROHDATEN["staetten"]["PLATZ1"], "address": adresse}}}
+
+        assert aufbereiten(ANSETZUNG, roh)["spielstaette"]["lat"] is None
+
+    def test_markiert_die_eigene_person_ueber_die_schiri_id(self):
+        gespann = aufbereiten(ANSETZUNG, {**ROHDATEN, "schiri_id": "PErika"})["schiedsrichter"]
+
+        assert [(p["rolle"], p["selbst"]) for p in gespann] == [("SR", False), ("SRA 1", True), ("SRA 2", False)]
 
     def test_gespann_ohne_beobachter_in_formularreihenfolge(self):
         gespann = aufbereiten(ANSETZUNG, ROHDATEN)["schiedsrichter"]
 
         assert gespann == [
             {"rolle": "SR", "name": "Max Muster", "telefon": "0151 111", "email": "max@example.org",
-             "strasse": "Musterweg 1", "plz_ort": "99999 Beispielstadt"},
+             "strasse": "Musterweg 1", "plz_ort": "99999 Beispielstadt", "selbst": False},
             {"rolle": "SRA 1", "name": "Erika Eins", "telefon": "0361 333", "email": "",
-             "strasse": "", "plz_ort": ""},
+             "strasse": "", "plz_ort": "", "selbst": False},
             {"rolle": "SRA 2", "name": "Paul Zwei", "telefon": "0361 222", "email": "",
-             "strasse": "", "plz_ort": ""},
+             "strasse": "", "plz_ort": "", "selbst": False},
         ]
 
     def test_turnier_mit_mehreren_sr_ohne_teams(self):
@@ -107,7 +130,7 @@ class TestAufbereiten:
                                                                "city": "Musterdorf"}}}}
 
         assert aufbereiten(ANSETZUNG, roh)["spielstaette"] == {
-            "name": "Halle", "adresse": "99999 Musterdorf", "platz_typ": ""}
+            "name": "Halle", "adresse": "99999 Musterdorf", "platz_typ": "", "lat": None, "lon": None}
 
     def test_spiel_fehlt(self):
         with pytest.raises(RuntimeError, match="nicht geliefert"):

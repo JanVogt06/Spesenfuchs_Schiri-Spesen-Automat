@@ -26,7 +26,12 @@ FORM_ROLES = [("SR", 0, "sr"), ("SRA 1", 0, "sra1"), ("SRA 2", 0, "sra2")]
 _MERGE_FIELDS = [
     "heim_team", "gast_team", "anpfiff", "mannschaftsart", "spielklasse",
     "staffel", "spieltag", "staette_name", "staette_adresse", "staette_platz_typ",
+    # Zahlen: NULLIF(x, '') laesst sie durch, COALESCE behaelt bei NULL den alten Wert
+    "staette_lat", "staette_lon",
 ]
+
+# Spalten, die erst eine spaetere Migration anlegt (024) - siehe upsert_match
+_NUR_MIT_WERT = ["staette_lat", "staette_lon"]
 
 
 def build_match_key(spiel_info: Dict, spielstaette: Dict, datum: str) -> str:
@@ -76,12 +81,13 @@ def _expense_prefix(rolle: str, seq: int) -> Optional[str]:
     return None
 
 
-def _merge_sets(quelle: str) -> str:
+def _merge_sets(quelle: str, values: Dict) -> str:
     # Nur nicht-leere Werte uebernehmen; '' bedeutet "Scraper hat nichts
-    # geliefert", nicht "Feld ist jetzt leer".
+    # geliefert", nicht "Feld ist jetzt leer". Felder, die gar nicht
+    # mitkommen (siehe _NUR_MIT_WERT), bleiben ganz aussen vor.
     return ",\n                ".join(
         f"{field} = COALESCE(NULLIF({quelle}{field}, ''), matches.{field})"
-        for field in _MERGE_FIELDS
+        for field in _MERGE_FIELDS if field in values
     )
 
 
@@ -94,7 +100,7 @@ def _schreibe_ohne_id(conn: sqlite3.Connection, values: Dict) -> int:
         INSERT INTO matches ({columns})
         VALUES ({placeholders})
         ON CONFLICT (user_id, match_key) DO UPDATE SET
-            {_merge_sets("excluded.")},
+            {_merge_sets("excluded.", values)},
             datum = COALESCE(NULLIF(excluded.datum, '1900-01-01'), matches.datum),
             scraped_at = excluded.scraped_at,
             missing_since = NULL
@@ -150,7 +156,7 @@ def _schreibe_mit_id(conn: sqlite3.Connection, values: Dict, dfb_spiel_id: str) 
     match_id = zeile["id"]
     conn.execute(f"""
         UPDATE matches SET
-            {_merge_sets(":")},
+            {_merge_sets(":", values)},
             match_key = :match_key,
             dfb_spiel_id = :dfb_spiel_id,
             datum = COALESCE(NULLIF(:datum, '1900-01-01'), matches.datum),
@@ -216,12 +222,21 @@ def upsert_match(
         "staette_name": spielstaette.get("name") or "",
         "staette_adresse": spielstaette.get("adresse") or "",
         "staette_platz_typ": spielstaette.get("platz_typ") or "",
+        "staette_lat": spielstaette.get("lat"),
+        "staette_lon": spielstaette.get("lon"),
         "sr_spesen": sr_spesen,
         "sra_spesen": sra_spesen,
         "km_satz": km_satz,
         "first_seen_at": scraped_at,
         "scraped_at": scraped_at,
     }
+
+    # Spalten juengerer Migrationen nur schreiben, wenn es einen Wert gibt.
+    # Migration 006 legt mit genau dieser Funktion Spiele aus Altdaten an -
+    # gegen ein Schema, in dem es die Spalten noch nicht gibt.
+    for spalte in _NUR_MIT_WERT:
+        if values[spalte] is None:
+            del values[spalte]
 
     dfb_spiel_id = (spiel_info.get("dfb_spiel_id") or "").strip()
 
@@ -242,18 +257,22 @@ def upsert_match(
                 seq = seq_per_rolle.get(rolle, 0)
                 seq_per_rolle[rolle] = seq + 1
 
-                conn.execute("""
-                    INSERT INTO match_officials
-                        (match_id, rolle, seq, name, telefon, email, strasse, plz_ort)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    match_id, rolle, seq,
-                    person.get("name") or "",
-                    person.get("telefon") or "",
-                    person.get("email") or "",
-                    person.get("strasse") or "",
-                    person.get("plz_ort") or "",
-                ))
+                zeile = {
+                    "match_id": match_id, "rolle": rolle, "seq": seq,
+                    "name": person.get("name") or "",
+                    "telefon": person.get("telefon") or "",
+                    "email": person.get("email") or "",
+                    "strasse": person.get("strasse") or "",
+                    "plz_ort": person.get("plz_ort") or "",
+                }
+                # ist_selbst hat den Standard 0; wie oben nur schreiben, wenn es zaehlt
+                if person.get("selbst"):
+                    zeile["ist_selbst"] = 1
+                conn.execute(
+                    f"INSERT INTO match_officials ({', '.join(zeile)}) "
+                    f"VALUES ({', '.join(':' + k for k in zeile)})",
+                    zeile,
+                )
 
             # Erfasste Fahrtkosten werden hier bewusst NICHT angetastet, auch
             # nicht fuer Rollen, die in diesem Scrape fehlen. Eine kuerzere
@@ -366,8 +385,14 @@ def _rows_to_matches(match_rows, official_rows, expense_rows) -> List[Dict]:
                 flat_expenses[f"{prefix}_km"] = entry["km"]
                 flat_expenses[f"{prefix}_oevm"] = entry["oevm"]
 
+        # Die eigene Zeile im Gespann, wie die Ansetzung sie markiert hat.
+        # Steht bewusst nicht in "schiedsrichter": das Frontend zeigt jedes
+        # Feld einer Person an.
+        selbst = next(({"rolle": o["rolle"], "seq": o["seq"]} for o in officials if o.get("ist_selbst")), None)
+
         matches.append({
             **match,
+            "selbst": selbst,
             "spiel_info": {
                 "anpfiff": match["anpfiff"],
                 "heim_team": match["heim_team"],
