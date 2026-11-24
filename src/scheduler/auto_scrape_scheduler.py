@@ -1,10 +1,10 @@
 """
-Naechtlicher Abruf der DFBnet-Ansetzungen fuer alle User.
+Nightly fetch of the DFBnet assignments (Ansetzungen) for all users.
 
-Frueher legte dieser Scheduler pro User und Nacht einen Session-Ordner mit
-JSON, DOCX und PDF an - bei 21 Usern waren das rund 7700 Dateien pro Jahr fuer
-einige hundert verschiedene Spiele. Jetzt schreibt er nur noch in die
-Datenbank; Dokumente entstehen beim Download.
+This scheduler used to create a session folder with JSON, DOCX and PDF per user
+and night - with 21 users that was around 7700 files per year for a few
+hundred distinct matches. Now it only writes to the database; documents are
+generated on download.
 """
 import asyncio
 import multiprocessing
@@ -24,15 +24,15 @@ from main import scrape_matches
 
 logger = setup_logger("auto_scheduler")
 
-# Wie lange ein einzelner User-Abruf hoechstens laufen darf. Ein voller Scrape
-# mit Login dauert wenige Minuten; danach haengt der Prozess.
+# How long a single per-user fetch may run at most. A full scrape including
+# login takes a few minutes; after that the process is hung.
 USER_TIMEOUT_SECONDS = 20 * 60
 
 
 def run_scrape_for_user(user_id: int, email: str, dfb_username: str, dfb_password: str, run_id: int):
     """
-    Scrapt die Ansetzungen eines Users. Laeuft in einem eigenen Prozess, weil
-    Playwright nicht im asyncio-Loop laufen kann.
+    Scrapes the assignments of one user. Runs in a separate process because
+    Playwright cannot run inside the asyncio loop.
     """
     process_logger = setup_logger("auto_scheduler_worker")
 
@@ -63,9 +63,9 @@ def run_scrape_for_user(user_id: int, email: str, dfb_username: str, dfb_passwor
         process_logger.info(f"[User {user_id}] Abruf abgeschlossen: {anzahl} Spiele")
 
     except DFBCredentialsInvalidError as e:
-        # Eigener Zweig wie im API-Pfad: das Frontend schickt den Nutzer bei
-        # diesem Code in die Einstellungen. Ohne ihn saehe er nach einem
-        # naechtlichen Lauf nur "ein Fehler ist aufgetreten".
+        # Separate branch as in the API path: on this code the frontend sends
+        # the user to the settings. Without it, after a nightly run they would
+        # only see "an error occurred".
         process_logger.error(f"[User {user_id}] DFB-Login fehlgeschlagen: {e.message}")
         update_run(
             run_id,
@@ -76,8 +76,8 @@ def run_scrape_for_user(user_id: int, email: str, dfb_username: str, dfb_passwor
                           "und Passwort in den Einstellungen.",
             finished=True,
         )
-        # Erst nach dem Lauf: scheitert dieser Schreibzugriff, soll der Lauf
-        # trotzdem als fehlgeschlagen dastehen.
+        # Only after the run: if this write fails, the run should still show
+        # up as failed.
         dfb_login_abgelehnt(user_id)
 
     except Exception as e:
@@ -93,7 +93,7 @@ def run_scrape_for_user(user_id: int, email: str, dfb_username: str, dfb_passwor
 
 
 class AutoScrapeScheduler:
-    """Ruft die Ansetzungen aller User einmal pro Nacht ab"""
+    """Fetches the assignments of all users once per night"""
 
     def __init__(self):
         self.scheduler = AsyncIOScheduler()
@@ -101,7 +101,7 @@ class AutoScrapeScheduler:
         logger.info("AutoScrapeScheduler initialisiert (sequenziell, ein User nach dem anderen)")
 
     async def process_user(self, user: Dict[str, Any]) -> Dict[str, Any]:
-        """Startet den Abruf fuer einen User und wartet, bis er fertig ist."""
+        """Starts the fetch for one user and waits until it is finished."""
         user_id = user['id']
         email = user['email']
 
@@ -116,7 +116,7 @@ class AutoScrapeScheduler:
 
             run_id = start_run(user_id)
 
-            # Credentials direkt als Parameter (nicht ueber ENV!)
+            # Credentials passed directly as parameters (not via ENV!)
             process = multiprocessing.Process(
                 target=run_scrape_for_user,
                 args=(user_id, email, dfb_username, dfb_password, run_id),
@@ -124,9 +124,10 @@ class AutoScrapeScheduler:
             )
             process.start()
 
-            # Warten, bevor der naechste User drankommt - ein Browser genuegt.
-            # Mit Zeitlimit: haengt ein Kindprozess, waere sonst der ganze
-            # naechtliche Lauf blockiert und alle folgenden User kaemen nie dran.
+            # Wait before the next user is processed - one browser is enough.
+            # With a time limit: if a child process hangs, the whole nightly
+            # run would otherwise be blocked and none of the following users
+            # would ever get their turn.
             await asyncio.get_event_loop().run_in_executor(
                 None, process.join, USER_TIMEOUT_SECONDS
             )
@@ -153,23 +154,23 @@ class AutoScrapeScheduler:
 
     @staticmethod
     def _ligatabellen_vorhanden() -> bool:
-        """Ob schon einmal Ligatabellen geholt wurden."""
+        """Whether league tables have been fetched at least once."""
         try:
             from db.ligen import bestand
 
             return bool(bestand().get("mannschaften"))
         except Exception:
-            return True   # im Zweifel nichts anstossen
+            return True   # when in doubt, trigger nothing
 
     @staticmethod
     def aktualisiere_ligatabellen():
         """
-        Gleicht die Ligatabellen ab und traegt offene Spesensaetze nach.
+        Reconciles the league tables and fills in outstanding expense rates.
 
-        Vor dem Abruf der Ansetzungen, damit ein heute neu angesetztes
-        Pokalspiel gleich seinen Satz bekommt statt erst in der naechsten
-        Nacht. Ein Fehler hier darf den Abruf nicht aufhalten - die Tabellen
-        sind eine Zugabe, die Ansetzungen sind der Zweck der Anwendung.
+        Runs before the assignments are fetched, so that a cup match newly
+        assigned today gets its rate right away instead of only the next
+        night. An error here must not stop the fetch - the tables are an extra,
+        the assignments are the purpose of the application.
         """
         try:
             from db.matches import ergaenze_offene_saetze
@@ -181,13 +182,13 @@ class AutoScrapeScheduler:
             logger.error(f"Ligatabellen konnten nicht abgeglichen werden: {e}", exc_info=True)
 
     async def scrape_all_users(self):
-        """Ruft die Ansetzungen aller User ab (naechtlich um 3 Uhr)."""
+        """Fetches the assignments of all users (nightly at 3 a.m.)."""
         if self._is_running:
             logger.warning("Abruf läuft bereits - überspringe doppelten Aufruf")
             return
 
         self._is_running = True
-        # Laeufe abgestuerzter Vornaechte abraeumen
+        # Clean up runs left over from crashed previous nights
         fail_stale_runs()
         self.aktualisiere_ligatabellen()
         logger.info("=" * 80)
@@ -218,7 +219,7 @@ class AutoScrapeScheduler:
             self._is_running = False
 
     def start(self):
-        """Startet den Scheduler"""
+        """Starts the scheduler"""
         self.scheduler.add_job(
             self.scrape_all_users,
             CronTrigger(hour=3, minute=0, timezone="Europe/Berlin"),
@@ -227,11 +228,11 @@ class AutoScrapeScheduler:
             replace_existing=True
         )
 
-        # Beim allerersten Start sind die Ligatabellen leer, und ohne sie
-        # bleibt der Reiter *Ligen* bis 3 Uhr nachts leer und die Pokalspesen
-        # unbestimmt. Also einmal kurz nach dem Start nachholen - im Scheduler
-        # und nicht im Startvorgang, damit die Anwendung nicht auf fussball.de
-        # wartet, bevor sie erreichbar ist.
+        # On the very first start the league tables are empty, and without them
+        # the *Ligen* tab stays empty until 3 a.m. and the cup expenses stay
+        # undetermined. So catch up once shortly after startup - in the
+        # scheduler and not in the startup sequence, so the application does
+        # not wait on fussball.de before it becomes reachable.
         if not self._ligatabellen_vorhanden():
             self.scheduler.add_job(
                 self.aktualisiere_ligatabellen,
@@ -248,13 +249,13 @@ class AutoScrapeScheduler:
         logger.info(f"Nächste Ausführung: {self.scheduler.get_job('auto_scrape').next_run_time}")
 
     def stop(self):
-        """Stoppt den Scheduler"""
+        """Stops the scheduler"""
         if self.scheduler.running:
             self.scheduler.shutdown(wait=False)
             logger.info("Scheduler gestoppt")
 
     def get_status(self) -> Dict[str, Any]:
-        """Status fuer den Scheduler-Endpunkt"""
+        """Status for the scheduler endpoint"""
         job = self.scheduler.get_job("auto_scrape")
 
         return {

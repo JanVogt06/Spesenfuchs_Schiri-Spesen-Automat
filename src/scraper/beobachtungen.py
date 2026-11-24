@@ -1,38 +1,42 @@
 """
-Liest die eigenen Beobachtungen aus zwei klassischen DFBnet-Modulen.
+Reads the user's own observations (Beobachtungen) from two classic DFBnet
+modules.
 
-- "Schiri-Beobachtung -> Beobachtung" fuehrt die Beobachtungen im
-  Landesverband (Herren-Spielklassen). Das Modul hat jeder Schiedsrichter.
-- "Schiri-Portal -> Beobachtung" fuehrt die Beobachtungen im DFB-Nachwuchs
-  (U19-Bundesliga/Nachwuchsliga). Das Modul haben nur wenige; wer es nicht
-  hat, dem fehlt der Menuepunkt komplett.
+- "Schiri-Beobachtung -> Beobachtung" holds the observations at state
+  association level (Landesverband, men's league levels). Every referee has
+  this module.
+- "Schiri-Portal -> Beobachtung" holds the observations in the DFB youth
+  leagues (U19 Bundesliga/Nachwuchsliga). Only few people have this module;
+  whoever does not have it is missing the menu item entirely.
 
-Beide Module sind dasselbe alte Server-Formular (kein Angular wie die
-Schiriansetzung): Saison, Datum von/bis und Funktion setzen, "Suchen" schickt
-die Seite ab und laedt sie mit der Ergebnisliste neu.
+Both modules are the same old server-side form (not Angular like the
+Schiriansetzung): set season, date from/to and function (Funktion), "Suchen"
+(search) submits the page and reloads it with the result list.
 
-Drei Dinge, die man wissen muss:
+Four things you need to know:
 
-1. Die Funktion filtert auf die EIGENE Rolle. "1. Assistent" liefert genau
-   die Spiele, in denen man selbst SRA1 war. Darueber wird die eigene Note
-   zugeordnet - ein Abgleich ueber den Namen ginge schief, sobald zwei
-   Personen gleichen Nachnamens im selben Gespann stehen.
+1. The function filters on the user's OWN role. "1. Assistent" returns exactly
+   the matches in which the user was SRA1 themselves. The user's own grade is
+   assigned via that - matching by name would go wrong as soon as two people
+   with the same surname are in the same crew.
 
-2. Die Notenspalte ist eine Untertabelle, deren Zeilen 1:1 zu den Zeilen
-   der Gespann-Untertabelle passen (SR, SRA1, SRA2, im Portal auch 4OF). Die
-   eigene Note steht also in der Zeile, in der im Gespann die eigene Rolle
-   steht.
+2. The grade column is a sub-table whose rows match 1:1 the rows of the crew
+   (Gespann) sub-table (SR, SRA1, SRA2, in the portal also 4OF). The user's
+   own grade is therefore in the row in which the crew lists the user's own
+   role.
 
-3. Die Formularwerte werden per JavaScript gesetzt, ohne Change-Events: der
-   Saison-Auswahl haengt ein onchange an, das die Seite sofort neu abschickt.
-   Abgeschickt wird dagegen mit einem echten Klick - ein per Skript
-   ausgeloester Klick erzeugte im Test eine ungueltige Webflow-Seite
-   ("moeglicherweise haben Sie die Browser-Back Funktion benutzt").
+3. The form values are set via JavaScript, without change events: the season
+   selection has an onchange attached that immediately resubmits the page.
+   Submitting, on the other hand, is done with a real click - a click
+   triggered by script produced an invalid Webflow page in testing
+   ("moeglicherweise haben Sie die Browser-Back Funktion benutzt" - "you may
+   have used the browser back function").
 
-4. Eine Suche ohne Treffer zeigt im Herren-Modul den Kasten "Fehlermeldungen
-   / Hinweise" mit "Ihre Suchanfrage ergab keine Treffer!". Das ist kein
-   Fehler, sondern der Normalfall fuer jede Rolle, in der man in einer Saison
-   nie eingesetzt war.
+4. A search without hits shows, in the men's module, the box "Fehlermeldungen
+   / Hinweise" (error messages / notes) with "Ihre Suchanfrage ergab keine
+   Treffer!" (your search returned no hits). That is not an error but the
+   normal case for every role in which the user was never assigned in a
+   season.
 """
 from typing import Callable, Dict, List, Optional
 from urllib.parse import urlparse
@@ -44,9 +48,9 @@ from utils.saison_utils import saison_zeitraum
 
 logger = setup_logger("beobachtungen")
 
-# Rollen, zu denen eine eigene Note gelesen wird: (Formularwert, Kuerzel in
-# der Gespann-Tabelle). Die Werte der Funktion-Auswahl sind in beiden Modulen
-# gleich; den 4. Offiziellen gibt es nur im Portal.
+# Roles for which an own grade is read: (form value, abbreviation in the crew
+# table). The values of the function selection are the same in both modules;
+# the fourth official only exists in the portal.
 QUELLEN = {
     "herren": {
         "menue": "Schiri-Beobachtung",
@@ -71,8 +75,8 @@ _MENUE_JS = """
     }
 """
 
-# Der Menuepunkt "Beobachtung" eines Moduls - erkannt am Pfad des Moduls und
-# am Ereignis, nicht am Text: "Beobachtung" steckt auch in
+# The "Beobachtung" menu item of a module - recognised by the module's path and
+# by the event, not by the text: "Beobachtung" is also part of
 # "Schiri-Beobachtung".
 _LISTEN_LINK_JS = """
     (modulpfad) => {
@@ -131,10 +135,10 @@ _SAISONS_JS = """
     }
 """
 
-# Die Ergebnisliste. Spalten: Symbol | Datum+Zeit | Spieltag | Staffel |
-# Heim+Gast | Ergebnis | Gespann (Untertabelle) | Noten (Untertabelle) |
-# Status+Freigabezeitpunkt. Eine leere Liste hat weder Zeilen noch die
-# Blaetterleiste "Seite x/y (n Treffer insgesamt)".
+# The result list. Columns: symbol | date+time | matchday | division (Staffel) |
+# home+away | result | crew (sub-table) | grades (sub-table) |
+# status+release time. An empty list has neither rows nor the paging bar
+# "Seite x/y (n Treffer insgesamt)" (page x/y (n hits in total)).
 _LISTE_JS = """
     () => {
         const text = document.body.innerText;
@@ -165,9 +169,9 @@ _LISTE_JS = """
             });
         }
 
-        // Das Herren-Modul meldet eine leere Suche im Kasten "Fehlermeldungen /
-        // Hinweise" ("Ihre Suchanfrage ergab keine Treffer!"); das Portal
-        // zeigt dann einfach nichts. Nur was dort SONST steht, ist ein Fehler.
+        // The men's module reports an empty search in the box "Fehlermeldungen /
+        // Hinweise" ("Ihre Suchanfrage ergab keine Treffer!"); the portal
+        // then simply shows nothing. Only what is OTHERWISE in there is an error.
         const kasten = /Fehlermeldungen[^\\n]*\\n([^\\n]*)/.exec(text);
         const keineTreffer = /ergab keine Treffer/.test(text);
 
@@ -186,9 +190,9 @@ _LISTE_JS = """
 
 def finde_module(page: Page) -> Dict[str, str]:
     """
-    Die Einstiegs-Links der Beobachtungsmodule aus dem DFBnet-Hauptmenue.
+    The entry links of the observation modules from the DFBnet main menu.
 
-    Liefert quelle -> URL nur fuer die Module, die der Account hat.
+    Returns source -> URL only for the modules that the account has.
     """
     namen = [cfg["menue"] for cfg in QUELLEN.values()]
     gefunden = page.evaluate(_MENUE_JS, namen) or {}
@@ -201,10 +205,10 @@ def finde_module(page: Page) -> Dict[str, str]:
 
 def oeffne_liste(page: Page, modul_url: str) -> str:
     """
-    Oeffnet die Beobachtungsliste eines Moduls und gibt ihre URL zurueck.
+    Opens the observation list of a module and returns its URL.
 
-    Mit der URL laesst sich die Liste nach einem Fehler frisch aufrufen - die
-    Webflow-Seiten nach einer Suche sind nicht wieder aufrufbar.
+    With the URL the list can be opened afresh after an error - the Webflow
+    pages after a search cannot be opened again.
     """
     page.goto(modul_url, wait_until="domcontentloaded", timeout=_ZEITLIMIT_MS)
 
@@ -212,9 +216,9 @@ def oeffne_liste(page: Page, modul_url: str) -> str:
     modulpfad = teile.path.rsplit("/", 1)[0]
     listen_url = page.evaluate(_LISTEN_LINK_JS, modulpfad)
 
-    # Steht der Menuepunkt nicht auf der Einstiegsseite, wird die Liste direkt
-    # aufgerufen - das Ereignis OBSERVATION laesst sich auch ohne vorherigen
-    # Klick ins Modul oeffnen.
+    # If the menu item is not on the entry page, the list is opened directly -
+    # the OBSERVATION event can also be opened without first clicking into the
+    # module.
     if not listen_url:
         listen_url = f"{teile.scheme}://{teile.netloc}{modulpfad}/webflow.do?event=OBSERVATION"
         logger.info(f"Menuepunkt 'Beobachtung' in {modulpfad} nicht gefunden - rufe die Liste direkt auf")
@@ -225,13 +229,14 @@ def oeffne_liste(page: Page, modul_url: str) -> str:
 
 def _warte_auf_formular(page: Page) -> None:
     """
-    Wartet auf das Suchformular - und sagt im Fehlerfall, was stattdessen da
-    steht.
+    Waits for the search form - and, in case of failure, says what is there
+    instead.
 
-    Die Seiten werden auf dem Server gerendert; nach domcontentloaded ist das
-    Formular da oder es kommt nicht mehr. Statt einer Fehlerseite 45 Sekunden
-    lang zuzusehen, wird kurz gewartet und der Seitenanfang ins Protokoll
-    geschrieben ("Die aufgerufene Seite ist ungueltig ..." o.ae.).
+    The pages are rendered on the server; after domcontentloaded the form is
+    either there or it will not come anymore. Instead of watching an error
+    page for 45 seconds, we wait briefly and write the top of the page to the
+    log ("Die aufgerufene Seite ist ungueltig ..." (the requested page is
+    invalid) or similar).
     """
     try:
         page.locator('select[name="kontext.searchPanel.seasonId"]').wait_for(
@@ -251,7 +256,7 @@ def lade_liste(page: Page, listen_url: str) -> None:
 
 
 def angebotene_saisons(page: Page) -> List[str]:
-    """Die Saisons der Auswahl, wie DFBnet sie listet: neueste zuerst."""
+    """The seasons of the selection, as DFBnet lists them: newest first."""
     return page.evaluate(_SAISONS_JS) or []
 
 
@@ -267,9 +272,9 @@ def _abschicken(page: Page, ausloeser: str) -> dict:
 
 def suche(page: Page, saison: str, rolle: str) -> dict:
     """
-    Sucht alle Beobachtungen einer Saison in einer Funktion (rolle "" = alle).
+    Searches all observations of a season in one function (rolle "" = all).
 
-    Blaettert durch, falls DFBnet mehr als eine Seite liefert (20 je Seite).
+    Pages through if DFBnet returns more than one page (20 per page).
 
     Returns:
         {"zeilen": [...], "treffer": n, "vollstaendig": bool}
@@ -285,8 +290,8 @@ def suche(page: Page, saison: str, rolle: str) -> dict:
 
     ergebnis = _abschicken(page, 'input[name="SEARCH"]')
 
-    # Hat DFBnet die Suche wirklich mit unseren Werten ausgefuehrt? Eine leere
-    # Liste sieht sonst genauso aus wie eine, die nie gesucht hat.
+    # Did DFBnet really run the search with our values? An empty list
+    # otherwise looks exactly like one that never searched.
     if page.evaluate(_FORMULAR_LESEN_JS) != [saison, von, bis, rolle]:
         raise RuntimeError(f"Suche {saison}/{rolle or 'alle'} nicht mit den gesetzten Werten ausgefuehrt")
 
@@ -318,10 +323,10 @@ def parse_note(text: str) -> Optional[float]:
 
 def eigene_beobachtung(zeile: dict, rolle: str) -> Optional[dict]:
     """
-    Macht aus einer Listenzeile die eigene Beobachtung in der gegebenen Rolle.
+    Turns a list row into the user's own observation in the given role.
 
-    None, wenn die Beobachtung nicht freigegeben ist, die Rolle im Gespann
-    nicht vorkommt oder zur Rolle keine Note eingetragen ist.
+    None if the observation is not released (freigegeben), the role does not
+    appear in the crew, or no grade is entered for the role.
     """
     status = zeile.get("status") or []
     if not status or status[0].strip().lower() != "freigegeben":
@@ -359,11 +364,11 @@ def eigene_beobachtung(zeile: dict, rolle: str) -> Optional[dict]:
 
 def lies_saison(page: Page, quelle: str, saison: str) -> dict:
     """
-    Alle eigenen, freigegebenen Beobachtungen einer Saison in einem Modul.
+    All of the user's own released observations of a season in one module.
 
-    Erst eine Suche ueber alle Funktionen: die meisten Saisons sind leer (vor
-    allem im Portal), und dann bleibt es bei dieser einen Suche. Nur wenn es
-    Treffer gibt, wird je Rolle einzeln gesucht.
+    First a search across all functions: most seasons are empty (especially in
+    the portal), and then it stays with this one search. Only if there are
+    hits is each role searched individually.
     """
     alle = suche(page, saison, "")
     if alle["treffer"] == 0 and not alle["zeilen"]:
@@ -392,15 +397,15 @@ def lies_quelle(
     progress_callback=None,
 ) -> Dict[str, dict]:
     """
-    Liest die noetigen Saisons eines Moduls.
+    Reads the required seasons of a module.
 
     Args:
-        saisons_fuer: (quelle, angebotene Saisons) -> zu lesende Saisons
+        saisons_fuer: (source, offered seasons) -> seasons to read
 
     Returns:
-        saison -> {"beobachtungen": [...], "vollstaendig": bool}. Eine Saison,
-        bei der etwas schiefging, fehlt im Ergebnis und wird beim naechsten
-        Lauf erneut gelesen.
+        season -> {"beobachtungen": [...], "vollstaendig": bool}. A season for
+        which something went wrong is missing from the result and is read
+        again on the next run.
     """
     listen_url = oeffne_liste(page, modul_url)
     zu_lesen = saisons_fuer(quelle, angebotene_saisons(page))
@@ -422,7 +427,7 @@ def lies_quelle(
             )
         except Exception as e:
             logger.warning(f"Beobachtungen {quelle} {saison} nicht gelesen: {e}")
-            # Nach einem Fehler steht die Seite irgendwo - frisch einsteigen.
+            # After an error the page is somewhere unknown - start afresh.
             try:
                 lade_liste(page, listen_url)
             except Exception as neu_laden:

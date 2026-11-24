@@ -1,23 +1,22 @@
 """
-Liga-Tabellen von fussball.de.
+League tables from fussball.de.
 
-Gebraucht werden sie fuer zwei Dinge: den Reiter *Ligen* und die Spesen der
-Pokal- und Freundschaftsspiele. Bei beiden richtet sich der Satz nicht nach
-der Spielklasse des Spiels, sondern nach der der beteiligten Mannschaften
-(§2 Abs. 3 und 4 der Spesenordnung), und die steht in den Ansetzungsdaten von
-DFBnet nicht drin.
+They are needed for two things: the *Ligen* tab and the expenses of cup
+matches and friendlies. For both, the rate does not depend on the league level
+of the match but on that of the participating teams (§2 para. 3 and 4 of the
+expense regulations, Spesenordnung), and that is not contained in the
+assignment data from DFBnet.
 
-Die Seiten sind serverseitig gerendert und ohne Anmeldung lesbar, deshalb
-genuegt urllib - wie beim Geocoder rechtfertigt das keine zusaetzliche
-Abhaengigkeit. robots.txt von fussball.de erlaubt alles ausser /*-service/
-und /tipply/.
+The pages are rendered server-side and readable without login, so urllib is
+enough - as with the geocoder, that does not justify an additional dependency.
+fussball.de's robots.txt allows everything except /*-service/ and /tipply/.
 
-Die Staffel-Kennungen sind NICHT fest verdrahtet: sie wechseln mit jeder
-Saison. Stattdessen werden sie entdeckt (siehe entdecke_staffeln) - ausgehend
-von einem Verein, von dem die eigenen Ansetzungen bereits wissen, dass er in
-der gesuchten Liga spielt. Das ist selbstpruefend: der Slug einer Staffel
-nennt Spielklasse, Mannschaftsart und Verband, es kann also nur die richtige
-Staffel herauskommen oder gar keine.
+The division identifiers (Staffel-Kennungen) are NOT hard-wired: they change
+every season. Instead they are discovered (see entdecke_staffeln) - starting
+from a club that the user's own assignments already know plays in the league
+in question. This is self-checking: the slug of a division names the league
+level, team type and association, so only the right division can come out, or
+none at all.
 """
 import re
 import threading
@@ -41,9 +40,9 @@ USER_AGENT = f"Spesenfuchs/{APP_VERSION} (+https://github.com/JanVogt06/dfb-spes
 
 TIMEOUT_SEKUNDEN = 20
 
-# Mindestabstand zwischen zwei Anfragen. fussball.de nennt keine Zahl, aber
-# ein naechtlicher Lauf ueber eine Handvoll Staffeln darf nicht wie ein
-# Lastangriff aussehen.
+# Minimum interval between two requests. fussball.de does not state a number,
+# but a nightly run over a handful of divisions must not look like a load
+# attack.
 MIN_INTERVALL = 1.0
 
 _schloss = threading.Lock()
@@ -51,18 +50,18 @@ _letzte_anfrage = 0.0
 
 
 class FussballDeNichtErreichbar(Exception):
-    """Die Seite hat nicht geantwortet - anders als "nichts gefunden"."""
+    """The page did not respond - as opposed to "nothing found"."""
 
 
 @dataclass(frozen=True)
 class Staffel:
-    """Eine Spielklasse-Staffel auf fussball.de."""
+    """A league-level division (Staffel) on fussball.de."""
     staffel_id: str
-    pfad: str            # vollstaendiger Pfad inkl. Slug, ohne Basis-URL
+    pfad: str            # full path incl. slug, without base URL
     slug: str
-    spielklasse: str     # aus dem Slug, z.B. "verbandsliga"
-    verband: str         # aus dem Slug, z.B. "thueringen"
-    anzeigename: str     # z.B. "11Teamsports Thüringenliga"
+    spielklasse: str     # from the slug, e.g. "verbandsliga"
+    verband: str         # from the slug, e.g. "thueringen"
+    anzeigename: str     # e.g. "11Teamsports Thüringenliga"
 
     @property
     def url(self) -> str:
@@ -71,7 +70,7 @@ class Staffel:
 
 @dataclass(frozen=True)
 class Tabellenplatz:
-    """Eine Zeile einer Ligatabelle."""
+    """One row of a league table."""
     platz: int
     mannschaft: str
     team_id: str
@@ -85,7 +84,7 @@ class Tabellenplatz:
 
 
 def _hole(url: str) -> str:
-    """Holt eine Seite, mit Mindestabstand zur vorherigen Anfrage."""
+    """Fetches a page, with a minimum interval since the previous request."""
     global _letzte_anfrage
 
     with _schloss:
@@ -103,35 +102,35 @@ def _hole(url: str) -> str:
             _letzte_anfrage = time.monotonic()
 
 
-# ===== Namen vergleichbar machen =====
+# ===== Making names comparable =====
 
-# Nur die Kennzeichnung einer Spielgemeinschaft wird abgeschnitten: DFBnet
-# schreibt "SG SV Alach I", fussball.de "SV Alach". Alles andere bleibt stehen.
+# Only the marker of a Spielgemeinschaft (joint team) is cut off: DFBnet
+# writes "SG SV Alach I", fussball.de "SV Alach". Everything else stays.
 #
-# Gemessen an den echten Namen dieses Bestandes: laesst man zusaetzlich die
-# Rechtsformen (SV, FC, ...) und Jahreszahlen weg, kommen zwei Zuordnungen
-# mehr zustande - darunter aber "SG Saalfeld 46 e.V." -> "FC Saalfeld", also
-# zwei verschiedene Vereine derselben Stadt. Zwei Treffer mehr sind diesen
-# Fehler nicht wert.
+# Measured against the real names in this data set: if the legal forms (SV,
+# FC, ...) and years are additionally dropped, two more matches are made -
+# among them, however, "SG Saalfeld 46 e.V." -> "FC Saalfeld", i.e. two
+# different clubs of the same town. Two more matches are not worth that
+# error.
 _SPIELGEMEINSCHAFT = {"sg", "spg"}
 
 _NUMMER_ROEMISCH = {"i": 1, "ii": 2, "iii": 3, "iv": 4}
 
-# Roemische Ziffer, arabische Zahl oder "2." am Ende des Namens.
+# Roman numeral, Arabic number or "2." at the end of the name.
 _NUMMER_AM_ENDE = re.compile(r"(?:^|[\s(])(i{1,3}|iv|[2-9])\s*\.?\s*$")
 
 
 def mannschaftsnummer(name: str) -> int:
     """
-    Die Nummer der Mannschaft innerhalb ihres Vereins.
+    The number of the team within its club.
 
-    DFBnet schreibt "SG SV Alach I", "FC Union Erfurt II" oder
-    "SV 09 Arnstadt 2.", fussball.de "FC Empor Weimar 06 2.". Ohne Nummer ist
-    die erste Mannschaft gemeint.
+    DFBnet writes "SG SV Alach I", "FC Union Erfurt II" or "SV 09 Arnstadt 2.",
+    fussball.de "FC Empor Weimar 06 2.". Without a number the first team is
+    meant.
 
-    Diese Zahl ist der wichtigste Teil des Vergleichs: die dritte Mannschaft
-    des FC Saalfeld spielt Kreisliga, die erste Verbandsliga. Wer die Nummer
-    wegwirft, verwechselt 25 Euro mit 50.
+    This number is the most important part of the comparison: the third team
+    of FC Saalfeld plays Kreisliga, the first Verbandsliga. Whoever throws the
+    number away confuses 25 euros with 50.
     """
     treffer = _NUMMER_AM_ENDE.search((name or "").strip().lower())
     if not treffer:
@@ -144,18 +143,18 @@ def mannschaftsnummer(name: str) -> int:
 
 def vereinskern(name: str) -> str:
     """
-    Der Vereinsname in vergleichbarer Form - ohne SG-Kennzeichnung,
-    Zeichensetzung und Mannschaftsnummer.
+    The club name in comparable form - without the SG marker, punctuation and
+    team number.
 
-    Nur zum Vergleichen gedacht, nie zum Anzeigen. Zahlen im Namen bleiben
-    stehen: "SV 09 Arnstadt" und "SV 1920 Arnstadt" waeren sonst derselbe
-    Verein, und "FC Saalfeld" und "SG Saalfeld 46" ebenfalls.
+    Intended for comparison only, never for display. Numbers in the name are
+    kept: "SV 09 Arnstadt" and "SV 1920 Arnstadt" would otherwise be the same
+    club, and so would "FC Saalfeld" and "SG Saalfeld 46".
     """
     text = unicodedata.normalize("NFKD", name or "")
     text = text.replace("\u200b", "").replace("ß", "ss")
     text = text.encode("ascii", "ignore").decode().lower()
 
-    # Mannschaftsnummer am Ende entfernen - sie wird getrennt verglichen
+    # Remove the team number at the end - it is compared separately
     text = _NUMMER_AM_ENDE.sub(" ", text)
 
     woerter = re.sub(r"[^a-z0-9]+", " ", text).split()
@@ -165,12 +164,12 @@ def vereinskern(name: str) -> str:
     return " ".join(woerter)
 
 
-# ===== Staffeln entdecken =====
+# ===== Discovering divisions =====
 
-# Der Slug einer Staffel traegt alles Noetige:
+# The slug of a division carries everything needed:
 #   coffeecom-kreisoberliga-kreis-mittelthueringen-kreisoberliga-herren-saison2627-thueringen
 #                                                  ^^^^^^^^^^^^^ ^^^^^^          ^^^^^^^^^^
-#                                                  Spielklasse   Mannschaftsart  Verband
+#                                                  league level   team type      association
 _SLUG = re.compile(
     r"/spieltagsuebersicht/"
     r"(?P<slug>[^/\"]*?-(?P<spielklasse>[a-z0-9]+)-(?P<art>herren|frauen|[a-g]-junior(?:en|innen))"
@@ -180,7 +179,7 @@ _SLUG = re.compile(
 
 
 def _staffeln_auf_seite(html: str, spielklasse: str, verband: str) -> List[Staffel]:
-    """Alle Staffeln einer Seite, die zu Spielklasse und Verband passen."""
+    """All divisions on a page that match the league level and association."""
     gefunden: Dict[str, Staffel] = {}
 
     for treffer in _SLUG.finditer(html):
@@ -207,7 +206,7 @@ def _staffeln_auf_seite(html: str, spielklasse: str, verband: str) -> List[Staff
 
 
 def _anzeigename(html: str, staffel_id: str) -> Optional[str]:
-    """Der Text des Links auf diese Staffel, also ihr lesbarer Name."""
+    """The text of the link to this division, i.e. its readable name."""
     treffer = re.search(
         rf'staffel/{re.escape(staffel_id)}[^"]*"[^>]*>(.*?)</a>', html, re.S
     )
@@ -220,7 +219,7 @@ def _anzeigename(html: str, staffel_id: str) -> Optional[str]:
 
 
 def _vereinsseite(suchbegriff: str) -> Optional[str]:
-    """Die erste Vereinsseite zu einem Suchbegriff, als HTML."""
+    """The first club page for a search term, as HTML."""
     treffer = re.findall(
         r'href="(https://www\.fussball\.de/verein/[^"]+)"',
         _hole(f"{BASIS_URL}/suche/-/text/{quote(suchbegriff)}"),
@@ -234,25 +233,26 @@ def _vereinsseite(suchbegriff: str) -> Optional[str]:
 def entdecke_staffeln(ankerverein: str, spielklasse: str, verband: str = "thueringen",
                       mit_nachbarstaffeln: bool = True) -> List[Staffel]:
     """
-    Sucht die Staffeln einer Spielklasse, ausgehend von einem Verein, der darin
-    spielt.
+    Finds the divisions of a league level, starting from a club that plays in
+    it.
 
-    Der Umweg ueber einen Verein ist noetig, weil fussball.de kein Verzeichnis
-    der Wettbewerbe anbietet, das sich abgreifen liesse - die Textsuche findet
-    nur Vereine und Personen. Und er ist ohnehin der bessere Weg als feste
-    Kennungen: die wechseln mit jeder Saison, ein Verein nicht.
+    The detour via a club is necessary because fussball.de offers no directory
+    of competitions that could be scraped - the text search only finds clubs
+    and persons. And it is the better way than fixed identifiers anyway: those
+    change every season, a club does not.
 
-    Selbstpruefend: aus dem Slug muessen Spielklasse, Mannschaftsart *Herren*
-    und Verband stimmen. Wird der falsche Verein gefunden, kommt deshalb keine
-    falsche Staffel heraus, sondern gar keine.
+    Self-checking: from the slug, the league level, team type *Herren* (men)
+    and association must match. If the wrong club is found, no wrong division
+    comes out as a result, but none at all.
 
-    Mehrstaffelige Ligen (Landesklasse 1 bis 3) sind mit einem Aufruf
-    vollstaendig: die Staffelseiten verlinken einander.
+    Multi-division leagues (Landesklasse 1 to 3) are complete with a single
+    call: the division pages link to each other.
 
-    mit_nachbarstaffeln=False bleibt bei der Staffel des Ankervereins. Noetig
-    bei ueberregionalen Ligen: von der Regionalliga Nordost fuehrt die Kette
-    durch alle fuenf Regionalligen, von der NOFV-Oberliga durch alle deutschen
-    Oberligen. Gebraucht wird aber nur die, in der der Anker wirklich spielt.
+    mit_nachbarstaffeln=False stays with the division of the anchor club.
+    Necessary for supra-regional leagues: from the Regionalliga Nordost the
+    chain leads through all five Regionalligen, from the NOFV-Oberliga through
+    all German Oberligen. But only the one in which the anchor really plays is
+    needed.
     """
     seite = _vereinsseite(ankerverein)
     if not seite:
@@ -264,9 +264,9 @@ def entdecke_staffeln(ankerverein: str, spielklasse: str, verband: str = "thueri
         logger.info(f"'{ankerverein}' spielt nicht in {spielklasse} ({verband})")
         return []
 
-    # Mehrstaffelige Ligen haengen als Kette aneinander: jede Staffelseite
-    # verlinkt per rel="next" die naechste, nicht alle auf einmal. Also der
-    # Kette folgen, bis sie endet oder sich schliesst.
+    # Multi-division leagues hang together as a chain: each division page
+    # links the next one via rel="next", not all at once. So follow the chain
+    # until it ends or closes.
     offen = list(staffeln.values()) if mit_nachbarstaffeln else []
     while offen:
         aktuell = offen.pop()
@@ -276,18 +276,17 @@ def entdecke_staffeln(ankerverein: str, spielklasse: str, verband: str = "thueri
             logger.warning(f"Staffel {aktuell.slug} nicht erreichbar: {fehler}")
             continue
 
-        # In beide Richtungen: die Seite verlinkt nur ihren direkten Nachbarn,
-        # und der Ausgangsverein kann in der mittleren oder letzten Staffel
-        # stehen. Wer nur rel="next" folgt, findet von Staffel 3 aus keine
-        # einzige weitere.
+        # In both directions: the page only links its direct neighbour, and the
+        # starting club may be in the middle or last division. Anyone who only
+        # follows rel="next" finds not a single further one from division 3.
         for richtung in re.findall(r'rel="(?:next|prev)"\s+href="([^"]+)"', seite):
             for nachbar in _staffeln_auf_seite(richtung, spielklasse, verband):
                 if nachbar.staffel_id not in staffeln:
                     staffeln[nachbar.staffel_id] = nachbar
                     offen.append(nachbar)
 
-    # Anzeigenamen nachtragen, wo der Link keinen Text hatte (die
-    # next-Verkettung ist ein Pfeil-Icon ohne Beschriftung).
+    # Fill in display names where the link had no text (the next chain link
+    # is an arrow icon without a label).
     staffeln = {sid: _mit_anzeigename(s) for sid, s in staffeln.items()}
 
     logger.info(f"{spielklasse} ({verband}): {len(staffeln)} Staffel(n) entdeckt")
@@ -297,11 +296,11 @@ def entdecke_staffeln(ankerverein: str, spielklasse: str, verband: str = "thueri
 
 def _mit_anzeigename(staffel: Staffel) -> Staffel:
     """
-    Holt den Namen einer Staffel von ihrer eigenen Seite nach.
+    Fetches the name of a division from its own page afterwards.
 
-    Noetig fuer Staffeln, die ueber die next-Verkettung gefunden wurden: dort
-    ist der Link ein Pfeil-Icon ohne Text, und der Slug als Ersatzname waere
-    in der Oberflaeche unlesbar.
+    Necessary for divisions found via the next chain: there the link is an
+    arrow icon without text, and the slug as a substitute name would be
+    unreadable in the user interface.
     """
     if staffel.anzeigename != staffel.slug:
         return staffel
@@ -311,10 +310,10 @@ def _mit_anzeigename(staffel: Staffel) -> Staffel:
     except FussballDeNichtErreichbar:
         return staffel
 
-    # Die Staffelseite hat keine Ueberschrift mit ihrem Namen. Der Link zum
-    # Merken als Favorit traegt ihn aber vollstaendig mit:
+    # The division page has no heading with its name. The link for saving it
+    # as a favourite does carry it in full, though:
     #   text=26/27 - Herren - Landesklasse - Thüringen: Landesklasse Staffel 1
-    # text= darf erster Parameter sein, und & steht im HTML oft als &amp;
+    # text= may be the first parameter, and & often appears in the HTML as &amp;
     treffer = re.search(r'my\.add\.favorite\?(?:[^"]*?&(?:amp;)?)?text=([^&"]+)', seite)
     if not treffer:
         return staffel
@@ -325,7 +324,7 @@ def _mit_anzeigename(staffel: Staffel) -> Staffel:
     return replace(staffel, anzeigename=name or staffel.slug)
 
 
-# ===== Tabelle lesen =====
+# ===== Reading the table =====
 
 _TABELLENZEILE = re.compile(r"<tr[^>]*>(.*?)</tr>", re.S)
 _ZELLE = re.compile(r'<td([^>]*)>(.*?)</td>', re.S)
@@ -334,11 +333,11 @@ _TEAM_ID = re.compile(r"/mannschaft/[^\"]*?/team-id/([A-Z0-9]+)")
 
 def hole_tabelle(staffel: Staffel) -> List[Tabellenplatz]:
     """
-    Liest die Tabelle einer Staffel.
+    Reads the table of a division.
 
-    Gibt eine leere Liste zurueck, wenn die Seite keine Tabelle enthaelt -
-    Pokalrunden und Turniere haben keine, und eine Liga vor dem ersten
-    Spieltag manchmal auch noch nicht.
+    Returns an empty list if the page contains no table - cup rounds and
+    tournaments have none, and a league before the first matchday sometimes
+    does not have one yet either.
     """
     html = _hole(staffel.url)
 
@@ -359,17 +358,16 @@ def hole_tabelle(staffel: Staffel) -> List[Tabellenplatz]:
 
 def _zeile_auswerten(zeile: str) -> Optional[Tabellenplatz]:
     """
-    Baut aus einer Tabellenzeile einen Tabellenplatz.
+    Builds a table position from a table row.
 
-    Gelesen wird ueber die Klassennamen der Zellen (column-rank, column-club,
-    column-points) und nicht ueber ihre Position: die Zahl der Spalten
-    schwankt mit Wappen, Trendpfeil und der Ausblendung auf schmalen Geraeten.
-    Die Zellen ohne eigene Klasse dazwischen sind Spiele, Siege, Unentschieden
-    und Niederlagen, das Torverhaeltnis ist die einzige mit Doppelpunkt.
+    Reading goes by the class names of the cells (column-rank, column-club,
+    column-points) and not by their position: the number of columns varies
+    with crest, trend arrow and hiding on narrow devices. The cells without
+    their own class in between are matches played, wins, draws and losses; the
+    goal difference is the only one with a colon.
 
-    Fehlt ein Bestandteil, wird die Zeile verworfen. Eine halb gelesene
-    Tabellenzeile ist schlimmer als eine fehlende: aus ihr wuerde spaeter ein
-    Spesensatz.
+    If a component is missing, the row is discarded. A half-read table row is
+    worse than a missing one: an expense rate would later be derived from it.
     """
     zellen = [
         (treffer.group(1),

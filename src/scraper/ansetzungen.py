@@ -1,29 +1,30 @@
 """
-Liest die eigenen Ansetzungen aus der JSON-Schnittstelle der Schiriansetzung.
+Reads the user's own assignments (Ansetzungen) from the JSON interface of the
+Schiriansetzung.
 
-Die Ansetzungs-App (sria.dfbnet.org) ist eine Angular-App, die alles von
-https://api.dfbnet.org/api/referee/ laedt. Statt fuer jedes Spiel drei Modals
-aufzuklicken und auszulesen, stellt dieses Modul genau die Abrufe, die die App
-selbst macht:
+The assignment app (sria.dfbnet.org) is an Angular app that loads everything
+from https://api.dfbnet.org/api/referee/. Instead of clicking open and
+reading three modals for every match, this module makes exactly the requests
+the app itself makes:
 
-1. appointment/with-action-state - die Ansetzungen eines Zeitraums, mit dem
-   kompletten Gespann samt Kontaktdaten
-2. match?match-ids=...           - Anpfiff, Spieltag, Staffel, Teams, Spielstaette
-3. club-team?club-team-ids=...   - die Teamnamen
-4. league/<id>                   - Spielklasse und Mannschaftsart des Wettbewerbs
-5. venue/query (POST, nur lesend) - Name, Adresse und Platzart der Spielstaette
+1. appointment/with-action-state - the assignments of a period, with the
+   complete crew (Gespann) including contact data
+2. match?match-ids=...           - kickoff, matchday, division (Staffel), teams, venue
+3. club-team?club-team-ids=...   - the team names
+4. league/<id>                   - league level and team type of the competition
+5. venue/query (POST, read-only) - name, address and surface type of the venue
 
-Die Spielklasse kommt bewusst aus dem Wettbewerb (league) und nicht aus dem
-Team: bei einem Pokal- oder Freundschaftsspiel steht dort "Kreispokal" bzw.
-"Kreisfreundschaftsspiele", die Liga des Teams waere falsch. Die Werte sind
-am 24.11.2026 Feld fuer Feld gegen das abgeglichen worden, was die Modals in
-die Datenbank geschrieben hatten - sie sind identisch, die Schluessel der
-gespeicherten Spiele bleiben also gleich.
+The league level deliberately comes from the competition (league) and not from
+the team: for a cup or friendly match it says "Kreispokal" or
+"Kreisfreundschaftsspiele" there, and the team's league would be wrong. On
+24.11.2026 the values were compared field by field against what the modals had
+written to the database - they are identical, so the keys of the stored
+matches stay the same.
 
-Anmeldung, Token und erlaubte Abrufe: siehe scraper/sria_api.py.
+Login, token and allowed requests: see scraper/sria_api.py.
 
-Das Fenster "Heute +/- 2 Wochen" der Liste "Meine Spiele" ist nur die
-Voreinstellung ihres Auswahlfelds. Die Schnittstelle liefert jeden Zeitraum.
+The "Heute +/- 2 Wochen" (today +/- 2 weeks) window of the "Meine Spiele" list
+is only the default of its selection field. The interface delivers any period.
 """
 from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional
@@ -37,14 +38,14 @@ from utils.logger import setup_logger
 
 logger = setup_logger("ansetzungen")
 
-# Ansetzungen je Seite; die Antwort ist ein blosses Array ohne Seitenangaben
+# Assignments per page; the response is a bare array without paging information
 _SEITE = 100
 _MAX_SEITEN = 20
 
 _WOCHENTAGE = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
 
-# Rollen der Schnittstelle -> Rollen in der Datenbank und im Formular.
-# Beobachter (OBSERVER) standen nie im Gespann-Modal und bleiben draussen.
+# Roles of the interface -> roles in the database and in the form.
+# Observers (OBSERVER) were never in the crew modal and stay out.
 _ROLLEN = {"REFEREE": "SR", "ASSISTANT_1": "SRA 1", "ASSISTANT_2": "SRA 2"}
 _ROLLEN_FOLGE = list(_ROLLEN.values())
 
@@ -57,14 +58,14 @@ _PLATZARTEN = {
 
 def zeitraum(heute: Optional[date] = None):
     """
-    Der abgefragte Zeitraum: die laufende Saison (mindestens die letzten zwei
-    Wochen, damit Anfang Juli die letzten Spiele der alten Saison nicht
-    herausfallen) bis ein Jahr voraus.
+    The queried period: the current season (at least the last two weeks, so
+    that at the start of July the last matches of the old season do not drop
+    out) up to one year ahead.
     """
     heute = heute or date.today()
     saisonstart = date(heute.year if heute.month >= 7 else heute.year - 1, 7, 1)
     von = min(saisonstart, heute - timedelta(days=14))
-    # Einen Tag Puffer, weil die Grenzen als UTC-Zeitpunkte gehen
+    # One day of buffer, because the bounds are sent as UTC timestamps
     return von - timedelta(days=1), heute + timedelta(days=365)
 
 
@@ -84,7 +85,7 @@ def hole_ansetzungen(page: Page, schiri_id: str, von: date, bis: date) -> List[D
 
 
 def hole_rohdaten(page: Page, schiri_id: str, von: date, bis: date) -> Dict:
-    """Alle Rohdaten zu den Ansetzungen eines Zeitraums - je Art ein paar Abrufe."""
+    """All raw data for the assignments of a period - a few requests per kind."""
     ansetzungen = hole_ansetzungen(page, schiri_id, von, bis)
 
     teams_und_spiele = sria_api.team_namen(page, (a.get("id") for a in ansetzungen))
@@ -103,10 +104,10 @@ def hole_rohdaten(page: Page, schiri_id: str, von: date, bis: date) -> Dict:
             "staetten": staetten, "wettbewerbe": wettbewerbe, "schiri_id": schiri_id}
 
 
-# ------------------------------------------------------------- Aufbereitung
+# ------------------------------------------------------------- Processing
 
 def anpfiff_text(anstoss: Optional[str]) -> str:
-    """'2026-11-14T14:00:00+01:00' -> 'Samstag · 14.11.2026 · 14:00 Uhr' (Ortszeit)."""
+    """'2026-11-14T14:00:00+01:00' -> 'Samstag · 14.11.2026 · 14:00 Uhr' (local time)."""
     if not anstoss:
         return ""
     zeit = datetime.fromisoformat(anstoss)
@@ -120,21 +121,21 @@ def _adresse(adresse: Optional[Dict]) -> str:
 
 
 def _koordinate(wert) -> Optional[float]:
-    """Breite oder Laenge aus der Schnittstelle; alles andere als eine Zahl gilt als fehlend."""
+    """Latitude or longitude from the interface; anything other than a number counts as missing."""
     if isinstance(wert, bool) or not isinstance(wert, (int, float, str)):
         return None
     try:
         zahl = float(wert)
     except ValueError:
         return None
-    # 0/0 liefert eine Schnittstelle gern statt "unbekannt" - in Deutschland liegt nichts dort
+    # An interface likes to return 0/0 instead of "unknown" - nothing lies there in Germany
     return zahl if zahl else None
 
 
 def _gespann(personen: List[Dict], schiri_id: Optional[str] = None) -> List[Dict]:
     """
-    Das Gespann in Formularreihenfolge. "selbst" markiert die eigene Person -
-    die Ansetzung des Nutzers fuehrt ihn mit seiner Schiedsrichter-ID.
+    The crew (Gespann) in form order. "selbst" (self) marks the user's own
+    person - the user's assignment lists them with their referee ID.
     """
     gespann = []
     for person in personen or []:
@@ -151,14 +152,14 @@ def _gespann(personen: List[Dict], schiri_id: Optional[str] = None) -> List[Dict
             "plz_ort": _adresse({"zipCode": person.get("zipCode"), "city": person.get("city")}),
             "selbst": bool(schiri_id) and str(person.get("id") or "") == str(schiri_id),
         })
-    # Stabil sortiert: bei Turnieren bleibt die Reihenfolge mehrerer SR erhalten
+    # Sorted stably: at tournaments the order of several referees (SR) is preserved
     return sorted(gespann, key=lambda p: _ROLLEN_FOLGE.index(p["rolle"]))
 
 
 def aufbereiten(ansetzung: Dict, rohdaten: Dict) -> Dict:
     """
-    Eine Ansetzung in der Struktur, die die Datenbank und der Generator
-    erwarten ('spiel_info', 'schiedsrichter', 'spielstaette').
+    An assignment in the structure that the database and the generator
+    expect ('spiel_info', 'schiedsrichter', 'spielstaette').
     """
     spiel = rohdaten["spiele"].get(ansetzung["id"])
     if not spiel:
@@ -185,8 +186,8 @@ def aufbereiten(ansetzung: Dict, rohdaten: Dict) -> Dict:
             "name": _text(staette.get("name")),
             "adresse": _adresse(staette.get("address")),
             "platz_typ": _PLATZARTEN.get(staette.get("type"), ""),
-            # Die Schnittstelle kennt den Platz genauer als jede Adresssuche:
-            # Spielstaetten stehen oft ohne Hausnummer da
+            # The interface knows the pitch location more precisely than any
+            # address search: venues often have no house number
             "lat": _koordinate((staette.get("address") or {}).get("latitude")),
             "lon": _koordinate((staette.get("address") or {}).get("longitude")),
         },

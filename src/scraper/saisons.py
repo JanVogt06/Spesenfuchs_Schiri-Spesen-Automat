@@ -1,23 +1,24 @@
 """
-Saisonzusammenfassung (Reiter "Spiele & Statistik") ueber die Schnittstelle.
+Season summary (tab "Spiele & Statistik") via the interface.
 
-Frueher wurde die Karte "Geleitete Spiele" je Saison per Auswahlfeld
-umgeschaltet, geblaettert und gegen Spinner und "erst Kopfzeilen, dann
-Daten" abgewartet (siehe Memory dfbnet-ladeverhalten). Die App holt dieselben
-Daten mit wenigen Abrufen, und genau die stellt dieses Modul:
+The "Geleitete Spiele" (officiated matches) card used to be switched per
+season via a selection field, paged through, and waited out against spinners
+and "headers first, then data" (see memory dfbnet-ladeverhalten). The app
+fetches the same data with a few requests, and this module makes exactly
+those:
 
-- season                                    - die Saisons mit Start und Ende
-- appointment/with-match-details             - die geleiteten Spiele eines Zeitraums
-  (mit Toren, Karten und Gespann; die Teamnamen kommen ueber match/club-team)
-- appointment/summary                        - Geleitet/Zurueckgegeben/Nicht
-  angetreten je Rolle
-- referee/<id>/exemption/summary             - Lehrabende, Leistungspruefung,
-  sonstige anrechenbare Einsaetze
+- season                                    - the seasons with start and end
+- appointment/with-match-details             - the officiated matches of a period
+  (with goals, cards and crew; the team names come via match/club-team)
+- appointment/summary                        - officiated/returned/did not
+  appear, per role
+- referee/<id>/exemption/summary             - training evenings (Lehrabende),
+  performance test (Leistungspruefung), other creditable efforts
 
-Das Ergebnis hat dieselbe Form wie das der alten Oberflaechen-Lesung, damit
-main.persist_saisons und db/season.py unveraendert bleiben. Beschriftungen
-und Darstellung ("-" fuer leer, "Summe" inklusive "Sonstiger Einsatz") stammen
-aus dem Quelltext der App (24.11.2026).
+The result has the same form as that of the old user-interface reading, so
+that main.persist_saisons and db/season.py stay unchanged. Labels and
+presentation ("-" for empty, "Summe" including "Sonstiger Einsatz") come from
+the app's source code (24.11.2026).
 """
 from datetime import date, datetime, timezone
 from typing import Dict, List, Optional
@@ -31,18 +32,19 @@ from utils.logger import setup_logger
 
 logger = setup_logger("saisons")
 
-# Am 24.11.2026 gemessen: der Server baut die Spieldetails beim ersten Abruf
-# langsam auf (rund 32 Sekunden fuer manche Spiele) und cacht sie dann -
-# derselbe Abruf kam danach in 1,5 Sekunden, die ganze Saison in 2,5. Liegen
-# mehrere noch ungecachte Spiele auf einer Seite, reisst sein Zeitlimit
-# (~60 s) und er antwortet mit 500. (Daher kam auch die leere Tabelle bei
-# "100 Ergebnisse pro Seite", gegen die die alte Oberflaechen-Lesung auf
-# 50/20/10 auswich.) Gelesen wird deshalb in 20er-Seiten; scheitert eine
-# auch im zweiten Versuch (dann meist schon gecacht), wird sie geteilt.
+# Measured on 24.11.2026: the server builds the match details slowly on the
+# first request (around 32 seconds for some matches) and then caches them -
+# the same request afterwards took 1.5 seconds, the whole season 2.5. If
+# several not-yet-cached matches are on one page, its time limit (~60 s)
+# is exceeded and it responds with 500. (That was also the cause of the empty
+# table at "100 Ergebnisse pro Seite" (100 results per page), which the old
+# user-interface reading sidestepped with 50/20/10.) Reading is therefore done
+# in pages of 20; if one fails even on the second attempt (by then usually
+# cached), it is split.
 _SEITE = 20
 _MAX_SPIELE = 2000
 
-# Rollen im Gespann einer Spielzeile (teamRole der App) in deren Reihenfolge
+# Roles in the crew of a match row (the app's teamRole) in the app's order
 _GESPANN = {
     "REFEREE": "SR",
     "ASSISTANT_1": "SRA 1",
@@ -57,7 +59,7 @@ _GESPANN = {
 }
 _GESPANN_FOLGE = list(_GESPANN)
 
-# Zeilen der Einsatzbilanz (row der App) in deren Reihenfolge
+# Rows of the assignment balance (the app's row) in the app's order
 _BILANZ = [
     ("referee", "SR"),
     ("assistant1", "SRA 1"),
@@ -73,7 +75,7 @@ _BILANZ = [
 
 
 def _zelle(wert) -> str:
-    """Wie die App: leer und 0 als "-"."""
+    """Like the app: empty and 0 as "-"."""
     return str(wert) if wert else "-"
 
 
@@ -82,7 +84,7 @@ def _zeitpunkt(wert: datetime) -> str:
 
 
 def saison_zeitraum(saison: Dict, jetzt: datetime):
-    """Von Saisonbeginn bis Saisonende - fuer die laufende nur bis jetzt, wie die App."""
+    """From season start to season end - for the current one only up to now, like the app."""
     von = f"{saison['start']}T00:00:00.000Z"
     ende = datetime.fromisoformat(f"{saison['end']}T21:59:59.999+00:00")
     return von, _zeitpunkt(min(ende, jetzt))
@@ -90,8 +92,8 @@ def saison_zeitraum(saison: Dict, jetzt: datetime):
 
 def angebotene_saisons(alle: List[Dict], schiedsrichter_seit: Optional[str], heute: date) -> List[Dict]:
     """
-    Die Saisons ab der, in der man Schiedsrichter wurde, bis zur laufenden -
-    neueste zuerst, wie im Auswahlfeld der App.
+    The seasons from the one in which the person became a referee up to the
+    current one - newest first, like in the app's selection field.
     """
     seit = schiedsrichter_seit or ""
     return sorted(
@@ -103,9 +105,8 @@ def angebotene_saisons(alle: List[Dict], schiedsrichter_seit: Optional[str], heu
 
 def _hole_seite(page: Page, schiri_id: str, von: str, bis: str, groesse: int, seite: int) -> List[Dict]:
     """
-    Eine Seite; scheitert sie am Server, dieselben Eintraege in kleineren
-    Seiten. Die Teile decken genau den Bereich der Seite ab: 20 -> 2x10 ->
-    2x5 -> 5x1.
+    One page; if it fails on the server, the same entries in smaller pages.
+    The parts cover exactly the range of the page: 20 -> 2x10 -> 2x5 -> 5x1.
     """
     query = urlencode({"size": groesse, "page": seite, "sort": "kickoff,desc",
                        "from": von, "until": bis, "referee-id": schiri_id})
@@ -137,7 +138,7 @@ def _hole_spiele(page: Page, schiri_id: str, von: str, bis: str) -> List[Dict]:
 
 
 def spielzeile(spiel: Dict, details: Dict, teams: Dict, schiri_id: str) -> Dict:
-    """Eine Zeile der geleiteten Spiele in der Form der alten Tabellen-Lesung."""
+    """One row of the officiated matches in the form of the old table reading."""
     anstoss = datetime.fromisoformat(spiel["kickoff"])
     match = details.get(spiel["id"]) or {}
     heim = teams.get(match.get("homeTeamId")) or {}
@@ -149,8 +150,8 @@ def spielzeile(spiel: Dict, details: Dict, teams: Dict, schiri_id: str) -> Dict:
         key=lambda p: _GESPANN_FOLGE.index(p["role"]),
     )
 
-    # Ein Turnier hat keine Teams; die Tabelle zeigt dann den Namen des
-    # Turnierblocks ("..., 3. Tag, NR 1") in der Heim-Spalte
+    # A tournament has no teams; the table then shows the name of the
+    # tournament block ("..., 3. Tag, NR 1") in the home column
     heim_name = text(heim.get("name")) or text((match.get("matchBlock") or {}).get("blockName"))
 
     return {
@@ -158,7 +159,7 @@ def spielzeile(spiel: Dict, details: Dict, teams: Dict, schiri_id: str) -> Dict:
         "liga": text((spiel.get("league") or {}).get("name")),
         "heim": heim_name,
         "gast": text(gast.get("name")),
-        # Ohne Ergebnis schreibt die Tabelle "- : -"
+        # Without a result the table writes "- : -"
         "ergebnis": " : ".join("-" if t is None else str(t) for t in tore),
         "heim_gelb": spiel.get("yellowCardsHome"),
         "heim_gelbrot": spiel.get("yellowRedCardsHome"),
@@ -179,10 +180,11 @@ def spielzeile(spiel: Dict, details: Dict, teams: Dict, schiri_id: str) -> Dict:
 
 def bilanz(summe: Dict, befreiung: Dict):
     """
-    Einsatzbilanz und Lehrgaenge aus appointment/summary und exemption/summary.
+    Assignment balance and courses (Lehrgaenge) from appointment/summary and
+    exemption/summary.
 
     Returns:
-        (einsaetze, lehrgaenge) wie frueher _bilanz_auswerten
+        (einsaetze, lehrgaenge) as _bilanz_auswerten used to return
     """
     summe = summe or {}
     befreiung = befreiung or {}
@@ -230,8 +232,8 @@ def lies_saison(page: Page, schiri_id: str, saison: Dict, jetzt: datetime) -> Di
     befreiung = abruf(page, "GET", f"referee/{schiri_id}/exemption/summary?{zeitraum}")
     einsaetze, lehrgaenge = bilanz(summe, befreiung)
 
-    # Null Spiele glaubt der Lauf nur, wenn auch die Bilanz nichts Geleitetes
-    # kennt - sonst wuerde replace_saison eine Saison leeren.
+    # The run only believes zero matches if the balance also knows of nothing
+    # officiated - otherwise replace_saison would empty a season.
     geleitet = einsaetze[-1]["geleitet"]
     vollstaendig = bool(zeilen) or geleitet == "-"
     if not vollstaendig:
@@ -249,15 +251,15 @@ def lies_saison(page: Page, schiri_id: str, saison: Dict, jetzt: datetime) -> Di
 def lies_saisons(page: Page, schiri_id: str, ueberspringen=None, progress_callback=None,
                  jetzt: Optional[datetime] = None) -> Dict[str, Dict]:
     """
-    Liest die geleiteten Spiele und die Bilanz je Saison.
+    Reads the officiated matches and the balance per season.
 
     Args:
-        ueberspringen: Saisons, die bereits vollstaendig gespeichert sind.
-            Abgeschlossene Saisons aendern sich bei DFBnet nicht mehr. Die
-            laufende Saison gehoert nie dazu - sie waechst mit jedem Spieltag.
+        ueberspringen: seasons that are already stored completely. Completed
+            seasons no longer change in DFBnet. The current season is never
+            among them - it grows with every matchday.
 
     Returns:
-        saison -> {spiele, einsaetze, lehrgaenge, vollstaendig, erwartet}
+        season -> {spiele, einsaetze, lehrgaenge, vollstaendig, erwartet}
     """
     jetzt = jetzt or datetime.now(timezone.utc)
     ueberspringen = set(ueberspringen or ())
@@ -279,7 +281,7 @@ def lies_saisons(page: Page, schiri_id: str, ueberspringen=None, progress_callba
             ergebnis[saison["name"]] = lies_saison(page, schiri_id, saison, jetzt)
             logger.info(f"✓ Saison {saison['name']}: {len(ergebnis[saison['name']]['spiele'])} Spiele")
         except sria_api.SitzungAbgelaufen as e:
-            # Das Gelesene behalten; der Rest kommt beim naechsten Lauf
+            # Keep what was read; the rest follows on the next run
             logger.warning(f"Saisons abgebrochen bei {saison['name']}: {e}")
             break
         except Exception as e:

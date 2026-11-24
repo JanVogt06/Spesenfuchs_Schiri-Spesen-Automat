@@ -1,19 +1,20 @@
 """
-Eigene Stammdaten und QMax-Werte ueber die Schnittstelle der Ansetzungs-App.
+Own master data (Stammdaten) and QMax values via the interface of the
+assignment app.
 
-Frueher wurden dafuer zwei Reiter angeklickt und deren Karten ausgelesen.
-Die Karten zeigen aber nur, was die App aus wenigen Abrufen formatiert:
+This used to be done by clicking two tabs and reading out their cards. But the
+cards only show what the app formats from a few requests:
 
-- referee/<id>                     - Kontakt- und Meldedaten, Status
-- referee-id-card/<id>             - Ausweis und Foto
-- referee/<id>/additional-qualification - Zusatzausbildungen
-- referee/<id>/qualification       - die QMax-Werte je Rolle
+- referee/<id>                     - contact and registration data, status
+- referee-id-card/<id>             - ID card and photo
+- referee/<id>/additional-qualification - additional qualifications
+- referee/<id>/qualification       - the QMax values per role
 
-Die Texte ("gueltig bis ...", "noch 825 Tage", "genehmigt", "aktiv", der
-FUSSBALL.DE-Satz) und die Regeln dafuer stammen aus dem Quelltext der App
-(24.11.2026), damit die gespeicherten Werte gleich bleiben. "-" steht wie
-auf der Karte fuer "wirklich leer"; ein Feld, das nicht gelesen werden
-konnte, bleibt dagegen weg - der Upsert behaelt dann den alten Wert.
+The texts ("gueltig bis ...", "noch 825 Tage", "genehmigt", "aktiv", the
+FUSSBALL.DE sentence) and the rules for them come from the app's source code
+(24.11.2026), so that the stored values stay the same. "-" stands, as on the
+card, for "really empty"; a field that could not be read, on the other hand,
+is left out - the upsert then keeps the old value.
 """
 from datetime import date
 from typing import Dict, Optional
@@ -79,7 +80,7 @@ def kontakt_und_meldedaten(schiri: Dict) -> Dict:
         "sr_gebiet": _oder_strich((schiri.get("coreArea") or {}).get("name")),
         "schiedsrichter_seit": _oder_strich(datum_de(schiri.get("refereeSince"))),
         "verein": _oder_strich((schiri.get("coreClub") or {}).get("name")),
-        # Wie die Karte: 0 Fehlmonate erscheinen als "-"
+        # Like the card: 0 absent months (Fehlmonate) appear as "-"
         "fehlmonate": str(schiri["absentMonths"]) if schiri.get("absentMonths") else "-",
         "patensystem_am": _oder_strich(datum_de(schiri.get("mentoringFinishedAt"))),
         "kreditor_nr": _oder_strich(schiri.get("creditorNumber")),
@@ -93,8 +94,9 @@ def kontakt_und_meldedaten(schiri: Dict) -> Dict:
 
 def ausweis(karte: Dict, heute: date) -> Dict:
     """
-    Wie getValidUntil/getPhotoValidUntil der App: "gueltig bis" nur bei
-    genehmigtem Foto, sonst "Laufzeit bis"; nach Ablauf "abgelaufen am".
+    Like the app's getValidUntil/getPhotoValidUntil: "gueltig bis" (valid
+    until) only with an approved photo, otherwise "Laufzeit bis" (term until);
+    after expiry "abgelaufen am" (expired on).
     """
     status = karte.get("photoStatus")
     gueltig = karte.get("validUntil")
@@ -138,10 +140,9 @@ def qmax(daten: Dict) -> Dict:
 
 def lies_stammdaten(page: Page, schiri_id: str, heute: Optional[date] = None) -> Dict:
     """
-    Stammdaten samt QMax in den Schluesseln von db/stammdaten.py.
+    Master data including QMax, under the keys of db/stammdaten.py.
 
-    Jeder Teil wird fuer sich gelesen: faellt einer aus, fehlen nur seine
-    Felder.
+    Each part is read on its own: if one fails, only its fields are missing.
     """
     heute = heute or date.today()
     teile = [

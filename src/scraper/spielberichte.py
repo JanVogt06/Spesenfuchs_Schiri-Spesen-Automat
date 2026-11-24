@@ -1,35 +1,36 @@
 """
-Liest die Spielberichte der eigenen Spiele - ausschliesslich lesend.
+Reads the match reports (Spielberichte) of the user's own matches - strictly
+read-only.
 
-Zwei DFBnet-Teile sind beteiligt:
+Two DFBnet parts are involved:
 
-1. "Spielberichte -> Einsatzplan" (/spielplus/mod_sbo) ist ein altes
-   Server-Formular wie die Beobachtungsmodule. Es listet je Saison alle
-   Spiele, in denen man angesetzt war, mit einem Link auf den Bericht. Die
-   Saison wird ueber eine Auswahlliste gewechselt, die die Seite neu
-   abschickt. Die Liste zeigt alle Treffer auf einer Seite.
+1. "Spielberichte -> Einsatzplan" (/spielplus/mod_sbo) is an old server-side
+   form like the observation modules. For each season it lists all matches
+   the user was assigned to, with a link to the report. The season is changed
+   via a selection list that resubmits the page. The list shows all hits on
+   one page.
 
-2. Der Bericht selbst ist eine eigene Angular-App (/sbo-mobile/v2), die
-   alles aus einer JSON-Schnittstelle laedt. Diese App ist EDITIERBAR -
-   Torschuetzen, Dokumente, Kontrollen haben Knoepfe. Deshalb wird in ihr
-   nichts angeklickt. Gelesen wird direkt ueber dieselben GET-Abrufe, die die
-   App beim Oeffnen macht.
+2. The report itself is a separate Angular app (/sbo-mobile/v2) that loads
+   everything from a JSON interface. This app is EDITABLE - goal scorers,
+   documents and checks have buttons. Therefore nothing is clicked in it.
+   Reading is done directly via the same GET requests that the app makes when
+   it is opened.
 
-Die Schnittstelle authentisiert ueber ein Cookie, das erst entsteht, wenn
-die App einmal geladen wurde. Vorher antwortet sie mit 410. Deshalb wird sie
-einmal ueber den Bericht eines Spiels geoeffnet - genau so, wie es ein Klick
-auf das Symbol im Einsatzplan tut.
+The interface authenticates via a cookie that only comes into existence once
+the app has been loaded. Before that it responds with 410. That is why it is
+opened once via the report of one match - exactly as a click on the symbol in
+the Einsatzplan does.
 
-Sicherheitsnetz: Jeder Abruf geht durch _pruefe_pfad. Erlaubt sind nur die
-drei Lese-Pfade und der Dokument-Download, und nur als GET. Alles, was die
-App zum Speichern, Bestaetigen, Zurueckziehen oder Loeschen benutzt, ist ein
-POST auf andere Pfade und kann hier gar nicht entstehen.
+Safety net: every request goes through _pruefe_pfad. Only the three read paths
+and the document download are allowed, and only as GET. Anything the app uses
+to save, confirm, withdraw or delete is a POST to other paths and cannot arise
+here at all.
 
-Gelesen werden nur Berichte von Spielen, die vorbei sind UND deren Bericht
-laut Einsatzplan schon freigegeben ist. Der Abruf .../report/<Spiel>/create
-liefert die Berichts-ID; die App ruft ihn bei jedem Oeffnen auf und er gibt
-fuer ein Spiel mit Bericht nur den vorhandenen zurueck. Fuer ein Spiel ohne
-Bericht wird er nie aufgerufen.
+Only reports of matches that are over AND whose report is already released
+(freigegeben) according to the Einsatzplan are read. The request
+.../report/<match>/create returns the report ID; the app calls it every time
+it opens, and for a match that has a report it only returns the existing one.
+For a match without a report it is never called.
 """
 import base64
 import re
@@ -50,7 +51,7 @@ _EINSATZPLAN_URL = f"{_BASIS}/spielplus/mod_sbo/webflow.do?event=SEARCH_REFEREE_
 _APP_URL = f"{_BASIS}/sbo-mobile/v2/#/match-report/report/{{}}?dmg_company=DFBNET"
 _API = "/sbo-mobile/v2/oauth/"
 
-# Die einzigen Pfade, die abgerufen werden duerfen (relativ zu _API).
+# The only paths that may be requested (relative to _API).
 _ID = r"[A-Za-z0-9]{10,64}"
 _ERLAUBT = [
     re.compile(rf"report/{_ID}/create"),
@@ -59,14 +60,16 @@ _ERLAUBT = [
     re.compile(rf"match/{_ID}/documents/{_ID}"),
 ]
 
-# Status-Symbole im Einsatzplan, die einen fertigen Bericht anzeigen:
-# "Spiel ist freigegeben", "Schiedsrichterfreigabe", "Prueferfreigabe".
-# "Spiel ist erfolgt" allein heisst: der Bericht wird noch ausgefuellt.
+# Status symbols in the Einsatzplan that indicate a finished report:
+# "Spiel ist freigegeben" (match is released), "Schiedsrichterfreigabe"
+# (referee release), "Prueferfreigabe" (verifier release).
+# "Spiel ist erfolgt" (match has taken place) alone means: the report is still
+# being filled in.
 _FREIGEGEBEN = {"spiel_anerkannt", "staffel_view", "staffel_wettbewerb"}
-# Geplant, Schiri geplant, verlegt - dazu gibt es (noch) keinen Bericht.
+# Planned, referee planned, rescheduled - there is (not yet) a report for these.
 _NICHT_LESEN = {"spiel_geplant", "spiel_schiri", "spiel_historisch"}
 
-# Ereignistypen der Bericht-App (aus deren Quelltext, *_TYPE_ID)
+# Event types of the report app (from its source code, *_TYPE_ID)
 EREIGNIS_TYPEN = {
     1: "wechsel",
     2: "gelb",
@@ -80,7 +83,7 @@ EREIGNIS_TYPEN = {
     13: "zeitstrafe",
 }
 
-# Kurzzeichen der Schiedsrichter-Rollen nach rolePosition
+# Abbreviations of the referee roles by rolePosition
 _ROLLEN = {1: "SR", 2: "SRA1", 3: "SRA2", 4: "4OF"}
 
 
@@ -114,9 +117,9 @@ _GEWAEHLTE_SAISON_JS = """
     }
 """
 
-# Die Liste: Gruppenzeilen (eine Zelle, "Herren, Regionalliga ...") stehen
-# vor ihren Spielen. Eine Spielzeile hat: Symbol mit Link | leer | Nr. |
-# "So. 22.11.2026 13:30" | Spieltag | Heim | - | Gast | Ergebnis | Status.
+# The list: group rows (one cell, "Herren, Regionalliga ...") come before
+# their matches. A match row has: symbol with link | empty | no. |
+# "So. 22.11.2026 13:30" | matchday | home | - | away | result | status.
 _LISTE_JS = """
     () => {
         const zeilen = [];
@@ -159,7 +162,7 @@ _LISTE_JS = """
 
 
 def finde_einsatzplan(page: Page) -> str:
-    """Der Link auf den Einsatzplan aus dem DFBnet-Menue, sonst die bekannte URL."""
+    """The link to the Einsatzplan from the DFBnet menu, otherwise the known URL."""
     try:
         url = page.evaluate(_EINSATZPLAN_LINK_JS)
     except Exception:
@@ -168,7 +171,7 @@ def finde_einsatzplan(page: Page) -> str:
 
 
 def oeffne_einsatzplan(page: Page, url: str) -> List[str]:
-    """Oeffnet den Einsatzplan und gibt die angebotenen Saisons zurueck (neueste zuerst)."""
+    """Opens the Einsatzplan and returns the offered seasons (newest first)."""
     page.goto(url, wait_until="domcontentloaded", timeout=_ZEITLIMIT_MS)
     page.locator("select.dfb-Dropdown-nativeSelect").wait_for(state="attached", timeout=15000)
     saisons = page.evaluate(_SAISONS_JS)
@@ -179,12 +182,12 @@ def oeffne_einsatzplan(page: Page, url: str) -> List[str]:
 
 def waehle_saison(page: Page, saison: str) -> None:
     """
-    Waehlt eine Saison wie ein Mensch: Auswahl aufklappen, Eintrag anklicken.
+    Selects a season like a human: open the selection, click the entry.
 
-    Die Auswahl ist ein eigenes Dropdown-Bauteil ueber einem versteckten
-    <select>; der Klick auf den Eintrag schickt das Formular ab und laedt die
-    Seite neu. Danach muss das versteckte Feld die Saison tragen - sonst
-    zeigte die Liste womoeglich noch die vorige.
+    The selection is a custom dropdown component on top of a hidden <select>;
+    clicking the entry submits the form and reloads the page. Afterwards the
+    hidden field must carry the season - otherwise the list might still show
+    the previous one.
     """
     if page.evaluate(_GEWAEHLTE_SAISON_JS) == saison:
         return
@@ -203,16 +206,16 @@ def waehle_saison(page: Page, saison: str) -> None:
 
 
 def lies_einsatzplan(page: Page) -> List[Dict]:
-    """Alle Spielzeilen der angezeigten Saison."""
+    """All match rows of the displayed season."""
     return page.evaluate(_LISTE_JS) or []
 
 
 def ist_lesbar(zeile: Dict, heute: Optional[date] = None) -> bool:
     """
-    Ob zu einer Zeile ein Bericht gelesen werden darf.
+    Whether a report may be read for a row.
 
-    Nur Einzelspielberichte (Sammelberichte von Turnieren haben einen anderen
-    Link), nur vergangene Spiele, nur mit freigegebenem Bericht.
+    Only single-match reports (collective reports of tournaments have a
+    different link), only past matches, only with a released report.
     """
     if not zeile.get("dfb_spiel_id"):
         return False
@@ -230,9 +233,9 @@ def ist_lesbar(zeile: Dict, heute: Optional[date] = None) -> bool:
 
 def wartet_auf_freigabe(zeile: Dict, heute: Optional[date] = None) -> bool:
     """
-    Ein vergangenes Spiel, dessen Bericht kommen wird, aber noch nicht freigegeben ist.
+    A past match whose report will come but is not yet released.
 
-    Solange es so eines gibt, ist die Saison nicht fertig gelesen.
+    As long as there is one, the season is not completely read.
     """
     if not zeile.get("dfb_spiel_id") or ist_lesbar(zeile, heute):
         return False
@@ -242,11 +245,11 @@ def wartet_auf_freigabe(zeile: Dict, heute: Optional[date] = None) -> bool:
 
 def spielkennung(zeile: Dict) -> str:
     """
-    Die neunstellige Spielkennung einer Einsatzplan-Zeile: Staffelkennung aus
-    der Gruppenueberschrift ("Herren, Kreisoberliga, Kreis Mittelthueringen
-    659000 - Meisterschaft, ...") plus die Nr. der Zeile ("082") ->
-    "659000082". So steht sie in jedem gespeicherten Bericht (identifier),
-    auch fuer Spiele, deren Bericht es noch nicht gibt.
+    The nine-digit match identifier (Spielkennung) of an Einsatzplan row:
+    division identifier from the group heading ("Herren, Kreisoberliga, Kreis
+    Mittelthueringen 659000 - Meisterschaft, ...") plus the row's no. ("082")
+    -> "659000082". That is how it appears in every stored report
+    (identifier), also for matches whose report does not exist yet.
     """
     nummer = (zeile.get("nummer") or "").strip()
     staffel = re.findall(r"\b(\d{6}) - ", zeile.get("gruppe") or "")
@@ -255,7 +258,7 @@ def spielkennung(zeile: Dict) -> str:
     return staffel[-1] + nummer
 
 
-# ----------------------------------------------------------- Bericht-App (JSON)
+# ----------------------------------------------------------- Report app (JSON)
 
 def _pruefe_pfad(pfad: str) -> str:
     if not any(muster.fullmatch(pfad) for muster in _ERLAUBT):
@@ -263,7 +266,7 @@ def _pruefe_pfad(pfad: str) -> str:
     return _API + pfad
 
 
-# Laeuft im Kontext der Bericht-App. Ausdruecklich method GET, kein Body.
+# Runs in the context of the report app. Explicitly method GET, no body.
 _HOLE_JSON_JS = """
     async (url) => {
         const antwort = await fetch(url, {method: 'GET', credentials: 'include',
@@ -293,7 +296,7 @@ _HOLE_DATEI_JS = """
 
 
 class SitzungAbgelaufen(RuntimeError):
-    """Die Schnittstelle will eine neu geladene App (410/401/403)."""
+    """The interface wants a freshly loaded app (410/401/403)."""
 
 
 def _hole_json(page: Page, pfad: str):
@@ -307,7 +310,7 @@ def _hole_json(page: Page, pfad: str):
 
 
 def hole_dokument(page: Page, bericht_spiel_id: str, dokument_id: str) -> bytes:
-    """Laedt ein angehaengtes Dokument (meist PDF) herunter."""
+    """Downloads an attached document (usually PDF)."""
     ergebnis = page.evaluate(
         _HOLE_DATEI_JS, _pruefe_pfad(f"match/{bericht_spiel_id}/documents/{dokument_id}")
     )
@@ -321,10 +324,10 @@ def hole_dokument(page: Page, bericht_spiel_id: str, dokument_id: str) -> bytes:
 
 def oeffne_bericht_app(page: Page, dfb_spiel_id: str) -> None:
     """
-    Laedt die Bericht-App einmal ueber den Bericht eines (freigegebenen) Spiels.
+    Loads the report app once via the report of one (released) match.
 
-    Gewartet wird auf deren ersten Datenabruf - erst danach ist das Cookie
-    gesetzt, mit dem die Schnittstelle antwortet. Angeklickt wird nichts.
+    We wait for its first data request - only after that is the cookie set
+    with which the interface responds. Nothing is clicked.
     """
     with page.expect_response(
         lambda antwort: _API in antwort.url and antwort.url.endswith("/info"),
@@ -335,8 +338,9 @@ def oeffne_bericht_app(page: Page, dfb_spiel_id: str) -> None:
 
 def hole_bericht(page: Page, dfb_spiel_id: str) -> List[Dict]:
     """
-    Die Rohdaten eines Berichts: je Spiel des Berichts (praktisch immer eins)
-    die Kopfdaten aus /matches und der komplette Spielverlauf aus /details.
+    The raw data of a report: for each match of the report (practically always
+    one) the header data from /matches and the complete match course from
+    /details.
     """
     bericht_id = _hole_json(page, f"report/{dfb_spiel_id}/create")
     if not isinstance(bericht_id, str) or not re.fullmatch(_ID, bericht_id):
@@ -350,7 +354,7 @@ def hole_bericht(page: Page, dfb_spiel_id: str) -> List[Dict]:
     return ergebnis
 
 
-# ------------------------------------------------------------- Aufbereitung
+# ------------------------------------------------------------- Processing
 
 def _name(person: Optional[Dict]) -> str:
     if not person:
@@ -361,7 +365,7 @@ def _name(person: Optional[Dict]) -> str:
 
 
 def _ohne_trennstriche(text: Optional[str]) -> str:
-    """DFBnet setzt weiche Trennstriche in Vereinsnamen ("BFC \\u00adPreussen")."""
+    """DFBnet puts soft hyphens in club names ("BFC \\u00adPreussen")."""
     return re.sub(r"\s+", " ", (text or "").replace("­", "")).strip()
 
 
@@ -375,14 +379,14 @@ def _tore(ergebnis: Optional[Dict]) -> Optional[str]:
 
 
 def _zeitpunkt(info: Optional[Dict]) -> Optional[Dict]:
-    """Name und Zeitstempel einer Bestaetigung/eines Uploads - ohne Telefon und Mail."""
+    """Name and timestamp of a confirmation/upload - without phone and mail."""
     if not info:
         return None
     return {"name": info.get("userName") or "", "zeit": info.get("timestamp") or ""}
 
 
 def _spieler(spieler: Dict) -> Dict:
-    """Nur was auf dem Spielbericht steht - kein Geburtsdatum, keine Passnummer."""
+    """Only what is on the match report - no date of birth, no passport number."""
     status = spieler.get("playerStatusShort") or spieler.get("playerStatus") or {}
     return {
         "id": spieler.get("id"),
@@ -402,11 +406,11 @@ def _offizieller(person: Dict) -> Dict:
 
 def aufbereiten(spiel: Dict, details: Dict) -> Dict:
     """
-    Macht aus den Rohdaten der Bericht-App das, was der Spesenfuchs anzeigt.
+    Turns the raw data of the report app into what the Spesenfuchs displays.
 
-    Bewusst eine Auswahl: Personen nur mit Name, Rueckennummer und Funktion.
-    Geburtsdaten, Passnummern, Fotos, Telefonnummern und Mailadressen bleiben
-    bei DFBnet.
+    Deliberately a selection: persons only with name, shirt number and function.
+    Dates of birth, passport numbers, photos, phone numbers and email addresses
+    stay at DFBnet.
     """
     info = details.get("matchInfo") or {}
     heim_id = (info.get("homeTeam") or {}).get("id")
@@ -455,7 +459,7 @@ def aufbereiten(spiel: Dict, details: Dict) -> Dict:
                 "sonderbericht": bool(e.get("extraReportAttached")),
             }
             if typ == "wechsel":
-                # teamPersonId1 kommt rein (Ersatzspieler), teamPersonId2 geht raus
+                # teamPersonId1 comes on (substitute), teamPersonId2 goes off
                 raus = personen.get(e.get("teamPersonId2")) or {}
                 eintrag["person_raus"] = raus.get("name", "")
                 eintrag["nummer_raus"] = raus.get("nummer")
@@ -463,7 +467,7 @@ def aufbereiten(spiel: Dict, details: Dict) -> Dict:
 
     ereignisse.sort(key=lambda e: (e["minute"] or 0, e["nachspielzeit"] or 0))
 
-    # Gespann: angesetzte Personen und, wer welche Rolle tatsaechlich hatte
+    # Crew (Gespann): assigned persons and who actually held which role
     angesetzt = {p.get("id"): p for p in details.get("appointedOfficials") or []}
     gespann = []
     for rolle in details.get("matchOfficials") or []:
@@ -586,7 +590,7 @@ def aufbereiten(spiel: Dict, details: Dict) -> Dict:
     }
 
 
-# ------------------------------------------------------------------ Ablauf
+# ------------------------------------------------------------------ Flow
 
 def lies_saisons(
     page: Page,
@@ -595,11 +599,11 @@ def lies_saisons(
     progress_callback=None,
 ) -> Dict[str, Dict]:
     """
-    Liest den Einsatzplan der noetigen Saisons.
+    Reads the Einsatzplan of the required seasons.
 
     Returns:
-        saison -> {"zeilen": [...]}. Eine Saison, bei der etwas schiefging,
-        fehlt und wird beim naechsten Lauf erneut gelesen.
+        season -> {"zeilen": [...]}. A season for which something went wrong
+        is missing and is read again on the next run.
     """
     angebotene = oeffne_einsatzplan(page, einsatzplan_url)
     zu_lesen = saisons_fuer(angebotene)
@@ -631,12 +635,12 @@ def lies_berichte(
     progress_callback=None,
 ) -> Dict[str, Dict]:
     """
-    Liest die Berichte zu den uebergebenen Einsatzplan-Zeilen.
+    Reads the reports for the Einsatzplan rows passed in.
 
     Args:
-        zeilen: nur lesbare Zeilen (ist_lesbar)
-        dokument_vorhanden: dfb_dokument_id -> schon gespeichert? Solche
-            Dokumente werden nicht noch einmal geladen.
+        zeilen: only readable rows (ist_lesbar)
+        dokument_vorhanden: dfb_dokument_id -> already stored? Such documents
+            are not loaded again.
 
     Returns:
         dfb_spiel_id -> {"zeile", "daten", "dateien": {dfb_dokument_id: bytes}}
@@ -663,7 +667,7 @@ def lies_berichte(
                 if not roh:
                     raise RuntimeError("Bericht ohne Spiel")
 
-                # Ein Einzelspielbericht hat genau ein Spiel
+                # A single-match report has exactly one match
                 daten = aufbereiten(roh[0]["spiel"], roh[0]["details"])
 
                 dateien = {}
@@ -683,15 +687,15 @@ def lies_berichte(
                 break
 
             except SitzungAbgelaufen as e:
-                # Einmal pro Lauf die App neu laden, dann aufgeben
+                # Reload the app once per run, then give up
                 if versuch == 1 and not neu_geoeffnet:
                     logger.info(f"Bericht-App neu laden ({e})")
                     neu_geoeffnet = True
                     try:
                         oeffne_bericht_app(page, spiel_id)
                     except Exception as fehler:
-                        # Das Gelesene behalten - sonst ginge mit einem
-                        # haengenden Neuladen der ganze Lauf verloren.
+                        # Keep what was read - otherwise a hanging reload would
+                        # lose the entire run.
                         logger.warning(f"Spielberichte abgebrochen, App laedt nicht neu: {fehler}")
                         return ergebnis
                     continue

@@ -1,12 +1,12 @@
 """
 Spesenfuchs - Main Entry Point
-Startet die FastAPI Backend-Anwendung
+Starts the FastAPI backend application
 """
 import os
 from datetime import date, timedelta
 from typing import Callable, Optional, List
 
-# .env laden, bevor Module importiert werden, die Secrets beim Import lesen
+# Load .env before importing modules that read secrets at import time
 from core.config import load_environment
 
 load_environment()
@@ -35,25 +35,25 @@ logger = setup_logger("main")
 
 def persist_matches(user_id: int, matches_data: List[dict], vollstaendig: bool = True) -> int:
     """
-    Schreibt ein Scrape-Ergebnis in die Datenbank.
+    Writes a scrape result to the database.
 
-    Die Spesensaetze und der km-Satz werden hier eingefroren: sie gelten ab
-    dem ersten Sehen eines Spiels und werden bei spaeteren Scrapes nicht mehr
-    angefasst, damit eine Aenderung der Spesenordnung keine bereits
-    abgegebene Abrechnung rueckwirkend umschreibt.
+    The expense rates and the km rate are frozen here: they apply from the
+    first time a match is seen and are not touched again by later scrapes, so
+    that a change to the expense regulations does not retroactively rewrite a
+    statement that has already been submitted.
 
-    Spiele, die nicht mehr in der Ansetzung stehen, werden markiert statt
-    geloescht - sonst wuerden eingetragene Kilometer mit verschwinden.
+    Matches that are no longer in the assignment list are marked instead of
+    deleted - otherwise the entered kilometres would disappear with them.
 
     Args:
-        vollstaendig: Ob der Scrape alle Ansetzungen erfasst hat. Nur dann darf
-            aus "nicht im Ergebnis" auf "nicht mehr angesetzt" geschlossen
-            werden. Der Scraper ueberspringt einzelne Spiele, deren Daten
-            sich nicht aufbereiten lassen; ohne diese Unterscheidung wuerden dem
-            Nutzer voellig gueltige Ansetzungen als zurueckgezogen angezeigt.
+        vollstaendig: Whether the scrape captured all assignments. Only then
+            may "not in the result" be taken to mean "no longer assigned". The
+            scraper skips individual matches whose data cannot be processed;
+            without this distinction the user would see perfectly valid
+            assignments displayed as withdrawn.
 
     Returns:
-        Anzahl gespeicherter Spiele.
+        Number of saved matches.
     """
     seen_ids = []
     saved = 0
@@ -95,16 +95,15 @@ def persist_matches(user_id: int, matches_data: List[dict], vollstaendig: bool =
 
 def persist_stammdaten(user_id: int, stammdaten: dict) -> None:
     """
-    Schreibt die eigenen Stammdaten eines Users in die Datenbank.
+    Writes a user's own master data (Stammdaten) to the database.
 
-    Fehler werden nur geloggt: die Ansetzungen sind das Produkt, die
-    Stammdaten sind Beiwerk. Sie sollen einen Lauf nicht scheitern lassen,
-    nachdem die Spiele bereits erfolgreich geschrieben wurden.
+    Errors are only logged: the assignments are the product, the master data
+    is a side feature. They must not make a run fail after the matches have
+    already been written successfully.
 
-    Ein leeres Ergebnis wird uebersprungen statt gespeichert. Sonst legte der
-    Upsert eine Zeile aus lauter Leerstrings an, und der Reiter zeigte dem
-    Nutzer eine leere Tabelle statt des Hinweises, dass noch nichts abgerufen
-    wurde.
+    An empty result is skipped instead of saved. Otherwise the upsert would
+    create a row of nothing but empty strings, and the tab would show the user
+    an empty table instead of the hint that nothing has been fetched yet.
     """
     if not any(stammdaten.values()):
         logger.warning("Keine Stammdaten gelesen - nichts zu speichern")
@@ -120,15 +119,16 @@ def persist_stammdaten(user_id: int, stammdaten: dict) -> None:
 
 def persist_saisons(user_id: int, saisons: dict) -> int:
     """
-    Schreibt die gelesenen Saisons in die Datenbank - jede fuer sich ersetzend.
+    Writes the seasons that were read to the database - each one replacing
+    its previous contents.
 
-    Eine unvollstaendig gelesene Saison wird NICHT geschrieben. Die Tabellen
-    werden pro Saison geleert und neu befuellt; mit einem halben Ergebnis
-    wuerde dabei der gute Bestand vernichtet. Lieber bleibt der alte Stand
-    stehen, bis der naechste Lauf die Saison sauber liest.
+    A season that was read incompletely is NOT written. The tables are emptied
+    and refilled per season; with a partial result the good stored data would
+    be destroyed. It is better to leave the old state in place until the next
+    run reads the season cleanly.
 
     Returns:
-        Anzahl der ersetzten Saisons.
+        Number of replaced seasons.
     """
     ersetzt = 0
 
@@ -137,9 +137,9 @@ def persist_saisons(user_id: int, saisons: dict) -> int:
             logger.warning(f"Saison {saison} unvollstaendig gelesen - bleibt unveraendert")
             continue
 
-        # Eine gespeicherte Saison mit Spielen wird nie durch eine leere
-        # ersetzt. Das waere ein Anzeigefehler von DFBnet und kein Rueckzug
-        # aller Spiele - der Bestand ginge dabei verloren.
+        # A stored season with matches is never replaced by an empty one. That
+        # would be a display glitch in DFBnet and not a withdrawal of all
+        # matches - the stored data would be lost.
         if not daten.get("spiele") and count_saison_spiele(user_id, saison):
             logger.warning(f"Saison {saison} leer gelesen, gespeichert sind Spiele - bleibt unveraendert")
             continue
@@ -190,13 +190,13 @@ def persist_saisons(user_id: int, saisons: dict) -> int:
 
 def waehle_beobachtungs_saisons(angebotene: List[str], schiedsrichter_seit: str, fertig: set) -> List[str]:
     """
-    Die Saisons, deren Beobachtungen gelesen werden muessen.
+    The seasons whose observations (Beobachtungen) need to be read.
 
-    Ab der Saison, in der man Schiedsrichter wurde - davor kann es keine
-    Beobachtung geben. Ist das Datum noch unbekannt (erster Abruf, die
-    Stammdaten werden erst spaeter im Lauf gelesen), werden alle angebotenen
-    Saisons gelesen; das passiert genau einmal, danach gelten die
-    abgeschlossenen als fertig.
+    From the season in which the person became a referee onwards - before
+    that there cannot be any observation. If the date is still unknown (first
+    fetch, the master data is only read later in the run), all offered seasons
+    are read; this happens exactly once, after which the completed ones count
+    as done.
     """
     seit = parse_deutsches_datum(schiedsrichter_seit)
     erste = saison_start_jahr(saison_fuer_datum(seit)) if seit else None
@@ -210,14 +210,14 @@ def waehle_beobachtungs_saisons(angebotene: List[str], schiedsrichter_seit: str,
 
 def persist_beobachtungen(user_id: int, beobachtungen: dict) -> int:
     """
-    Schreibt die gelesenen Beobachtungen - je Quelle und Saison ersetzend.
+    Writes the observations that were read - replacing per source and season.
 
-    Wie bei den Saisons: unvollstaendig Gelesenes bleibt liegen, und eine
-    gespeicherte Saison mit Noten wird nie durch eine leere ersetzt. Beides
-    waere ein Anzeigefehler von DFBnet, kein Verschwinden der Beobachtungen.
+    As with the seasons: anything read incompletely is left untouched, and a
+    stored season with grades is never replaced by an empty one. Either would
+    be a display glitch in DFBnet, not a disappearance of the observations.
 
     Returns:
-        Anzahl der ersetzten Saisons.
+        Number of replaced seasons.
     """
     ersetzt = 0
 
@@ -245,18 +245,18 @@ def persist_beobachtungen(user_id: int, beobachtungen: dict) -> int:
     return ersetzt
 
 
-# Wie lange ein gespeicherter Bericht nach dem Spiel noch nachgelesen wird.
-# Sonderberichte, Spesendokumente und Korrekturen kommen oft Tage spaeter.
+# How long after the match a stored report is still re-read.
+# Special reports, expense documents and corrections often arrive days later.
 BERICHT_NACHLAUF_TAGE = 30
 
-# Wie lange auf die Freigabe eines Berichts gewartet wird. Hallenturniere und
-# manche Freundschaftsspiele bekommen nie einen freigegebenen Bericht; ohne
-# diese Grenze galte ihre Saison nie als fertig und wuerde jede Nacht gelesen.
+# How long to wait for a report to be released (Freigabe). Indoor tournaments
+# and some friendlies never get a released report; without this limit their
+# season would never count as finished and would be read every night.
 FREIGABE_WARTEN_TAGE = 60
 
 
 def braucht_bericht(zeile: dict, gespeichert: dict, heute: Optional[date] = None) -> bool:
-    """Neu, oder noch so frisch, dass DFBnet etwas nachgetragen haben koennte."""
+    """New, or still so recent that DFBnet may have added something."""
     if zeile.get("dfb_spiel_id") not in gespeichert:
         return True
     heute = heute or date.today()
@@ -268,14 +268,15 @@ def braucht_bericht(zeile: dict, gespeichert: dict, heute: Optional[date] = None
 
 def persist_spielberichte(user_id: int, ergebnis: dict, heute: Optional[date] = None) -> int:
     """
-    Schreibt die gelesenen Spielberichte und merkt sich fertige Saisons.
+    Writes the match reports (Spielberichte) that were read and remembers
+    finished seasons.
 
-    Eine Saison ist fertig, wenn sie vorbei ist (plus Nachlauf), jeder
-    freigegebene Bericht gespeichert ist und keiner mehr auf seine Freigabe
-    wartet. Dann wird ihr Einsatzplan nicht mehr gelesen.
+    A season is finished when it is over (plus the follow-up period), every
+    released report is stored and none is still waiting for its release. Then
+    its assignment schedule (Einsatzplan) is no longer read.
 
     Returns:
-        Anzahl gespeicherter Berichte.
+        Number of saved reports.
     """
     heute = heute or date.today()
     saisons = ergebnis.get("saisons") or {}
@@ -327,11 +328,13 @@ def persist_spielberichte(user_id: int, ergebnis: dict, heute: Optional[date] = 
 
 def persist_spielnummern(user_id: int, ergebnis: dict) -> int:
     """
-    Traegt die Spielkennungen aus dem Einsatzplan bei den Ansetzungen ein -
-    sie stehen auf den Spesenquittungen (TFV und NOFV).
+    Enters the match identifiers (Spielkennungen) from the assignment
+    schedule (Einsatzplan) into the assignments - they appear on the expense
+    receipts (TFV and NOFV).
 
-    Laeuft nach persist_matches, damit auch gerade erst angelegte Spiele ihre
-    Kennung bekommen. Fehler werden nur geloggt, wie bei allem Beiwerk.
+    Runs after persist_matches so that matches that were only just created
+    also get their identifier. Errors are only logged, as with all side
+    features.
     """
     eintraege = []
     for daten in (ergebnis.get("saisons") or {}).values():
@@ -344,7 +347,7 @@ def persist_spielnummern(user_id: int, ergebnis: dict) -> int:
                 "heim": zeile.get("heim"),
                 "gast": zeile.get("gast"),
             })
-    # Der gelesene Bericht ist die genaueste Quelle
+    # The report that was read is the most accurate source
     for spiel_id, bericht in (ergebnis.get("berichte") or {}).items():
         eintraege.append({
             "spielkennung": (bericht.get("daten") or {}).get("spielkennung"),
@@ -368,21 +371,21 @@ def scrape_matches(
     progress_callback: Optional[Callable[[int, int, str], None]] = None
 ) -> List[dict]:
     """
-    Scrapt alle Ansetzungen des Users und schreibt sie in die Datenbank.
+    Scrapes all assignments of the user and writes them to the database.
 
-    Frueher wurde das Ergebnis zusaetzlich als spesen_data.json in einen
-    Session-Ordner gelegt und daraus sofort je ein DOCX und ein PDF erzeugt.
-    Beides entfaellt: die Datenbank ist die Quelle der Wahrheit, Dokumente
-    entstehen erst beim Download.
+    The result used to be additionally placed as spesen_data.json in a session
+    folder, and a DOCX and a PDF were generated from it right away. Both are
+    gone: the database is the source of truth, documents are only generated on
+    download.
 
     Args:
-        username: DFB.net Benutzername (sonst aus ENV - nur fuer Entwicklung)
-        password: DFB.net Passwort (sonst aus ENV - nur fuer Entwicklung)
-        user_id: User, dem die Spiele gehoeren
-        progress_callback: wird als (aktuell, gesamt, schritt) aufgerufen
+        username: DFB.net username (otherwise from ENV - for development only)
+        password: DFB.net password (otherwise from ENV - for development only)
+        user_id: User who owns the matches
+        progress_callback: called as (current, total, step)
 
     Returns:
-        Die gescrapten Spiele (kann leer sein, z.B. in der Winterpause).
+        The scraped matches (may be empty, e.g. during the winter break).
     """
     logger.info("=== DFB Scraper: Sammle alle Spieldaten ===")
 
@@ -407,9 +410,9 @@ def scrape_matches(
         scraper.click_login()
         scraper.login()
 
-        # login() wirft bei abgelehnten Zugangsdaten; hier hat DFBnet sie
-        # angenommen. Faellt der Abruf danach aus anderem Grund aus, sind die
-        # Zugangsdaten trotzdem in Ordnung.
+        # login() raises on rejected credentials; at this point DFBnet has
+        # accepted them. If the fetch fails afterwards for another reason, the
+        # credentials are still fine.
         if user_id is not None:
             dfb_login_angenommen(user_id)
 
@@ -423,9 +426,8 @@ def scrape_matches(
 
         all_matches = scraper.scrape_all_matches(progress_callback=fortschritt)
 
-        # Hat der Scraper einzelne Spiele uebersprungen, ist das Ergebnis
-        # unvollstaendig und taugt nicht als Grundlage fuer "nicht mehr
-        # angesetzt"
+        # If the scraper skipped individual matches, the result is incomplete
+        # and is no basis for "no longer assigned"
         erwartet = getattr(scraper, "erwartete_spiele", len(all_matches))
         vollstaendig = len(all_matches) >= erwartet
 
@@ -435,14 +437,14 @@ def scrape_matches(
                 "unvollstaendiger Scrape"
             )
 
-        # Stammdaten und Saisons kommen wie die Ansetzungen ueber die
-        # Schnittstelle der Ansetzungs-App, im selben angemeldeten Tab.
+        # Master data and seasons come, like the assignments, through the
+        # interface of the assignment app, in the same logged-in tab.
         #
-        # Das eigene try/except, das nur warnt, ist tragend: persist_matches
-        # laeuft erst nach dem with-Block. Eine Exception hier kaeme aus
-        # scrape_matches heraus, und kein einziges Spiel waere gespeichert -
-        # ein kompletter Nachtlauf verloren, weil DFBnet ein Stammdaten-Feld
-        # verschoben hat.
+        # The separate try/except that only warns is load-bearing:
+        # persist_matches only runs after the with block. An exception here
+        # would escape from scrape_matches, and not a single match would be
+        # saved - a whole nightly run lost because DFBnet moved a master data
+        # field.
         stammdaten = {}
 
         try:
@@ -453,17 +455,17 @@ def scrape_matches(
         except Exception as e:
             logger.warning(f"Stammdaten konnten nicht gelesen werden: {e}")
 
-        # Und die Saisonzusammenfassung. Auch sie mit eigenem try/except: sie
-        # laeuft ueber alle Saisons, aber die Ansetzungen sind das Produkt
-        # und duerfen daran nicht scheitern.
+        # And the season summary. It also gets its own try/except: it runs
+        # over all seasons, but the assignments are the product and must not
+        # fail because of it.
         saisons = {}
 
         try:
             melde(len(all_matches), erwartet, "Lese Saisonzusammenfassung...")
 
-            # Abgeschlossene Saisons aendern sich nicht mehr - was vollstaendig
-            # in der Datenbank steht, wird nicht noch einmal gelesen. Die
-            # laufende Saison nimmt der Scraper selbst wieder aus der Liste.
+            # Completed seasons no longer change - whatever is stored completely
+            # in the database is not read again. The scraper itself takes the
+            # current season back out of the list.
             fertig = get_komplette_saisons(user_id) if user_id is not None else set()
 
             saisons = scraper.scrape_saisons(
@@ -473,18 +475,18 @@ def scrape_matches(
         except Exception as e:
             logger.warning(f"Saisonzusammenfassung konnte nicht gelesen werden: {e}")
 
-        # Ganz zum Schluss die Beobachtungen aus den alten DFBnet-Modulen
-        # (Schiri-Beobachtung, Schiri-Portal). Bewusst als letzter Schritt:
-        # diese Module halten ihren Zustand in der Sitzung, und als sie vor der
-        # Schiriansetzung liefen, klappte deren Menue danach nicht mehr auf -
-        # der komplette Abruf ging verloren. Wie alles nach den Ansetzungen
-        # mit eigenem try/except.
+        # Last of all, the observations from the old DFBnet modules
+        # (Schiri-Beobachtung, Schiri-Portal). Deliberately the last step:
+        # these modules keep their state in the session, and when they ran
+        # before the Schiriansetzung, its menu no longer opened afterwards -
+        # the entire fetch was lost. Like everything after the assignments,
+        # with its own try/except.
         beobachtungen = {}
 
         try:
             melde(len(all_matches), erwartet, "Lese Beobachtungen...")
 
-            # Frisch gelesen, sonst der Stand aus dem letzten Abruf
+            # Freshly read, otherwise the state from the last fetch
             schiedsrichter_seit = stammdaten.get("schiedsrichter_seit") or ""
             if not schiedsrichter_seit and user_id is not None:
                 schiedsrichter_seit = (get_stammdaten(user_id) or {}).get("schiedsrichter_seit") or ""
@@ -503,10 +505,10 @@ def scrape_matches(
         except Exception as e:
             logger.warning(f"Beobachtungen konnten nicht gelesen werden: {e}")
 
-        # Danach die Spielberichte - auch sie laufen ueber die alten
-        # Formularmodule und kommen deshalb nach der Schiriansetzung. Sie
-        # werden ausschliesslich gelesen; was bei DFBnet etwas aendern
-        # koennte, kann der Scraper gar nicht aufrufen.
+        # Then the match reports - they too go through the old form modules and
+        # therefore come after the Schiriansetzung. They are only ever read;
+        # anything that could change something in DFBnet cannot even be called
+        # by the scraper.
         spielberichte = {}
 
         try:
@@ -547,21 +549,21 @@ def scrape_matches(
 
 def main():
     """
-    Startet die FastAPI Backend-Anwendung.
-    Das Frontend läuft separat mit Vite Dev-Server.
+    Starts the FastAPI backend application.
+    The frontend runs separately with the Vite dev server.
     """
     import uvicorn
 
-    # Port und Host aus Umgebungsvariablen laden
+    # Load port and host from environment variables
     API_HOST = os.getenv("API_HOST", "0.0.0.0")
-    API_PORT = int(os.getenv("API_PORT", "8001"))  # Default: 8001 statt 8000
+    API_PORT = int(os.getenv("API_PORT", "8001"))  # Default: 8001 instead of 8000
 
     logger.info("Starte Spesenfuchs API...")
     logger.info("==============================================")
     logger.info(f"API läuft auf: http://{API_HOST}:{API_PORT}")
     logger.info("==============================================")
 
-    # Starte API
+    # Start the API
     uvicorn.run(
         "api.main_api:app",
         host=API_HOST,

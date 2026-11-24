@@ -1,16 +1,16 @@
 """
-Naechtlicher Abgleich der Ligatabellen mit fussball.de.
+Nightly reconciliation of the league tables with fussball.de.
 
-Welche Ligen gebraucht werden, ergibt sich aus der Spesenordnung: bei
-Pokalspielen zaehlt die hoechstklassige beteiligte Mannschaft (§2 Abs. 3), bei
-Freundschaftsspielen die Spielklasse des Gastgebers (§2 Abs. 4). Dafuer
-muessen alle Spielklassen ab Landesklasse aufwaerts bekannt sein - dann ist
-eine Mannschaft, die in keiner Tabelle steht, zwangslaeufig unterhalb der
-Landesklasse und kann den Satz nicht mehr anheben.
+Which leagues are needed follows from the expense regulations (Spesenordnung):
+for cup matches the highest-ranked participating team counts (§2 para. 3), for
+friendlies the league level of the host (§2 para. 4). For that, all league
+levels from Landesklasse upwards must be known - then a team that appears in
+no table is necessarily below the Landesklasse and can no longer raise the
+rate.
 
-Die Staffel-Kennungen wechseln mit jeder Saison und stehen deshalb nirgends
-fest im Code. Als Ausgangspunkt dient ein Verein, von dem die eigenen
-Ansetzungen bereits wissen, dass er in der gesuchten Liga spielt - siehe
+The division identifiers (Staffel-Kennungen) change every season and are
+therefore not hard-coded anywhere. The starting point is a club that the
+user's own assignments already know plays in the league in question - see
 fussball_de.entdecke_staffeln.
 """
 from dataclasses import dataclass
@@ -26,46 +26,45 @@ logger = setup_logger("ligen")
 
 @dataclass(frozen=True)
 class Ziel:
-    """Eine Liga, die abgeglichen werden soll."""
-    spielklasse: str          # wie im Slug von fussball.de
-    verband: str              # wie im Slug von fussball.de
-    dfbnet_spielklasse: str   # wie DFBnet sie in den Ansetzungen nennt
+    """A league that is to be reconciled."""
+    spielklasse: str          # as in the fussball.de slug
+    verband: str              # as in the fussball.de slug
+    dfbnet_spielklasse: str   # as DFBnet names it in the assignments
     mit_nachbarstaffeln: bool
 
 
 ZIELE: Tuple[Ziel, ...] = (
-    # Thueringer Landesebene - mehrstaffelig, deshalb der Kette folgen
+    # Thuringian state level - multiple divisions, so follow the chain
     Ziel("verbandsliga", "thueringen", "Verbandsliga", True),
     Ziel("landesklasse", "thueringen", "Landesklasse", True),
 
-    # Ueberregional. Nicht um daraus Saetze zu bilden, sondern um zu erkennen,
-    # DASS eine Mannschaft ueberregional spielt - dann bleiben die Spesen leer.
-    # Ohne Nachbarstaffeln: von der Regionalliga Nordost fuehrt die Kette sonst
-    # durch alle fuenf Regionalligen Deutschlands.
+    # Supra-regional. Not to derive rates from them, but to recognise THAT a
+    # team plays supra-regionally - then the expenses stay empty.
+    # Without neighbouring divisions: from the Regionalliga Nordost the chain
+    # would otherwise lead through all five Regionalligen of Germany.
     Ziel("regionalliga", "region-nordostdeutschland", "Regionalliga Nordost", False),
     Ziel("oberliga", "deutschland", "Oberliga", False),
 )
 
-# Wieviele Vereine je DFBnet-Staffel probiert werden. Der erste Anker kann
-# danebengehen - ein Verein steigt ab, wird umbenannt, oder die Textsuche
-# findet ihn nicht.
+# How many clubs are tried per DFBnet division. The first anchor can miss - a
+# club gets relegated, is renamed, or the text search does not find it.
 ANKER_JE_STAFFEL = 3
 
 
 def _ankervereine(dfbnet_spielklasse: str) -> List[str]:
     """
-    Heimmannschaften aus den eigenen Ansetzungen dieser Spielklasse.
+    Home teams from the user's own assignments in this league level.
 
-    Heim und nicht Gast, weil der Gastgeber die Spielstaette stellt und damit
-    sicher zum ausrichtenden Verband gehoert. Neueste zuerst: eine Ansetzung
-    aus der laufenden Saison beschreibt die heutige Liga, eine drei Jahre alte
-    vielleicht nicht mehr.
+    Home and not away, because the host provides the venue and thus certainly
+    belongs to the organising association. Newest first: an assignment from
+    the current season describes today's league, one that is three years old
+    perhaps no longer does.
 
-    Gruppiert nach der Staffel, die DFBnet nennt, und reihum daraus bedient.
-    Sonst kaemen bei parallelen Staffeln alle Anker aus derselben - die vier
-    juengsten Oberliga-Ansetzungen dieses Bestandes sind saemtlich
-    NOFV-Oberliga Nord, und die fuer Thueringen entscheidende Sued-Staffel
-    bliebe unbekannt.
+    Grouped by the division that DFBnet names, and served from those in turn.
+    Otherwise, with parallel divisions, all anchors would come from the same
+    one - the four most recent Oberliga assignments in this data set are all
+    NOFV-Oberliga Nord, and the Sued division that matters for Thuringia would
+    remain unknown.
     """
     conn = get_connection()
 
@@ -89,7 +88,7 @@ def _ankervereine(dfbnet_spielklasse: str) -> List[str]:
         if len(gruppe) < ANKER_JE_STAFFEL:
             gruppe.append(zeile["heim_team"])
 
-    # Reihum, damit jede Staffel mit ihrem besten Anker zuerst drankommt
+    # In turn, so that each division gets its best anchor first
     anker: List[str] = []
     for runde in range(ANKER_JE_STAFFEL):
         for gruppe in je_staffel.values():
@@ -101,10 +100,10 @@ def _ankervereine(dfbnet_spielklasse: str) -> List[str]:
 
 def aktualisiere_liga(ziel: Ziel) -> int:
     """
-    Gleicht eine Liga ab. Gibt die Zahl der geschriebenen Mannschaften zurueck.
+    Reconciles one league. Returns the number of teams written.
 
-    Schlaegt der Abruf fehl, bleibt der bisherige Bestand stehen: eine
-    veraltete Tabelle ist brauchbar, eine halb geleerte nicht.
+    If the fetch fails, the existing data stays in place: an outdated table is
+    usable, a half-emptied one is not.
     """
     anker = _ankervereine(ziel.dfbnet_spielklasse)
     if not anker:
@@ -127,12 +126,12 @@ def aktualisiere_liga(ziel: Ziel) -> int:
         for staffel in gefunden:
             staffeln.setdefault(staffel.staffel_id, staffel)
 
-        # Eine Liga mit verketteten Staffeln ist mit dem ersten Treffer
-        # vollstaendig - die Kette hat alle Geschwister mitgebracht. Ligen ohne
-        # Kette laufen dagegen nebeneinander (NOFV-Oberliga Nord und Sued), und
-        # jeder Ausgangsverein kennt nur seine eigene. Dort muessen alle
-        # Vereine durch, sonst fehlt genau die Staffel, in der die Thueringer
-        # Mannschaften stehen.
+        # A league with chained divisions is complete with the first hit - the
+        # chain brought all its siblings along. Leagues without a chain, on the
+        # other hand, run side by side (NOFV-Oberliga Nord and Sued), and each
+        # starting club only knows its own. There all clubs must be tried,
+        # otherwise exactly the division containing the Thuringian teams is
+        # missing.
         if staffeln and ziel.mit_nachbarstaffeln:
             break
 
@@ -162,10 +161,10 @@ def aktualisiere_liga(ziel: Ziel) -> int:
 
 def aktualisiere_alle() -> int:
     """
-    Gleicht alle Ligen ab. Ein Fehler in einer Liga stoppt die anderen nicht.
+    Reconciles all leagues. An error in one league does not stop the others.
 
     Returns:
-        Zahl der insgesamt geschriebenen Mannschaften.
+        Total number of teams written.
     """
     logger.info("Ligatabellen werden abgeglichen")
 

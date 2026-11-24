@@ -3,7 +3,7 @@ from pathlib import Path
 
 from playwright.sync_api import sync_playwright, Page, Browser
 
-# Füge src/ zum Path hinzu für Imports
+# Add src/ to the path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from utils.logger import setup_logger
@@ -15,16 +15,16 @@ logger = setup_logger("dfb_scraper")
 
 
 class DFBScraper:
-    """Scraper für DFB.net Ansetzungen"""
+    """Scraper for DFB.net assignments (Ansetzungen)"""
 
     def __init__(self, headless: bool = True, username: str = None, password: str = None):
         """
-        Initialisiert den Scraper.
+        Initializes the scraper.
 
         Args:
-            headless: Browser im Hintergrund starten (False = sichtbar für Debugging)
-            username: DFB.net Benutzername
-            password: DFB.net Passwort
+            headless: Start the browser in the background (False = visible, for debugging)
+            username: DFB.net username
+            password: DFB.net password
         """
         self.headless = headless
         self.username = username
@@ -33,13 +33,13 @@ class DFBScraper:
         self.page: Page | None = None
 
     def start(self):
-        """Startet den Browser"""
+        """Starts the browser"""
         logger.info("Starte Browser...")
 
         self.playwright = sync_playwright().start()
         self.browser = self.playwright.chromium.launch(headless=self.headless)
 
-        # Browser-Kontext mit fester Größe erstellen
+        # Create the browser context with a fixed size
         context = self.browser.new_context(
             viewport={'width': 1920, 'height': 1080},
             screen={'width': 1920, 'height': 1080}
@@ -49,7 +49,7 @@ class DFBScraper:
         logger.info(f"Browser gestartet (headless={self.headless}, 1920x1080)")
 
     def stop(self):
-        """Stoppt den Browser"""
+        """Stops the browser"""
         if self.browser:
             logger.info("Schließe Browser...")
             self.browser.close()
@@ -57,37 +57,37 @@ class DFBScraper:
             logger.info("Browser geschlossen")
 
     def open_dfbnet(self):
-        """Öffnet die DFB.net Startseite"""
+        """Opens the DFB.net start page"""
         logger.info("Öffne dfbnet.org...")
 
-        # Weniger strikte Bedingung + längeres Timeout
+        # Less strict condition + longer timeout
         self.page.goto(
             "https://www.dfbnet.org",
             wait_until="domcontentloaded",
             timeout=60000
         )
 
-        # Titel ausgeben
+        # Log the title
         title = self.page.title()
         logger.info(f"Seite geladen: {title}")
 
         return title
 
     def accept_cookies(self):
-        """Akzeptiert das Cookie-Banner"""
+        """Accepts the cookie banner"""
         logger.info("Suche Cookie-Banner...")
 
         try:
             logger.info("Warte auf Cookie-Banner...")
 
-            # Direkter, einfacherer Ansatz
+            # Direct, simpler approach
             accept_button = self.page.locator('button:has-text("Alle akzeptieren")').first
             accept_button.wait_for(state="visible", timeout=30000)
 
             logger.info("Cookie-Banner gefunden, klicke...")
             accept_button.click()
 
-            # Warte bis Banner VERSCHWUNDEN ist
+            # Wait until the banner has DISAPPEARED
             accept_button.wait_for(state="hidden", timeout=10000)
             logger.info("Cookies akzeptiert")
 
@@ -96,11 +96,11 @@ class DFBScraper:
             logger.info("Fahre trotzdem fort...")
 
     def click_login(self):
-        """Klickt auf den Anmelden-Button"""
+        """Clicks the login ("Anmelden") button"""
         logger.info("Suche Anmelden-Button...")
 
         try:
-            # Verschiedene Selektoren für "Anmelden" probieren
+            # Try various selectors for "Anmelden"
             selectors = [
                 'button:has-text("Anmelden")',
                 'a:has-text("Anmelden")',
@@ -131,7 +131,7 @@ class DFBScraper:
             raise
 
     def login(self):
-        """Füllt Login-Formular aus und meldet sich an"""
+        """Fills in the login form and logs in"""
         logger.info("Fülle Login-Formular aus...")
 
         if not self.username or not self.password:
@@ -139,74 +139,74 @@ class DFBScraper:
             raise ValueError("Username und Passwort müssen angegeben werden")
 
         try:
-            # Warte bis Login-Formular sichtbar ist
+            # Wait until the login form is visible
             self.page.wait_for_selector('input[placeholder*="Benutzerkennung"], input[name*="username"]', timeout=20000)
 
-            # Benutzername eingeben
+            # Enter username
             username_field = self.page.locator('input[placeholder*="Benutzerkennung"], input[name*="username"]').first
             username_field.fill(self.username)
             logger.info("Benutzername eingegeben")
 
-            # Passwort eingeben
+            # Enter password
             password_field = self.page.locator('input[placeholder*="Passwort"], input[type="password"]').first
             password_field.fill(self.password)
             logger.info("Passwort eingegeben")
 
-            # Anmelden-Button im Formular klicken
+            # Click the login button in the form
             login_submit = self.page.locator('button:has-text("ANMELDEN")').first
             login_submit.click()
             logger.info("Login-Button geklickt")
 
-            # Warte und prüfe ob Login erfolgreich war
+            # Wait and check whether the login succeeded
             logger.info("Warte auf Antwort vom Server...")
             self.page.wait_for_timeout(10000)
 
-            # Prüfe mehrere Indikatoren für erfolgreichen Login
+            # Check several indicators for a successful login
             current_url = self.page.url
             logger.info(f"Aktuelle URL nach Login: {current_url}")
 
-            # 1. Prüfung: Sind wir auf einer anderen Domain?
+            # Check 1: are we on a different domain?
             if "auth.dfbnet.org" not in current_url:
                 logger.info("Login erfolgreich - Weitergeleitet zu DFBnet")
                 return
 
-            # 2. Prüfung: Gibt es eine Fehlermeldung?
+            # Check 2: is there an error message?
             try:
                 error_message = self.page.locator('.alert-error, .error, [class*="error"]').first
                 if error_message.is_visible(timeout=2000):
                     error_text = error_message.inner_text()
                     logger.error(f"Login-Fehler: {error_text}")
-                    # GEÄNDERT: Spezifische Exception werfen
+                    # CHANGED: raise a specific exception
                     raise DFBCredentialsInvalidError(f"DFBnet meldet: {error_text}")
             except DFBCredentialsInvalidError:
-                raise  # Weiterleiten
+                raise  # Re-raise
             except:
                 pass
 
-            # 3. Prüfung: Ist Login-Formular noch sichtbar?
+            # Check 3: is the login form still visible?
             if self.page.locator('input[type="password"]').is_visible(timeout=3000):
                 logger.error("Login fehlgeschlagen - Login-Formular noch sichtbar")
-                # GEÄNDERT: Spezifische Exception werfen
+                # CHANGED: raise a specific exception
                 raise DFBCredentialsInvalidError()
 
-            # Wenn wir hier sind, war Login erfolgreich
+            # If we get here, the login was successful
             logger.info("Login erfolgreich")
 
         except DFBCredentialsInvalidError:
-            raise  # Weiterleiten ohne zu wrappen
+            raise  # Re-raise without wrapping
         except Exception as e:
             logger.error(f"Fehler beim Login: {e}")
             raise
 
     def open_menu_if_needed(self):
-        """Öffnet das Menü, falls es noch geschlossen ist"""
+        """Opens the menu if it is still closed"""
         logger.info("Prüfe ob Menü geöffnet werden muss...")
 
         try:
-            # Suche nach dem Menü-Button (nur bei kleinen Bildschirmen sichtbar)
+            # Look for the menu button (only visible on small screens)
             menu_button = self.page.locator('#dfb-Menu-toggle, button[ng-click*="menuBtnClicked"]').first
 
-            # Prüfe ob Button existiert und sichtbar ist
+            # Check whether the button exists and is visible
             if menu_button.is_visible(timeout=3000):
                 logger.info("Menü-Button gefunden, klicke...")
                 menu_button.click()
@@ -217,43 +217,44 @@ class DFBScraper:
 
         except Exception as e:
             logger.info("Menü-Button nicht gefunden - Menü wahrscheinlich bereits offen")
-            # Kein Fehler werfen, da dies normal ist bei großen Bildschirmen
+            # Do not raise an error, as this is normal on large screens
 
     def navigate_to_schiriansetzung(self):
-        """Navigiert zu Schiriansetzung -> Eigene Daten"""
+        """Navigates to Schiriansetzung -> Eigene Daten (referee assignment -> own data)"""
         logger.info("Navigiere zu Schiriansetzung...")
 
         try:
-            # Schritt 1: Auf "Schiriansetzung" klicken
+            # Step 1: click "Schiriansetzung"
             schiri_menu = self.page.locator('text=Schiriansetzung').first
             schiri_menu.wait_for(state="visible", timeout=15000)
             logger.info("Schiriansetzung-Menüpunkt gefunden, klicke...")
             schiri_menu.click()
 
-            # Warte bis Untermenü SICHTBAR ist
+            # Wait until the submenu is VISIBLE
             eigene_daten = self.page.locator('text=Eigene Daten').first
             eigene_daten.wait_for(state="visible", timeout=10000)
 
-            # Schritt 2: Auf "Eigene Daten" klicken
+            # Step 2: click "Eigene Daten"
             logger.info("Eigene Daten gefunden, klicke...")
 
-            # Neuen Tab erwarten
+            # Expect a new tab
             with self.page.context.expect_page() as new_page_info:
                 eigene_daten.click()
 
-            # Wechsle zum neuen Tab
+            # Switch to the new tab
             new_page = new_page_info.value
             new_page.wait_for_load_state("domcontentloaded", timeout=30000)
 
-            # Die Startseite mit dem Hauptmenue bleibt offen und wird gemerkt:
-            # die Beobachtungen laufen am Ende des Abrufs ueber deren Menue.
+            # The start page with the main menu stays open and is remembered:
+            # the observations (Beobachtungen) are read at the end of the fetch
+            # via its menu.
             self.startseite = self.page
 
             # Update page reference
             self.page = new_page
 
-            # Ohne Query: nach dem Anmelde-Ruecksprung kann dort ein
-            # Autorisierungscode stehen, und das Protokoll liegt auf der Platte.
+            # Without the query: after the redirect back from the login an
+            # authorization code may be in there, and the log is written to disk.
             logger.info(f"Neue Seite geöffnet: {self.page.url.split('?')[0]}")
             logger.info("Erfolgreich zu Eigene Daten navigiert")
 
@@ -263,31 +264,31 @@ class DFBScraper:
 
     def schiri_id(self) -> str:
         """
-        Die eigene Schiedsrichter-ID - sobald die Ansetzungs-App angemeldet ist.
+        The user's own referee ID - as soon as the assignment app is logged in.
 
-        Setzt voraus, dass navigate_to_schiriansetzung gelaufen ist. Alles,
-        was danach aus der Schiriansetzung gelesen wird, kommt ueber deren
-        JSON-Schnittstelle (scraper/sria_api.py); angeklickt wird dort nichts.
+        Requires that navigate_to_schiriansetzung has run. Everything read from
+        the Schiriansetzung afterwards comes through its JSON interface
+        (scraper/sria_api.py); nothing is clicked there.
         """
         if not getattr(self, "_schiri_id", None):
             self._schiri_id = sria_api.warte_auf_app(self.page)
         return self._schiri_id
 
     def lies_stammdaten(self) -> dict:
-        """Stammdaten und QMax-Werte (scraper/stammdaten.py)."""
+        """Master data (Stammdaten) and QMax values (scraper/stammdaten.py)."""
         logger.info("Lese Stammdaten...")
         return stammdaten.lies_stammdaten(self.page, self.schiri_id())
 
     def scrape_saisons(self, progress_callback=None, ueberspringen=None) -> dict:
         """
-        Geleitete Spiele und Bilanz je Saison (scraper/saisons.py).
+        Officiated matches and balance per season (scraper/saisons.py).
 
         Args:
-            ueberspringen: bereits vollstaendig gespeicherte Saisons; die
-                laufende wird trotzdem gelesen.
+            ueberspringen: seasons that are already stored completely; the
+                current one is read anyway.
 
         Returns:
-            Dict saison -> {spiele, einsaetze, lehrgaenge, vollstaendig, erwartet}
+            Dict season -> {spiele, einsaetze, lehrgaenge, vollstaendig, erwartet}
         """
         logger.info("=== Lese Saisonzusammenfassung ===")
         ergebnis = saisons.lies_saisons(
@@ -299,25 +300,26 @@ class DFBScraper:
 
     def scrape_beobachtungen(self, saisons_fuer, progress_callback=None) -> dict:
         """
-        Liest die eigenen Beobachtungen aus Schiri-Beobachtung und Schiri-Portal.
+        Reads the user's own observations (Beobachtungen) from Schiri-Beobachtung
+        and Schiri-Portal.
 
-        Laeuft als LETZTER Schritt des Abrufs. Die alten DFBnet-Module halten
-        ihren Zustand in der Sitzung; im ersten Versuch lief dieser Schritt vor
-        der Schiriansetzung, und danach klappte deren Menue nicht mehr auf -
-        der ganze Abruf brach ab. Am Ende kann er nichts mehr kaputt machen.
+        Runs as the LAST step of the fetch. The old DFBnet modules keep their
+        state in the session; in the first attempt this step ran before the
+        Schiriansetzung, and afterwards its menu no longer opened - the whole
+        fetch aborted. At the end it can no longer break anything.
 
-        Die Einstiege stehen im Hauptmenue der Startseite, die
-        navigate_to_schiriansetzung als self.startseite stehen laesst.
-        Gelesen wird in einem eigenen Tab desselben Browser-Kontexts.
+        The entry points are in the main menu of the start page, which
+        navigate_to_schiriansetzung leaves behind as self.startseite.
+        Reading happens in a separate tab of the same browser context.
 
         Args:
-            saisons_fuer: (quelle, angebotene Saisons) -> zu lesende Saisons
-            progress_callback: wird als (aktuell, gesamt, schritt) aufgerufen
+            saisons_fuer: (source, offered seasons) -> seasons to read
+            progress_callback: called as (current, total, step)
 
         Returns:
-            quelle -> saison -> {"beobachtungen", "vollstaendig"}. Eine Quelle
-            fehlt, wenn der Account das Modul nicht hat oder es nicht
-            gelesen werden konnte.
+            source -> season -> {"beobachtungen", "vollstaendig"}. A source is
+            missing if the account does not have the module or it could not be
+            read.
         """
         logger.info("=== Lese Beobachtungen ===")
 
@@ -344,17 +346,18 @@ class DFBScraper:
     def scrape_spielberichte(self, saisons_fuer, braucht_bericht, dokument_vorhanden,
                              progress_callback=None) -> dict:
         """
-        Liest die Spielberichte der eigenen Spiele - nur lesend.
+        Reads the match reports (Spielberichte) of the user's own matches -
+        read-only.
 
-        Erst der Einsatzplan aller noetigen Saisons (altes Formularmodul, in
-        einem eigenen Tab), dann in einem weiteren Tab die Berichte ueber die
-        JSON-Schnittstelle der Bericht-App. In der App wird nichts angeklickt;
-        siehe scraper/spielberichte.py.
+        First the assignment schedule (Einsatzplan) of all required seasons (old
+        form module, in a separate tab), then, in another tab, the reports via
+        the JSON interface of the report app. Nothing is clicked in the app;
+        see scraper/spielberichte.py.
 
         Args:
-            saisons_fuer: angebotene Saisons -> zu lesende Saisons
-            braucht_bericht: Einsatzplan-Zeile -> soll der Bericht (neu) gelesen werden?
-            dokument_vorhanden: dfb_dokument_id -> liegt die Datei schon vor?
+            saisons_fuer: offered seasons -> seasons to read
+            braucht_bericht: schedule row -> should the report be (re-)read?
+            dokument_vorhanden: dfb_dokument_id -> is the file already present?
 
         Returns:
             {"saisons": saison -> {"zeilen"}, "berichte": dfb_spiel_id -> {...}}
@@ -395,13 +398,13 @@ class DFBScraper:
 
     def scrape_all_matches(self, progress_callback=None):
         """
-        Liest alle Ansetzungen ueber die JSON-Schnittstelle der Ansetzungs-App.
+        Reads all assignments through the JSON interface of the assignment app.
 
-        Setzt voraus, dass navigate_to_schiriansetzung gelaufen ist. Statt je
-        Spiel drei Modals aufzuklicken, holt scraper/ansetzungen.py die Daten
-        aller Spiele mit einer Handvoll Abrufen - und nicht nur fuer die
-        zwei Wochen, die die Liste "Meine Spiele" anzeigt, sondern fuer die
-        laufende Saison und ein Jahr voraus.
+        Requires that navigate_to_schiriansetzung has run. Instead of clicking
+        open three modals per match, scraper/ansetzungen.py fetches the data of
+        all matches with a handful of requests - and not only for the two weeks
+        that the "Meine Spiele" list shows, but for the current season and a
+        year ahead.
 
         Args:
             progress_callback: Optional callback function(current, total, step)
@@ -416,9 +419,9 @@ class DFBScraper:
         rohdaten = ansetzungen.hole_rohdaten(self.page, schiri_id, von, bis)
         anzahl_spiele = len(rohdaten["ansetzungen"])
 
-        # Wie viele Ansetzungen die Schnittstelle hergab. Der Aufrufer braucht
-        # das, um einen unvollstaendigen Abruf zu erkennen: einzelne Spiele
-        # koennen unten uebersprungen werden.
+        # How many assignments the interface returned. The caller needs this
+        # to detect an incomplete fetch: individual matches can be skipped
+        # below.
         self.erwartete_spiele = anzahl_spiele
 
         all_matches = []
@@ -437,10 +440,10 @@ class DFBScraper:
         return all_matches
 
     def __enter__(self):
-        """Context Manager: Automatisches Starten"""
+        """Context manager: starts automatically"""
         self.start()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context Manager: Automatisches Beenden"""
+        """Context manager: stops automatically"""
         self.stop()
