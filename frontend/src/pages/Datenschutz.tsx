@@ -76,13 +76,15 @@ export function Datenschutz() {
         },
         {
             icon: MapIcon,
-            title: 'Karte der Anfahrt',
+            title: 'Karten und Kilometer',
             content: (
                 <>
                     <p className="mb-2 text-sm leading-relaxed text-muted-foreground">
-                        Zu jedem Spiel lässt sich eine Karte mit den Anschriften der angesetzten
-                        Unparteiischen und der Spielstätte anzeigen. Dafür verlassen Daten den
-                        Server – das sind die beiden einzigen Stellen, an denen das geschieht:
+                        Zu jedem Spiel lassen sich eine Karte mit den Anschriften der angesetzten
+                        Unparteiischen und der Spielstätte sowie Kilometer-Vorschläge anzeigen; der
+                        Reiter Saison zeigt geschätzte Fahrtkosten und eine Karte der besuchten
+                        Spielstätten. Dafür verlassen Daten den Server – das sind die einzigen
+                        Stellen, an denen das geschieht:
                     </p>
                     <ul className="list-inside list-disc space-y-1 text-sm text-muted-foreground">
                         <li>
@@ -95,6 +97,13 @@ export function Datenschutz() {
                             wird.
                         </li>
                         <li>
+                            Für die Kilometer wird ein Routenplaner gefragt – voreingestellt ist der
+                            Dienst von OpenStreetMap Deutschland (routing.openstreetmap.de, FOSSGIS
+                            e.V.). Übertragen werden allein Koordinaten, also Punkte auf der Karte,
+                            ohne Namen, Anschrift oder Spiel. Jede Strecke wird dauerhaft in der
+                            Datenbank gespeichert und nur ein einziges Mal gefragt.
+                        </li>
+                        <li>
                             Die Kartenbilder lädt dein Browser direkt beim Kachelserver von
                             OpenStreetMap. Dieser erfährt dabei deine IP-Adresse und welchen
                             Kartenausschnitt du betrachtest – und damit ungefähr, wo die
@@ -102,9 +111,9 @@ export function Datenschutz() {
                         </li>
                     </ul>
                     <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                        Wer den Betrieb selbst übernimmt, kann beides auf einen eigenen Dienst
+                        Wer den Betrieb selbst übernimmt, kann alle drei auf einen eigenen Dienst
                         umstellen; dann verlässt auch dafür nichts mehr den eigenen Server. Wird
-                        die Karte nie geöffnet, wird auch keine Adresse übermittelt.
+                        keine dieser Ansichten geöffnet, wird auch nichts übermittelt.
                     </p>
                 </>
             ),

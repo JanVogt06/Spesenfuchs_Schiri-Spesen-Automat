@@ -8,7 +8,10 @@ wenn die Kilometer im Rechner eingetragen sind. Beim selben Abruf liest die
 Anwendung auch die eigenen Stammdaten aus DFB.net und zeigt sie im Reiter
 *Stammdaten*; die persönlichen Angaben darunter liegen verschlüsselt in der
 Datenbank. Der Reiter *Saison* zeigt alle geleiteten Spiele je Saison mit
-Ergebnis, Kartenstatistik und Gespann, dazu Einsatzbilanz und Lehrabende.
+Ergebnis, Kartenstatistik und Gespann, dazu Einsatzbilanz und Lehrabende,
+die eigenen Spesen und Fahrtkosten der Saison (fehlende Fahrtkosten
+geschätzt und als geschätzt gekennzeichnet) und eine Karte aller
+Spielstätten, an denen man schon im Einsatz war.
 Der Reiter *Beobachtungen* zeigt die eigenen Noten aus Schiri-Beobachtung
 (Herren, ab der Saison von „Schiedsrichter seit“) und – wer es hat – aus dem
 Schiri-Portal (DFB-Nachwuchs): je Saison ein Schnitt als Schiedsrichter, als
@@ -151,20 +154,35 @@ festhält.
 
 ## Karte
 
-Die Karte bei den Fahrtkosten braucht Koordinaten, DFBnet liefert aber nur
+Die Karten brauchen Koordinaten, DFBnet liefert aber nur
 Anschriften im Klartext. Sie werden beim ersten Öffnen einer Karte einmalig
 aufgelöst und danach dauerhaft in `app.db` behalten — dieselbe Spielstätte und
 dieselben Kollegen tauchen über eine Saison hinweg immer wieder auf, sodass es
 insgesamt bei einer Handvoll Abfragen bleibt. Wird nie eine Karte geöffnet,
 wird auch nie eine Adresse verschickt.
 
-Voreingestellt sind die öffentlichen Dienste von OpenStreetMap. Beide lassen
+Bei den Fahrtkosten schlägt die Anwendung Kilometer vor: für jede Person
+Hin- und Rückfahrt allein und, wo es Kilometer spart, Fahrgemeinschaften – wer
+fährt, wen er unterwegs abholt, Mitfahrer mit 0 km. Ein Klick übernimmt die
+Werte in die Felder, gespeichert wird wie gewohnt. Dafür fragt sie einen
+Routenplaner nach den Straßenkilometern zwischen den Wohnorten und dem Platz;
+übertragen werden nur Koordinaten. Die Koordinate des Platzes liefert DFBnet
+selbst, sie ist genauer als die Adresssuche. Dieselben Strecken nutzt die
+Statistik im Reiter *Saison*, um Fahrtkosten zu schätzen, wo keine eingetragen
+sind (allein vom eigenen Wohnort, hin und zurück). Auch jede Strecke wird nur
+einmal gefragt und dann in `app.db` behalten; Auswertungen über viele Spiele
+fragen je Aufruf nur einige Sekunden lang nach und holen den Rest beim
+nächsten.
+
+Voreingestellt sind die öffentlichen Dienste von OpenStreetMap. Alle lassen
 sich auf eine eigene Instanz umstellen:
 
 | Variable | Standard | Zweck |
 | --- | --- | --- |
 | `NOMINATIM_URL` | `https://nominatim.openstreetmap.org` | Adresse → Koordinate |
 | `GEOCODER_MIN_INTERVAL` | `1.0` | Mindestabstand zwischen zwei Abfragen in Sekunden |
+| `ROUTING_URL` | `https://routing.openstreetmap.de/routed-car` | Straßenkilometer (OSRM, Matrix-Abfrage) |
+| `ROUTING_MIN_INTERVAL` | `1.0` | Mindestabstand zwischen zwei Routenabfragen in Sekunden |
 | `MAP_TILE_URL` | `https://tile.openstreetmap.org/{z}/{x}/{y}.png` | Kartenbilder, vom Browser geladen |
 | `MAP_TILE_ATTRIBUTION` | OpenStreetMap-Mitwirkende | Quellenangabe in der Karte |
 
