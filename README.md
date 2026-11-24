@@ -163,7 +163,12 @@ opened, no address is ever sent.
 
 For travel costs, the application suggests kilometres: for each person the
 round trip alone and, where it saves kilometres, carpools – who drives, whom
-they pick up on the way, passengers with 0 km. One click transfers the values
+they pick up on the way, passengers with 0 km. Next to that comes the best
+meeting point on the driver's way: the others drive there in their own cars
+and continue together, each claiming what they drove themselves. In kilometres
+a pick-up is never shorter, but the driver stays on the main road; the meeting
+point is named after the nearest village (one reverse lookup at the geocoder,
+cached in `app.db`) and links to OpenStreetMap. One click transfers the values
 into the fields; saving works as usual. To do this, it asks a route planner for
 the road kilometres between the places of residence and the venue; only
 coordinates are transmitted. The venue's coordinate is supplied by DFBnet
