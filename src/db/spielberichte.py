@@ -302,6 +302,40 @@ def get_index(user_id: int) -> List[Dict]:
         conn.close()
 
 
+def get_spielorte(user_id: int) -> List[Dict]:
+    """
+    Spielstaette und Ausgang je Bericht - fuer die Karte der besuchten Plaetze.
+    Liest aus dem JSON nur die beiden Teile, die dafuer zaehlen.
+    """
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            "SELECT dfb_spiel_id, saison, datum, heim, gast, daten FROM spielberichte WHERE user_id = ?",
+            (user_id,),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    orte = []
+    for row in rows:
+        try:
+            daten = json.loads(row["daten"] or "{}")
+        except ValueError:
+            daten = {}
+        ergebnis = daten.get("ergebnis") or {}
+        orte.append({
+            "dfb_spiel_id": row["dfb_spiel_id"],
+            "saison": row["saison"],
+            "datum": row["datum"],
+            "heim": row["heim"],
+            "gast": row["gast"],
+            "spielstaette": daten.get("spielstaette") or {},
+            # Ausgefallen: eine Wertung, aber kein Endstand
+            "ausgefallen": bool(ergebnis.get("wertung")) and not ergebnis.get("endstand"),
+        })
+    return orte
+
+
 # Was in den DFBnet-Modulen mal am Mannschaftsnamen steht und mal nicht:
 # Altersklasse ("U19", "U18/U19"), Mannschaftsnummer ("2.", "II", "1") und
 # Rechtsform ("e.V."). Der Spielbericht schreibt "SG Dynamo Dresden", die

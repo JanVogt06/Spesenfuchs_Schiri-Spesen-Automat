@@ -74,6 +74,7 @@ from db.stammdaten import get_stammdaten
 from utils.geocoder import geocode, GeocoderNichtErreichbar
 from utils.fahrten import vorschlaege_fuer_spiel
 from utils.statistik import statistik
+from utils.spielstaetten import besuchte_spielstaetten
 from db.season import get_saisons, get_saison
 from db.beobachtungen import get_beobachtungen
 from db.spielberichte import get_bericht, get_dokument, get_index, Zuordnung, kurzinfo
@@ -641,6 +642,17 @@ async def get_statistik(saison: Optional[str] = None, current_user: dict = Depen
     das Frontend fragt dann noch einmal und bekommt den Rest.
     """
     return await run_in_threadpool(statistik, current_user['id'], saison)
+
+
+@app.get("/api/spielstaetten")
+async def get_spielstaetten(current_user: dict = Depends(get_current_user)):
+    """
+    Die Plaetze, an denen man schon im Einsatz war, fuer die Karte im Reiter
+    Saison. Wie die Statistik: was nicht schnell nachzuschlagen war, steht in
+    "offen", und das Frontend fragt noch einmal.
+    """
+    daten = await run_in_threadpool(besuchte_spielstaetten, current_user['id'])
+    return {**daten, "kacheln": {"url": MAP_TILE_URL, "attribution": MAP_TILE_ATTRIBUTION}}
 
 
 # ===== Download-Endpunkte: Dokumente entstehen bei jedem Abruf neu =====

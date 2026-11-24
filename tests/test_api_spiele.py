@@ -763,3 +763,19 @@ class TestStatistik:
 
     def test_ohne_anmeldung(self, client):
         assert client.get("/api/statistik").status_code == 401
+
+
+# ===== Besuchte Spielstaetten =====
+
+class TestSpielstaetten:
+    def test_orte_mit_kachelquelle(self, client, user, auth_header, monkeypatch):
+        import api.main_api as modul
+        monkeypatch.setattr(modul, "besuchte_spielstaetten", lambda uid: {"orte": [], "user": uid})
+
+        daten = client.get("/api/spielstaetten", headers=auth_header).json()
+
+        assert daten["user"] == user["id"]
+        assert daten["kacheln"]["url"].startswith("https://")
+
+    def test_ohne_anmeldung(self, client):
+        assert client.get("/api/spielstaetten").status_code == 401

@@ -366,6 +366,18 @@ def get_saison(user_id: int, saison: str) -> Optional[Dict]:
         conn.close()
 
 
+def get_eigene_rollen(user_id: int) -> List[Dict]:
+    """Datum, Teams und eigene Rolle aller geleiteten Spiele - zum Zuordnen anderer Quellen."""
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            "SELECT datum, heim, gast, eigene_rolle FROM season_matches WHERE user_id = ?", (user_id,)
+        ).fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
+
+
 def delete_saisons(user_id: int) -> int:
     """
     Loescht alle Saisondaten eines Users.
