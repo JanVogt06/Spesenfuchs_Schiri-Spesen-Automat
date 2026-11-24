@@ -103,7 +103,7 @@ export function MatchList({matches, onReload}: MatchListProps) {
     return (
         <div className="space-y-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div role="group" aria-label="Zeitraum" className="inline-flex self-start rounded-lg bg-muted p-1">
+                <div role="group" aria-label="Zeitraum" className="inline-flex self-start rounded-lg border bg-card p-1">
                     {reiter.map((eintrag) => (
                         <button
                             key={eintrag.wert}
@@ -113,7 +113,7 @@ export function MatchList({matches, onReload}: MatchListProps) {
                             className={cn(
                                 'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
                                 ansicht === eintrag.wert
-                                    ? 'bg-card text-foreground shadow-sm'
+                                    ? 'bg-primary/10 text-primary'
                                     : 'text-muted-foreground hover:text-foreground'
                             )}
                         >
