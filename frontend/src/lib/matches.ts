@@ -117,6 +117,40 @@ export async function getMatchGeo(matchId: number): Promise<GeoDaten> {
     return response.data;
 }
 
+/** Formular-Praefix einer Rolle: sr, sra1, sra2 */
+export type RollenPraefix = 'sr' | 'sra1' | 'sra2';
+
+export interface Fahrt {
+    fahrer: RollenPraefix;
+    /** In Abholreihenfolge */
+    mitfahrer: RollenPraefix[];
+    km: number;
+}
+
+export interface Fahrgemeinschaft {
+    fahrten: Fahrt[];
+    km: Partial<Record<RollenPraefix, number>>;
+    gesamt: number;
+    ersparnis: number;
+}
+
+/** Kilometer-Vorschläge eines Spiels, jeweils Hin- und Rückfahrt in ganzen km */
+export interface FahrtVorschlaege {
+    /** strasse: Routenplaner; luftlinie: Notbehelf ohne Routenplaner; gestoert: Adresssuche ausgefallen */
+    quelle: 'strasse' | 'luftlinie' | 'gestoert';
+    selbst: RollenPraefix | null;
+    einzeln: {km: Partial<Record<RollenPraefix, number>>; gesamt: number};
+    fahrgemeinschaften: Fahrgemeinschaft[];
+    ohne_anschrift: string[];
+    ohne_spielort: boolean;
+}
+
+/** Fragt beim ersten Mal Adresssuche und Routenplaner - das kann Sekunden dauern */
+export async function getFahrtVorschlaege(matchId: number): Promise<FahrtVorschlaege> {
+    const response = await api.get<FahrtVorschlaege>(`/api/matches/${matchId}/fahrten`);
+    return response.data;
+}
+
 // API Funktionen
 export async function getAllMatches(): Promise<MatchData[]> {
     const response = await api.get<MatchData[]>('/api/matches');

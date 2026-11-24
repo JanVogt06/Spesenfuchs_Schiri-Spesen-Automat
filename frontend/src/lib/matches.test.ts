@@ -6,6 +6,7 @@ import {
     downloadMatchesAsZip,
     extractApiError,
     getAllMatches,
+    getFahrtVorschlaege,
     getMatchGeo,
     saveMatchExpenses,
     triggerBrowserDownload,
@@ -83,6 +84,12 @@ describe('Endpunkte', () => {
         getRouten({'/api/matches/42/geo': {punkte: [], ohne_treffer: [], gestoert: false}});
         await expect(getMatchGeo(42)).resolves.toMatchObject({gestoert: false});
         expect(apiGet).toHaveBeenCalledWith('/api/matches/42/geo');
+    });
+
+    it('getFahrtVorschlaege laedt die Kilometer-Vorschlaege', async () => {
+        getRouten({'/api/matches/42/fahrten': {quelle: 'strasse', einzeln: {km: {sr: 30}, gesamt: 30}}});
+        await expect(getFahrtVorschlaege(42)).resolves.toMatchObject({einzeln: {gesamt: 30}});
+        expect(apiGet).toHaveBeenCalledWith('/api/matches/42/fahrten');
     });
 
     it('saveMatchExpenses schickt die Spiel-ID flach mit den Werten', async () => {

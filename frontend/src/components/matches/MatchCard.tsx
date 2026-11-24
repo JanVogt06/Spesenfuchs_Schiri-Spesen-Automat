@@ -1,11 +1,12 @@
 import {useState, useEffect, useRef} from 'react';
-import type {MatchData, MatchExpenses} from '@/lib/matches';
+import type {MatchData, MatchExpenses, RollenPraefix} from '@/lib/matches';
 import {saveMatchExpenses} from '@/lib/matches';
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import {Separator} from '@/components/ui/separator';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {MatchMap} from '@/components/matches/MatchMap';
+import {FahrtVorschlaege} from '@/components/matches/FahrtVorschlaege';
 import {cn} from '@/lib/utils';
 import {Link} from 'react-router-dom';
 import {formatEuro as formatDfbEuro, spielberichtPfad} from '@/lib/spielberichte';
@@ -362,6 +363,20 @@ export function MatchCard({
         );
     };
 
+    /** Füllt die km-Felder aus einem Vorschlag; Mitfahrer bekommen 0 */
+    const uebernehmeKilometer = (km: Partial<Record<RollenPraefix, number>>) => {
+        hatEigeneEingaben.current = true;
+        setExpenseInputs((vorher) => {
+            const neu = {...vorher};
+            for (const [rolle, wert] of Object.entries(km)) {
+                if (sichtbareRollen[`${rolle}_km`]) neu[`${rolle}_km`] = String(wert);
+            }
+            return neu;
+        });
+        setSaveError('');
+        setSaveMessage('Übernommen – mit „Speichern“ festhalten.');
+    };
+
     const renderExpenses = () => {
         // Nur Rollen anzeigen, die tatsächlich angesetzt sind (SR immer)
         const rows = [
@@ -383,6 +398,7 @@ export function MatchCard({
                     Fahrtkosten & öffentliche VM
                 </h4>
                 <div className="space-y-3 rounded-lg border border-dashed p-3">
+                    {match._id && <FahrtVorschlaege matchId={match._id} onUebernehmen={uebernehmeKilometer}/>}
                     <div className="grid grid-cols-[52px_1fr_1fr] gap-2 text-xs text-muted-foreground">
                         <span/>
                         <span>Kilometer</span>
