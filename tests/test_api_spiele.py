@@ -722,3 +722,26 @@ class TestSammelDownload:
         assert "1 von 3" in fehler["message"]
         assert _downloads() == []
 
+
+
+# ===== Kilometer-Vorschlaege =====
+
+class TestFahrten:
+    def test_liefert_die_vorschlaege(self, client, user, auth_header, ein_spiel, monkeypatch):
+        import api.main_api as modul
+        gesehen = []
+        monkeypatch.setattr(modul, "vorschlaege_fuer_spiel",
+                            lambda match: gesehen.append(match["id"]) or {"einzeln": {"km": {"sr": 12}}})
+
+        antwort = client.get(f"/api/matches/{ein_spiel}/fahrten", headers=auth_header)
+
+        assert antwort.status_code == 200
+        assert antwort.json() == {"einzeln": {"km": {"sr": 12}}}
+        assert gesehen == [ein_spiel]
+
+    def test_fremdes_spiel_ist_unbekannt(self, client, user, auth_header, fremder):
+        (fremdes,) = spiele_anlegen(fremder["id"], spiel(heim="FC Fremd"))
+        assert client.get(f"/api/matches/{fremdes}/fahrten", headers=auth_header).status_code == 404
+
+    def test_ohne_anmeldung(self, client, ein_spiel):
+        assert client.get(f"/api/matches/{ein_spiel}/fahrten").status_code == 401

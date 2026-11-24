@@ -72,6 +72,7 @@ from db.database import (
 )
 from db.stammdaten import get_stammdaten
 from utils.geocoder import geocode, GeocoderNichtErreichbar
+from utils.fahrten import vorschlaege_fuer_spiel
 from db.season import get_saisons, get_saison
 from db.beobachtungen import get_beobachtungen
 from db.spielberichte import get_bericht, get_dokument, get_index, Zuordnung, kurzinfo
@@ -616,6 +617,17 @@ async def get_match_geo(match_id: int, current_user: dict = Depends(get_current_
     """
     match = _owned_match(match_id, current_user['id'])
     return await run_in_threadpool(_build_geo, match)
+
+
+@app.get("/api/matches/{match_id}/fahrten")
+async def get_match_fahrten(match_id: int, current_user: dict = Depends(get_current_user)):
+    """
+    Kilometer-Vorschlaege fuer ein Spiel: jede Person allein und als
+    Fahrgemeinschaft. Wie die Karte im Threadpool - der erste Aufruf fragt
+    Adresssuche und Routenplaner, danach kommt alles aus der Datenbank.
+    """
+    match = _owned_match(match_id, current_user['id'])
+    return await run_in_threadpool(vorschlaege_fuer_spiel, match)
 
 
 # ===== Download-Endpunkte: Dokumente entstehen bei jedem Abruf neu =====
