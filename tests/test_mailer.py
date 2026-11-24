@@ -1,9 +1,8 @@
 """
-Versand der Fehlerberichte - ohne echten SMTP-Server.
+Sending the bug reports - without a real SMTP server.
 
-smtplib.SMTP und smtplib.SMTP_SSL sind durch eine Attrappe ersetzt, die sich
-merkt, wie sie benutzt wurde, und auf Wunsch an einer bestimmten Stelle
-scheitert.
+smtplib.SMTP and smtplib.SMTP_SSL are replaced by a stub that remembers how
+it was used and, on request, fails at a specific point.
 """
 import smtplib
 import socket
@@ -28,7 +27,7 @@ SMTP_VARIABLEN = ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD", "SMTP_PORT", "SMTP_
 
 
 class FalscherServer:
-    """Attrappe fuer smtplib.SMTP / SMTP_SSL."""
+    """Stub for smtplib.SMTP / SMTP_SSL."""
 
     instanzen = []
 
@@ -68,7 +67,7 @@ class FalscherServer:
 
 @pytest.fixture
 def smtp_leer(monkeypatch):
-    """Keine SMTP-Konfiguration in der Umgebung."""
+    """No SMTP configuration in the environment."""
     for name in SMTP_VARIABLEN:
         monkeypatch.delenv(name, raising=False)
 
@@ -82,7 +81,7 @@ def smtp_konfiguriert(monkeypatch, smtp_leer):
 
 @pytest.fixture
 def server(monkeypatch):
-    """Ersetzt beide SMTP-Klassen und liefert eine Steuerung fuer Fehler."""
+    """Replaces both SMTP classes and provides a control for errors."""
     FalscherServer.instanzen = []
     steuerung = {"klasse": None, "fehler_bei": None, "fehler": None}
 
@@ -116,7 +115,7 @@ def _gesendet():
     return instanz, instanz.nachrichten[0]
 
 
-# ===== Konfiguration =====
+# ===== Configuration =====
 
 class TestKonfiguration:
     def test_ohne_alles_nicht_konfiguriert(self, smtp_leer):
@@ -157,7 +156,7 @@ class TestKonfiguration:
         assert FalscherServer.instanzen == []
 
 
-# ===== Versand =====
+# ===== Sending =====
 
 class TestVersand:
     def test_standardport_mit_starttls(self, smtp_konfiguriert, server):
@@ -205,7 +204,7 @@ class TestVersand:
         _, nachricht = _gesendet()
         assert nachricht["From"] == "Spesenfuchs <noreply@example.org>"
         assert nachricht["Reply-To"] == "melder@example.org"
-        # Angemeldet wird trotzdem mit dem Konto
+        # Login still happens with the account
         assert FalscherServer.instanzen[0].login_daten[0] == "postausgang@example.org"
 
     def test_eigener_empfaenger(self, smtp_konfiguriert, server, monkeypatch):
@@ -237,7 +236,7 @@ class TestVersand:
         assert "------------------------\n—\n" in text
 
 
-# ===== Fehler =====
+# ===== Errors =====
 
 class TestFehler:
     @pytest.mark.parametrize("fehler_bei, fehler, fragment", [
@@ -257,7 +256,7 @@ class TestFehler:
         assert info.value.status_code == 502
         assert info.value.error_code == "MAIL_SEND_FAILED"
         assert fragment in info.value.message
-        # Nur der Typ, nie der Fehlertext - der kann Zugangsdaten enthalten
+        # Only the type, never the error text - it may contain credentials
         assert info.value.details == type(fehler).__name__
         assert info.value.__cause__ is fehler
 

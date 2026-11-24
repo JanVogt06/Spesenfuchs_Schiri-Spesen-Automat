@@ -1,4 +1,4 @@
-"""Beobachtungen: je (quelle, saison) ersetzend, und wann eine Saison fertig gelesen ist."""
+"""Observations: replacing per (source, season), and when a season counts as fully read."""
 from datetime import date
 
 import pytest

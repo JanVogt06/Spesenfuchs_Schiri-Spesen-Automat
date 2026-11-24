@@ -1,9 +1,10 @@
 """
-Spesenrechner nach TFV-Spesenordnung §2 und NOFV-Finanzordnung §9 Nr. 7.
+Expense calculator according to TFV expense regulations §2 and NOFV finance
+regulations §9 no. 7.
 
-Geldkritisch. Leitlinie der App: wo der Satz nicht eindeutig feststeht,
-kommt (None, None) heraus - nie ein geratener Betrag. Diese Faelle sind hier
-ausdruecklich abgedeckt.
+Money-critical. The app's guideline: where the rate is not clearly
+established, the result is (None, None) - never a guessed amount. These
+cases are explicitly covered here.
 """
 import pytest
 
@@ -29,10 +30,10 @@ from generator.spesen_calculator import (
 LEER = (None, None)
 
 
-# ===== Ligatabellen fuer Pokal/Freundschaft =====
+# ===== League tables for cup/friendly =====
 
 def _staffel(spielklasse, staffel_id, mannschaften, verband="thueringen"):
-    """Legt eine Staffel samt Tabelle ueber den echten Schreibweg an."""
+    """Creates a division including table via the real write path."""
     from db.ligen import ersetze_staffel
     from scraper.fussball_de import Staffel, Tabellenplatz
 
@@ -56,7 +57,7 @@ def _staffel(spielklasse, staffel_id, mannschaften, verband="thueringen"):
 @pytest.fixture
 def ligen(db):
     """
-    Thueringer Landesebene plus ueberregionale Tabellen:
+    Thuringian state level plus supra-regional tables:
     - Verbandsliga: FC Saalfeld, SV 09 Arnstadt
     - Landesklasse: FC Empor Weimar 06, SV Germania Ilmenau, FC Saalfeld 2.
     - Oberliga:     FC Carl Zeiss Jena II
@@ -72,7 +73,7 @@ def ligen(db):
 
 @pytest.fixture
 def ligen_ohne_ueberregional(db):
-    """Nur Thueringer Landesebene - die ueberregionalen Tabellen fehlen."""
+    """Thuringian state level only - the supra-regional tables are missing."""
     _staffel("verbandsliga", "VL1", ["FC Saalfeld"])
     _staffel("landesklasse", "LK1", ["FC Empor Weimar 06"])
     return db
@@ -93,14 +94,14 @@ class TestWettbewerbsart:
         ("Landesturnier", PUNKTSPIEL),
         ("", PUNKTSPIEL),
         (None, PUNKTSPIEL),
-        # Pokal hat Vorrang, falls beide Woerter vorkommen
+        # Cup takes precedence if both words occur
         ("Pokal-Freundschaftsturnier", POKALSPIEL),
     ])
     def test_zuordnung(self, spielklasse, erwartet):
         assert wettbewerbsart(spielklasse) == erwartet
 
 
-# ===== Eingabepruefung =====
+# ===== Input validation =====
 
 class TestFehlendeAngaben:
     @pytest.mark.parametrize("spielklasse, mannschaftsart", [
@@ -119,7 +120,7 @@ class TestFehlendeAngaben:
         assert calculate_spesen("Kreisoberliga", mannschaftsart) == LEER
 
 
-# ===== §2 Abs. 2a Maenner =====
+# ===== §2 Abs. 2a Men =====
 
 class TestMaenner:
     @pytest.mark.parametrize("spielklasse, erwartet", [
@@ -131,10 +132,10 @@ class TestMaenner:
         ("1.Kreisklasse", (25.00, 23.00)),
         ("2. Kreisklasse", (25.00, 23.00)),
         ("Kreisliga A", (25.00, 23.00)),
-        # Gross-/Kleinschreibung egal
+        # Case does not matter
         ("VERBANDSLIGA", (50.00, 40.00)),
         ("kreisoberliga", (30.00, 25.00)),
-        # Kreis-Fallback: alles mit "kreis" ohne Tabellenzeile
+        # District fallback: everything with "kreis" without a table row
         ("Kreismeisterschaft", (25.00, 23.00)),
         ("Hallenkreismeisterschaft", (25.00, 23.00)),
     ])
@@ -146,25 +147,25 @@ class TestMaenner:
         assert calculate_spesen("Verbandsliga", mannschaftsart) == (50.00, 40.00)
 
     def test_kreisoberliga_nicht_als_kreisliga(self):
-        # "kreisoberliga" enthaelt "kreis" und "liga" - darf nicht 25/23 werden
+        # "kreisoberliga" contains "kreis" and "liga" - must not become 25/23
         assert calculate_spesen("Kreisoberliga", "Herren") == (30.00, 25.00)
 
     def test_kreisoberliga_nicht_als_oberliga_ueberregional(self):
-        # "Kreisoberliga" enthaelt "oberliga" - ist aber Kreisebene
+        # "Kreisoberliga" contains "oberliga" - but is district level
         assert calculate_spesen("Kreisoberliga", "Herren") != LEER
 
     @pytest.mark.parametrize("spielklasse", [
-        "Landesliga",          # gibt es bei den TFV-Herren nicht
-        "Landesturnier",       # Herren-Turnier auf Landesebene: keine Zeile
+        "Landesliga",          # does not exist for TFV men
+        "Landesturnier",       # Men's tournament at state level: no row
         "Stadtliga",
-        "Thüringenliga",       # Sponsorenname ohne "verbandsliga"
+        "Thüringenliga",       # Sponsor name without "verbandsliga"
         "  ",
     ])
     def test_unbekannte_landesklasse_leer(self, spielklasse):
         assert calculate_spesen(spielklasse, "Herren") == LEER
 
 
-# ===== §2 Abs. 2a Alte Herren =====
+# ===== §2 Abs. 2a Alte Herren (veterans) =====
 
 class TestAlteHerren:
     @pytest.mark.parametrize("mannschaftsart", [
@@ -173,7 +174,7 @@ class TestAlteHerren:
     ])
     @pytest.mark.parametrize("spielklasse", ["Kreisoberliga", "Kreisliga", "Kreisklasse"])
     def test_kreis_einheitlich(self, spielklasse, mannschaftsart):
-        # Kreisoberliga Ue45 darf NICHT die 30/25 der Maenner bekommen
+        # Kreisoberliga Ue45 must NOT get the 30/25 of the men
         assert calculate_spesen(spielklasse, mannschaftsart) == (25.00, 23.00)
 
     @pytest.mark.parametrize("spielklasse", [
@@ -190,7 +191,7 @@ class TestAlteHerren:
 
     @pytest.mark.parametrize("spielklasse", ["Verbandsliga", "Landesklasse", "Landesliga"])
     def test_landesebene_ohne_meisterschaft_leer(self, spielklasse):
-        # Keine Maenner-Tabelle fuer Alte Herren - lieber leer
+        # No men's table for veterans - better empty
         assert calculate_spesen(spielklasse, "Herren Ü40") == LEER
 
     @pytest.mark.parametrize("mannschaftsart, erwartet", [
@@ -200,22 +201,22 @@ class TestAlteHerren:
         ("alte herren", True),
         ("herren", False),
         ("männer", False),
-        ("herren ü3", False),    # einstellig ist keine Altersklasse
+        ("herren ü3", False),    # single-digit is not an age group
         ("a-junioren", False),
     ])
     def test_is_alte_herren(self, mannschaftsart, erwartet):
-        # Aufrufer reichen die Mannschaftsart kleingeschrieben herein
+        # Callers pass the team type in lower case
         assert bool(is_alte_herren(mannschaftsart)) is erwartet
 
 
-# ===== §2 Abs. 2b Frauen/Juniorinnen =====
+# ===== §2 Abs. 2b Women/junior girls =====
 
 class TestFrauen:
     @pytest.mark.parametrize("spielklasse, erwartet", [
         ("Verbandsliga", (25.00, 20.00)),
         ("Landesklasse", (25.00, 20.00)),
         ("Kreisoberliga", (20.00, None)),
-        ("Kreisliga", (20.00, None)),       # Kreis-Fallback
+        ("Kreisliga", (20.00, None)),       # District fallback
         ("Kreisklasse", (20.00, None)),
     ])
     @pytest.mark.parametrize("mannschaftsart", ["Frauen", "Damen"])
@@ -237,7 +238,7 @@ class TestFrauen:
         assert calculate_spesen(spielklasse, mannschaftsart) == (20.00, None)
 
 
-# ===== §2 Abs. 2c Junioren =====
+# ===== §2 Abs. 2c Juniors =====
 
 class TestJunioren:
     @pytest.mark.parametrize("mannschaftsart", ["A-Junioren", "B-Junioren"])
@@ -273,7 +274,7 @@ class TestJunioren:
         "Stadtliga", "Landesmeisterschaft", "Hallenturnier", "Verbandsturnier",
     ])
     def test_land_ohne_tfv_spielklasse_leer(self, spielklasse):
-        # Geschlossene Liste: fremde Landesverbaende nicht still mit 25/20 abrechnen
+        # Closed list: do not silently bill foreign state associations at 25/20
         assert calculate_spesen(spielklasse, "B-Junioren") == LEER
 
     @pytest.mark.parametrize("spielklasse", [
@@ -284,7 +285,7 @@ class TestJunioren:
         assert calculate_spesen(spielklasse, "A-Junioren") == LEER
 
 
-# ===== Ueberregional =====
+# ===== Supra-regional =====
 
 class TestUeberregional:
     @pytest.mark.parametrize("spielklasse", [
@@ -300,7 +301,7 @@ class TestUeberregional:
         assert sc._is_ueberregional(spielklasse.lower()) is False
 
 
-# ===== §2 Abs. 6 fremde Verbaende =====
+# ===== §2 Abs. 6 foreign associations =====
 
 class TestFremderVerband:
     @pytest.mark.parametrize("staffel", [
@@ -357,16 +358,16 @@ class TestFremderVerband:
         assert sc._ist_fremder_verband(schluessel) is True
 
     @pytest.mark.parametrize("staffel", [
-        # Kein Kurzschluessel im erwarteten Format -> Fliesstext, kein Stichwort
-        "FS/H/K-FS/SA",          # Nummer fehlt
-        "XX/H/K-FS/SA/1",        # falsches Praefix
-        "FS/H/SA/1",             # zu wenige Felder
+        # No short key in the expected format -> free text, no keyword
+        "FS/H/K-FS/SA",          # number missing
+        "XX/H/K-FS/SA/1",        # wrong prefix
+        "FS/H/SA/1",             # too few fields
     ])
     def test_kein_gueltiger_kurzschluessel(self, staffel):
         assert sc._ist_fremder_verband(staffel) is False
 
     def test_fremder_kurzschluessel_leert_freundschaftsspiel(self, ligen):
-        # Selbst ein bekannter Thueringer Gastgeber: fremder Verband geht vor
+        # Even a known Thuringian host: foreign association takes precedence
         assert calculate_spesen("Freundschaftsspiele", "Herren", "FS/H/K-FS/SA/1",
                                 "FC Saalfeld", "Irgendwer") == LEER
 
@@ -399,31 +400,31 @@ class TestNofv:
         assert calculate_spesen("Oberliga", "Herren", staffel) == (100.00, 60.00)
 
     @pytest.mark.parametrize("spielklasse, mannschaftsart, staffel", [
-        # Oberliga eines anderen Regionalverbandes
+        # Oberliga of a different regional association
         ("Oberliga", "Herren", "Oberliga Niedersachsen"),
         ("Oberliga", "Herren", "Bayernliga"),
         ("Oberliga", "Herren", ""),
-        # "NOFV" ohne "Oberliga" in der Staffel
+        # "NOFV" without "Oberliga" in the division
         ("Oberliga", "Herren", "NOFV-Staffel"),
-        # Oberliga nur fuer Herren
+        # Oberliga only for men
         ("Oberliga", "Frauen", "NOFV-Oberliga Süd"),
         ("Oberliga", "A-Junioren", "NOFV-Oberliga Süd"),
         ("Oberliga", "Herren Ü35", "NOFV-Oberliga Süd"),
-        # Spielklasse nicht exakt "Oberliga"
+        # League class not exactly "Oberliga"
         ("Kreisoberliga", "Herren", "NOFV-Oberliga Süd"),
-        # Regionalliga ohne "Nordost" in der Spielklasse
+        # Regionalliga without "Nordost" in the league class
         ("Regionalliga", "Herren", "Regionalliga Nordost"),
         ("Regionalliga Nord", "Herren", "Regionalliga Nord"),
-        # Regionalliga Nordost, aber Staffel nennt keine Regionalliga
+        # Regionalliga Nordost, but the division names no Regionalliga
         ("Regionalliga Nordost", "Herren", ""),
         ("Regionalliga Nordost", "Herren", "Staffel 1"),
-        # Mannschaftsart nur exakt
+        # Team type exact only
         ("Regionalliga Nordost", "Herren Ü35", "Regionalliga Nordost"),
         ("Regionalliga Nordost", "A-Juniorinnen", "Regionalliga Nordost"),
         ("Regionalliga Nordost", "B-Juniorinnen", "Regionalliga Nordost"),
         ("Regionalliga Nordost", "D-Junioren", "Regionalliga Nordost"),
         ("Regionalliga Nordost", "Männer", "Regionalliga Nordost"),
-        # Keine regulaeren Pflichtspiele
+        # No regular compulsory matches
         ("Regionalliga Nordost", "C-Junioren", "Aufstiegsspiel zur NOFV-CJRL Regionalliga"),
         ("Regionalliga Nordost", "Herren", "Regionalliga Nordost Relegation"),
         ("Regionalliga Nordost", "Herren", "Regionalliga Nordost Entscheidungsspiel"),
@@ -433,13 +434,13 @@ class TestNofv:
         ("Regionalliga Nordost", "Herren", "Regionalliga Nordost Halle"),
         ("Hallen-Regionalliga Nordost", "Herren", "Regionalliga Nordost"),
         ("Oberliga", "Herren", "NOFV-Oberliga Süd Aufstieg"),
-        # Pokal/Freundschaft sind keine Pflichtspiele mit festem Satz
+        # Cup/friendly are not compulsory matches with a fixed rate
         ("NOFV-Pokal Regionalliga Nordost", "Herren", "Regionalliga Nordost"),
         ("Freundschaftsspiele Regionalliga Nordost", "Herren", "Regionalliga Nordost"),
     ])
     def test_kein_nofv_pflichtspiel(self, spielklasse, mannschaftsart, staffel):
         assert nofv_spielklasse(spielklasse, mannschaftsart, staffel) is None
-        # Und auch kein TFV-Satz: alles davon ist ueberregional oder fremd
+        # And no TFV rate either: all of it is supra-regional or foreign
         assert calculate_spesen(spielklasse, mannschaftsart, staffel) == LEER
 
     def test_nofv_none_eingaben(self):
@@ -459,12 +460,12 @@ class TestNofv:
         assert ist_nofv_spiel(spiel_info) is erwartet
 
     def test_nofv_vor_ueberregional_ausschluss(self):
-        # "Regionalliga" waere sonst ueberregional und "Nordost" fremder Verband
+        # "Regionalliga" would otherwise be supra-regional and "Nordost" a foreign association
         assert calculate_spesen("Regionalliga Nordost", "Frauen",
                                 "Regionalliga Nordost") == (60.00, 40.00)
 
 
-# ===== §2 Abs. 3/4 Pokal und Freundschaft - klassenunabhaengig =====
+# ===== §2 Abs. 3/4 Cup and friendly - independent of class =====
 
 class TestPokalFreundschaftKlassenunabhaengig:
     @pytest.mark.parametrize("spielklasse", [
@@ -494,41 +495,41 @@ class TestPokalFreundschaftKlassenunabhaengig:
         "Frauen", "A-Junioren", "B-Junioren", "C-Junioren", "D-Junioren", "E-Junioren",
     ])
     def test_frauen_und_junioren_leer(self, spielklasse, mannschaftsart):
-        # Satz haengt von der Spielklasse der Vereine ab, die nicht vorliegt
+        # Rate depends on the league class of the clubs, which is not available
         assert calculate_spesen(spielklasse, mannschaftsart, "", "A", "B") == LEER
 
     @pytest.mark.parametrize("spielklasse", ["Kreispokal", "Kreisfreundschaftsspiele"])
     def test_kein_satz_der_punktspieltabelle(self, spielklasse):
-        # Frueher bekamen Pokalspiele den Punktspielsatz der "kreis"-Zeile
+        # Previously, cup matches got the league-match rate of the "kreis" row
         assert calculate_spesen(spielklasse, "Herren") == LEER
         assert calculate_spesen(spielklasse, "A-Junioren") == LEER
         assert calculate_spesen(spielklasse, "Frauen") == LEER
 
 
-# ===== §2 Abs. 3/4 Herren nach Ligatabellen =====
+# ===== §2 Abs. 3/4 Men by league tables =====
 
 class TestHerrenPokal:
     def test_kreispokal_nie(self, ligen):
-        # Selbst mit Verbandsliga-Beteiligung: Kreispokal bleibt leer
+        # Even with Verbandsliga participation: district cup stays empty
         assert calculate_spesen("Kreispokal", "Herren", "", "FC Saalfeld", "SV 09 Arnstadt") == LEER
 
     @pytest.mark.parametrize("heim, gast, erwartet", [
         ("FC Saalfeld", "SV 09 Arnstadt", (50.00, 40.00)),          # VL vs VL
-        ("FC Saalfeld", "FC Empor Weimar 06", (50.00, 40.00)),      # VL vs LK -> hoehere
-        ("FC Empor Weimar 06", "FC Saalfeld", (50.00, 40.00)),      # Reihenfolge egal
+        ("FC Saalfeld", "FC Empor Weimar 06", (50.00, 40.00)),      # VL vs LK -> higher
+        ("FC Empor Weimar 06", "FC Saalfeld", (50.00, 40.00)),      # Order does not matter
         ("FC Empor Weimar 06", "SV Germania Ilmenau", (40.00, 30.00)),  # LK vs LK
-        ("FC Empor Weimar 06", "SV Kreisklassenverein", (40.00, 30.00)),  # LK vs unbekannt
-        ("SV Kreisklassenverein", "FC Saalfeld", (50.00, 40.00)),   # unbekannt vs VL
-        ("SG FC Saalfeld", "Unbekannt", (50.00, 40.00)),            # SG-Praefix ignoriert
-        ("FC Saalfeld I", "Unbekannt", (50.00, 40.00)),             # roemische Eins
+        ("FC Empor Weimar 06", "SV Kreisklassenverein", (40.00, 30.00)),  # LK vs unknown
+        ("SV Kreisklassenverein", "FC Saalfeld", (50.00, 40.00)),   # unknown vs VL
+        ("SG FC Saalfeld", "Unbekannt", (50.00, 40.00)),            # SG prefix ignored
+        ("FC Saalfeld I", "Unbekannt", (50.00, 40.00)),             # Roman one
     ])
     def test_landespokal(self, ligen, heim, gast, erwartet):
         assert calculate_spesen("Landespokal", "Herren", "", heim, gast) == erwartet
 
     @pytest.mark.parametrize("heim, gast", [
-        ("FC Carl Zeiss Jena II", "FC Saalfeld"),   # Oberliga beteiligt
+        ("FC Carl Zeiss Jena II", "FC Saalfeld"),   # Oberliga involved
         ("FC Saalfeld", "FC Carl Zeiss Jena II"),
-        ("FC Rot-Weiss Erfurt", "FC Empor Weimar 06"),  # Regionalliga beteiligt
+        ("FC Rot-Weiss Erfurt", "FC Empor Weimar 06"),  # Regionalliga involved
         ("Unbekannt", "FC Rot-Weiss Erfurt"),
     ])
     def test_ueberregionale_beteiligung_leer(self, ligen, heim, gast):
@@ -545,12 +546,12 @@ class TestHerrenPokal:
         assert calculate_spesen("Landespokal", "Herren") == LEER
 
     def test_mannschaftsnummer_entscheidet(self, ligen):
-        # "FC Saalfeld 2." spielt Landesklasse, die Erste Verbandsliga
+        # "FC Saalfeld 2." plays Landesklasse, the first team Verbandsliga
         assert calculate_spesen("Landespokal", "Herren", "", "FC Saalfeld 2.", "Unbekannt") == (40.00, 30.00)
         assert calculate_spesen("Landespokal", "Herren", "", "FC Saalfeld II", "Unbekannt") == (40.00, 30.00)
 
     def test_dritte_mannschaft_unbekannt(self, ligen):
-        # "FC Saalfeld 3." steht nirgends - darf nicht die 50 der Ersten bekommen
+        # "FC Saalfeld 3." is nowhere - must not get the first team's 50
         assert calculate_spesen("Landespokal", "Herren", "", "FC Saalfeld 3.", "SV Niemand") == LEER
 
     def test_ohne_ueberregionale_tabellen_unbekannte_nicht_einzuordnen(self, ligen_ohne_ueberregional):
@@ -564,13 +565,13 @@ class TestHerrenPokal:
         assert calculate_spesen("Landespokal", "Herren", "", "FC Saalfeld", "SV 09 Arnstadt") == LEER
 
     def test_spielklasse_ohne_satz_leer(self, db):
-        # Eine Landesliga (z.B. aus einem anderen Verband) hat keinen Herren-Satz
+        # A Landesliga (e.g. from another association) has no men's rate
         _staffel("oberliga", "OL1", ["FC Ober"], verband="nofv")
         _staffel("landesliga", "LL1", ["SV Landesliga"])
         assert calculate_spesen("Landespokal", "Herren", "", "SV Landesliga", "Unbekannt") == LEER
 
     def test_mehrdeutige_mannschaft_alleine_leer(self, ligen):
-        # Derselbe Kern in zwei Staffeln -> finde_mannschaft sagt None
+        # The same core in two divisions -> finde_mannschaft says None
         _staffel("landesklasse", "LK2", ["SV 09 Arnstadt"])
         assert calculate_spesen("Landespokal", "Herren", "", "SV 09 Arnstadt", "SV Niemand") == LEER
 
@@ -580,9 +581,9 @@ class TestHerrenPokal:
                                 "SV 09 Arnstadt", "FC Empor Weimar 06") == LEER
 
     def test_mehrdeutige_mannschaft_mit_bekanntem_gegner_leer(self, ligen):
-        # "SV 09 Arnstadt" steht in Verbandsliga UND Landesklasse - welche Zeile
-        # gilt, ist nicht zu entscheiden. Der Gegner spielt Landesklasse.
-        # Leer - der Satz des Gegners (40/30) waere geraten, es koennte 50/40 sein.
+        # "SV 09 Arnstadt" is in Verbandsliga AND Landesklasse - which row
+        # applies cannot be decided. The opponent plays Landesklasse.
+        # Empty - the opponent's rate (40/30) would be a guess, it could be 50/40.
         _staffel("landesklasse", "LK2", ["SV 09 Arnstadt"])
         assert calculate_spesen("Landespokal", "Herren", "",
                                 "SV 09 Arnstadt", "FC Empor Weimar 06") == LEER
@@ -592,16 +593,16 @@ class TestHerrenFreundschaft:
     @pytest.mark.parametrize("spielklasse", ["Freundschaftsspiele", "Kreisfreundschaftsspiele"])
     @pytest.mark.parametrize("heim, gast, erwartet", [
         ("FC Saalfeld", "SV Niemand", (50.00, 40.00)),
-        ("FC Empor Weimar 06", "FC Saalfeld", (40.00, 30.00)),   # Gastgeber zaehlt allein
-        ("FC Empor Weimar 06", "FC Rot-Weiss Erfurt", (40.00, 30.00)),  # Gast egal
-        ("FC Empor Weimar 06", "", (40.00, 30.00)),              # Gast nicht noetig
+        ("FC Empor Weimar 06", "FC Saalfeld", (40.00, 30.00)),   # Host counts alone
+        ("FC Empor Weimar 06", "FC Rot-Weiss Erfurt", (40.00, 30.00)),  # Guest irrelevant
+        ("FC Empor Weimar 06", "", (40.00, 30.00)),              # Guest not needed
     ])
     def test_gastgeber_entscheidet(self, ligen, spielklasse, heim, gast, erwartet):
         assert calculate_spesen(spielklasse, "Herren", "", heim, gast) == erwartet
 
     @pytest.mark.parametrize("heim", [
-        "SV Niemand",              # nicht gefunden
-        "",                        # fehlt
+        "SV Niemand",              # not found
+        "",                        # missing
         "FC Carl Zeiss Jena II",   # Oberliga
         "FC Rot-Weiss Erfurt",     # Regionalliga
     ])
@@ -617,7 +618,7 @@ class TestHerrenFreundschaft:
                                 "FC Saalfeld", "X") == (50.00, 40.00)
 
 
-# ===== Rueckgabewerte =====
+# ===== Return values =====
 
 class TestRueckgabe:
     @pytest.mark.parametrize("args", [
@@ -632,7 +633,7 @@ class TestRueckgabe:
         assert isinstance(ergebnis[0], float)
 
     def test_sra_nie_ohne_sr(self):
-        # Jede Tabellenzeile: wenn es einen SRA-Satz gibt, dann auch einen SR-Satz
+        # Every table row: if there is an SRA rate, there is also an SR rate
         zeilen = [
             *sc.SPESEN_MAENNER.values(), *sc.SPESEN_FRAUEN.values(),
             *sc.SPESEN_NOFV.values(), *sc.SPESEN_HERREN_NACH_SPIELKLASSE.values(),
@@ -646,7 +647,7 @@ class TestRueckgabe:
             assert sra is None or 0 < sra <= sr
 
     def test_tabellen_nicht_versehentlich_geaendert(self):
-        # Festschreibung der Saetze laut Spesenordnung Stand 01.07.2025
+        # Fixing of the rates according to the expense regulations as of 01.07.2025
         assert sc.SPESEN_MAENNER == {
             "verbandsliga": (50.00, 40.00),
             "landesklasse": (40.00, 30.00),

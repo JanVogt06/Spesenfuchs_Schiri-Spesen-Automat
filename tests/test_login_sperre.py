@@ -1,4 +1,4 @@
-"""Login-Sperre nach fuenf falschen Passwoertern."""
+"""Login lockout after five wrong passwords."""
 from datetime import datetime, timedelta, UTC
 
 import pytest

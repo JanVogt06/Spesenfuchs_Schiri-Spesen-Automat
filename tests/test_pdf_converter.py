@@ -1,7 +1,7 @@
 """
-PDF-Konvertierung ohne LibreOffice: soffice-Suche und subprocess.run sind
-ersetzt. Der Ersatz fuer soffice legt die PDFs so an, wie es das echte
-Programm taete - neben die Eingabe ins --outdir.
+PDF conversion without LibreOffice: the soffice lookup and subprocess.run are
+replaced. The replacement for soffice creates the PDFs the way the real
+program would - next to the input in --outdir.
 """
 import subprocess
 from pathlib import Path
@@ -18,11 +18,11 @@ from utils.pdf_converter import (
 
 
 class FalschesSoffice:
-    """Ersatz fuer subprocess.run, merkt sich die Aufrufe."""
+    """Replacement for subprocess.run, remembers the calls."""
 
     def __init__(self, returncode=0, erzeugen=None, ausnahme=None, stderr=""):
         self.returncode = returncode
-        # None: fuer jede Eingabe eine PDF; sonst nur fuer diese Indizes
+        # None: a PDF for every input; otherwise only for these indices
         self.erzeugen = erzeugen
         self.ausnahme = ausnahme
         self.stderr = stderr
@@ -50,7 +50,7 @@ def soffice_da(monkeypatch):
 
 @pytest.fixture
 def temp_dirs(monkeypatch, tmp_path):
-    """Leitet mkdtemp in tmp_path um, damit sich das Aufraeumen pruefen laesst."""
+    """Redirects mkdtemp to tmp_path so that the cleanup can be checked."""
     angelegt = []
     zaehler = iter(range(1000))
 
@@ -64,7 +64,7 @@ def temp_dirs(monkeypatch, tmp_path):
     return angelegt
 
 
-# ===== soffice finden =====
+# ===== Finding soffice =====
 
 class TestSofficeFinden:
     def test_nimmt_ersten_treffer_im_path(self, monkeypatch):
@@ -92,7 +92,7 @@ class TestSofficeFinden:
             pdf_converter._find_soffice()
 
 
-# ===== Dateien =====
+# ===== Files =====
 
 class TestDateienKonvertieren:
     def _dateien(self, verzeichnis, anzahl):
@@ -169,7 +169,7 @@ class TestDateienKonvertieren:
         assert convert_docx_files_to_pdf(pfade) == {pfade[0]: False, pfade[1]: True}
 
     def test_fehlercode_aber_pdf_da_zaehlt_als_erfolg(self, monkeypatch, tmp_path, soffice_da):
-        # Entscheidend ist die Datei, nicht der Rueckgabewert von soffice
+        # What matters is the file, not the return value of soffice
         monkeypatch.setattr(pdf_converter.subprocess, "run", FalschesSoffice(returncode=81))
         pfade = self._dateien(tmp_path, 1)
         assert convert_docx_files_to_pdf(pfade) == {pfade[0]: True}
@@ -245,13 +245,13 @@ class TestBytesKonvertieren:
     def test_arbeitsverzeichnis_verschwindet(self, monkeypatch, soffice_da, temp_dirs):
         monkeypatch.setattr(pdf_converter.subprocess, "run", FalschesSoffice())
         convert_docx_bytes_to_pdf([("a.docx", b"A")])
-        assert len(temp_dirs) == 2  # Arbeitsverzeichnis + soffice-Profil
+        assert len(temp_dirs) == 2  # Working directory + soffice profile
         assert not any(p.exists() for p in temp_dirs)
 
     def test_zeitueberschreitung_raeumt_alles_auf(self, monkeypatch, soffice_da, temp_dirs):
         monkeypatch.setattr(pdf_converter.subprocess, "run", FalschesSoffice(
             ausnahme=subprocess.TimeoutExpired(cmd="soffice", timeout=120)))
-        # Haengendes LibreOffice gilt als gescheiterte Konvertierung (-> 503)
+        # A hanging LibreOffice counts as a failed conversion (-> 503)
         assert convert_docx_bytes_to_pdf([("a.docx", b"A"), ("b.docx", b"B")]) == [None, None]
         assert not any(p.exists() for p in temp_dirs)
 

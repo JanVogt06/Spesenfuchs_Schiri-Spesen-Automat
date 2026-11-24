@@ -1,8 +1,9 @@
 """
-Spielberichte - Einsatzplan, Bericht-Schnittstelle und Aufbereitung, ohne Browser.
+Match reports - duty roster, report interface and processing, without a
+browser.
 
-Die Bericht-App ist bei DFBnet editierbar. Deshalb pruefen mehrere Tests das
-Sicherheitsnetz: nur GET, nur die freigegebenen Lese-Pfade.
+The report app is editable at DFBnet. Therefore several tests check the
+safety net: only GET, only the approved read paths.
 """
 import base64
 import json
@@ -42,7 +43,7 @@ def bericht():
     return roh["spiel"], roh["details"]
 
 
-# ===== Einsatzplan =====
+# ===== Duty roster =====
 
 class PlanLocator:
     def __init__(self, seite, selektor):
@@ -74,7 +75,7 @@ class PlanLocator:
 
 
 class PlanSeite:
-    """Der Einsatzplan (/spielplus/mod_sbo) mit Saisonauswahl und Liste."""
+    """The duty roster (/spielplus/mod_sbo) with season selection and list."""
 
     def __init__(self, saisons=("26/27", "25/26"), gewaehlt="26/27", zeilen=None, link=None):
         self.saisons = list(saisons)
@@ -176,12 +177,12 @@ class TestIstLesbar:
         assert ist_lesbar(_zeile(status=status), HEUTE) is True
 
     @pytest.mark.parametrize("zeile", [
-        _zeile(spiel_id=None),                        # kein Link (kuenftig oder Turnier)
-        _zeile(datum="2026-11-23"),                   # heute
-        _zeile(datum="2026-11-29"),                   # kuenftig
-        _zeile(datum=""),                             # kaputtes Datum
+        _zeile(spiel_id=None),                        # no link (future or tournament)
+        _zeile(datum="2026-11-23"),                   # today
+        _zeile(datum="2026-11-29"),                   # future
+        _zeile(datum=""),                             # broken date
         _zeile(datum="23.11.2025"),
-        _zeile(status=("spiel_erfolgt",)),            # Bericht wird noch ausgefuellt
+        _zeile(status=("spiel_erfolgt",)),            # Report is still being filled in
         _zeile(status=()),
         _zeile(status=("spiel_anerkannt", "spiel_historisch")),
         _zeile(status=("staffel_view", "spiel_geplant")),
@@ -208,7 +209,7 @@ class TestWartetAufFreigabe:
         assert wartet_auf_freigabe(_zeile(status=("spiel_historisch",)), HEUTE) is False
 
 
-# ===== Sicherheitsnetz =====
+# ===== Safety net =====
 
 class TestPruefePfad:
     @pytest.mark.parametrize("pfad", [
@@ -250,7 +251,7 @@ class TestPruefePfad:
 
 
 class ApiSeite:
-    """Die Bericht-App: beantwortet die fetch-Skripte aus einer Tabelle."""
+    """The report app: answers the fetch scripts from a table."""
 
     def __init__(self, antworten):
         self.antworten = antworten
@@ -281,7 +282,7 @@ class TestHoleJson:
         with pytest.raises(RuntimeError) as fehler:
             sb._hole_json(seite, f"report/{SPIEL_ID}/create")
         assert not isinstance(fehler.value, SitzungAbgelaufen)
-        # Keine Kennungen im Protokoll
+        # No identifiers in the log
         assert SPIEL_ID not in str(fehler.value)
 
     def test_verbotener_pfad_wird_gar_nicht_abgerufen(self):
@@ -380,15 +381,15 @@ class TestOeffneBerichtApp:
         assert not bedingung(Antwort("https://www.dfbnet.org/andere/info"))
 
 
-# ===== Aufbereitung =====
+# ===== Processing =====
 
 class TestAufbereiten:
     def test_kopfdaten(self, bericht):
         daten = aufbereiten(*bericht)
 
         assert daten["spielkennung"] == "460101001"
-        assert daten["heim"] == "FC Beispielstadt"          # ohne weiche Trennstriche
-        assert daten["gast"] == "SV Musterdorf 2."          # Leerraum zusammengefasst
+        assert daten["heim"] == "FC Beispielstadt"          # without soft hyphens
+        assert daten["gast"] == "SV Musterdorf 2."          # whitespace collapsed
         assert daten["runde"] == "5. Spieltag"
         assert daten["anstoss_geplant"] == "2025-09-14T15:00:00"
         assert daten["beginn"] == "2025-09-14T15:02:00"
@@ -564,7 +565,7 @@ class TestAufbereiten:
         assert daten["bericht_spiel_id"] == "INFO00000001"
 
 
-# ===== Ablauf =====
+# ===== Flow =====
 
 class TestLiesSaisons:
     @pytest.fixture
@@ -610,7 +611,7 @@ class TestLiesSaisons:
         ergebnis = lies_saisons(PlanSeite(), sb._EINSATZPLAN_URL, lambda l: l)
 
         assert list(ergebnis) == ["26/27", "24/25"]
-        assert ablauf["geoeffnet"] == 2  # einmal am Anfang, einmal nach dem Fehler
+        assert ablauf["geoeffnet"] == 2  # once at the start, once after the error
 
     def test_bricht_ab_wenn_einsatzplan_nicht_wieder_aufgeht(self, ablauf):
         ablauf["fehler"] = {"26/27"}
@@ -621,14 +622,14 @@ class TestLiesSaisons:
 
 
 class FakeBerichtApp:
-    """Ersetzt oeffne_bericht_app, hole_bericht und hole_dokument."""
+    """Replaces oeffne_bericht_app, hole_bericht and hole_dokument."""
 
     def __init__(self, bericht, monkeypatch):
         self.bericht = bericht
         self.geoeffnet = []
         self.berichte = []
         self.dokumente = []
-        # Folge von Ausnahmen je Spiel-ID bzw. Dokument-ID; None = klappt
+        # Sequence of exceptions per match ID or document ID; None = works
         self.bericht_fehler = {}
         self.dokument_fehler = {}
         self.oeffnen_fehler = []
@@ -687,7 +688,7 @@ class TestLiesBerichte:
         assert eintrag["zeile"] is ZEILEN[0]
         assert eintrag["daten"]["heim"] == "FC Beispielstadt"
         assert eintrag["dateien"] == {"DOKUMENT00000000001": b"PDF DOKUMENT00000000001"}
-        # Abruf ueber die Bericht-Spiel-ID, nicht die Einsatzplan-ID
+        # Retrieval via the report match ID, not the duty roster ID
         assert app.dokumente[0] == (BERICHT_SPIEL_ID, "DOKUMENT00000000001")
         assert fortschritt[0] == (1, 2, "Spielbericht 2025-09-14 Heim 1 (1/2)")
 
@@ -716,7 +717,7 @@ class TestLiesBerichte:
 
         ergebnis = lies_berichte(object(), ZEILEN, lambda d: True)
 
-        # Was bis dahin gelesen war, bleibt; danach wird nichts mehr versucht
+        # What had been read up to then stays; afterwards nothing more is tried
         assert list(ergebnis) == [ZEILEN[0]["dfb_spiel_id"]]
         assert dritte not in app.berichte
 
@@ -747,7 +748,7 @@ class TestLiesBerichte:
         ergebnis = lies_berichte(object(), ZEILEN, lambda d: True)
 
         assert list(ergebnis) == [ZEILEN[0]["dfb_spiel_id"], ZEILEN[2]["dfb_spiel_id"]]
-        assert app.berichte.count(zweite) == 1  # kein zweiter Versuch
+        assert app.berichte.count(zweite) == 1  # no second attempt
         assert len(app.geoeffnet) == 1
 
     def test_bericht_ohne_spiel(self, app):

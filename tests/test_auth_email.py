@@ -1,4 +1,4 @@
-"""E-Mail-Adressen ohne Ruecksicht auf Gross-/Kleinschreibung."""
+"""Email addresses regardless of upper/lower case."""
 from core.security import hash_password
 from db.database import create_user, get_user_by_email
 
@@ -17,9 +17,9 @@ def test_registrierung_speichert_klein(client, db):
 
 
 def test_altbestand_mit_zwei_schreibweisen_bevorzugt_exakte(db):
-    """Vor dem Fix konnten zwei Konten derselben Adresse entstehen."""
+    """Before the fix, two accounts with the same address could be created."""
     alt = create_user("Doppelt@example.org", hash_password("a"))
     neu = create_user("doppelt@example.org", hash_password("b"))
     assert get_user_by_email("doppelt@example.org")["id"] == neu
     assert get_user_by_email("Doppelt@example.org")["id"] == alt
-    assert get_user_by_email("DOPPELT@example.org")["id"] == alt  # sonst die aelteste
+    assert get_user_by_email("DOPPELT@example.org")["id"] == alt  # otherwise the oldest

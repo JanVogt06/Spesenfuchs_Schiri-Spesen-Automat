@@ -1,9 +1,9 @@
 """
-core.security: Passwort-Hashes und JWT.
+core.security: password hashes and JWT.
 
-core.security liest JWT_SECRET_KEY beim Import. Die Tests fuer das
-Import-Verhalten laden deshalb eine eigene Kopie des Moduls unter fremdem
-Namen - das von allen anderen Tests benutzte core.security bleibt unberuehrt.
+core.security reads JWT_SECRET_KEY at import time. The tests for the import
+behaviour therefore load a separate copy of the module under a different
+name - the core.security used by all other tests stays untouched.
 """
 import hashlib
 import importlib.util
@@ -27,14 +27,14 @@ SECURITY_DATEI = Path(__file__).resolve().parent.parent / "src" / "core" / "secu
 
 
 def _frische_kopie(name="security_testkopie"):
-    """Laedt core/security.py neu, ohne sys.modules['core.security'] zu ersetzen."""
+    """Reloads core/security.py without replacing sys.modules['core.security']."""
     spec = importlib.util.spec_from_file_location(name, SECURITY_DATEI)
     modul = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(modul)
     return modul
 
 
-# ===== Passwoerter =====
+# ===== Passwords =====
 
 class TestPasswoerter:
     def test_hin_und_zurueck(self):
@@ -154,12 +154,12 @@ class TestToken:
         assert decode_access_token(token) is None
 
     def test_ohne_ablauf_bleibt_gueltig(self):
-        # PyJWT verlangt exp nicht - dokumentiert das tatsaechliche Verhalten
+        # PyJWT does not require exp - documents the actual behaviour
         token = jwt.encode({"user_id": 5}, SECRET_KEY, algorithm=ALGORITHM)
         assert decode_access_token(token) == 5
 
 
-# ===== Laden =====
+# ===== Loading =====
 
 class TestImport:
     def test_ohne_secret_bricht_der_import_ab(self, monkeypatch):
@@ -179,7 +179,7 @@ class TestImport:
         assert kopie.TOKEN_EXPIRE_DAYS == 7
         assert kopie.ALGORITHM == "HS512"
         assert kopie.decode_access_token(kopie.create_access_token(3)) == 3
-        # Ein HS512-Token wird vom HS256-Modul nicht angenommen
+        # An HS512 token is not accepted by the HS256 module
         assert decode_access_token(kopie.create_access_token(3)) is None
 
     def test_anderes_secret_macht_tokens_ungueltig(self, monkeypatch):

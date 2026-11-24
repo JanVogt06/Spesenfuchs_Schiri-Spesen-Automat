@@ -1,8 +1,8 @@
 """
-Stammdaten und QMax aus der Schnittstelle - ohne Browser (Daten erfunden).
+Master data and QMax from the interface - without a browser (data invented).
 
-Die Texte muessen genau so aussehen, wie die Karten der App sie zeigten:
-so stehen sie in der Datenbank.
+The texts must look exactly as the app's cards showed them:
+that is how they are stored in the database.
 """
 from datetime import date
 
@@ -138,6 +138,6 @@ class TestLiesStammdaten:
 
         daten = lies_stammdaten(seite, "SCHIRI42", heute=HEUTE)
 
-        # Was nicht gelesen wurde, fehlt - der Upsert behaelt den alten Wert
+        # What was not read is missing - the upsert keeps the old value
         assert "ausweisgueltigkeit" not in daten
         assert daten["verein"] == "FC Beispiel e.V."

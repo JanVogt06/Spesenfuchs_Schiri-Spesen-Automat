@@ -1,4 +1,4 @@
-"""Geocode-Cache: 'nie gefragt' und 'nichts gefunden' muessen unterscheidbar bleiben."""
+"""Geocode cache: 'never asked' and 'nothing found' must remain distinguishable."""
 from db import geocode
 from db.geocode import get_cached, store
 from db_helpers import feste_uhr

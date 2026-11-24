@@ -1,8 +1,8 @@
 """
-Die Reiter neben den Spesen: Stammdaten, Saisons, Spielberichte samt
-Dokumenten, Beobachtungen und Ligatabellen.
+The tabs beside the expenses: master data, seasons, match reports including
+documents, observations and league tables.
 
-Alles wird ueber die echten Schreibfunktionen aus src/db angelegt.
+Everything is created via the real write functions from src/db.
 """
 import pytest
 
@@ -24,7 +24,7 @@ def _log():
         conn.close()
 
 
-# ===== Stammdaten =====
+# ===== Master data =====
 
 class TestStammdaten:
     def test_vor_dem_ersten_abruf_null(self, client, user, auth_header):
@@ -55,7 +55,7 @@ class TestStammdaten:
         assert client.get("/api/stammdaten", headers=fremder["header"]).json()["name_vorname"] == "Fremd, Franz"
 
 
-# ===== Saisons =====
+# ===== Seasons =====
 
 def _saison(user_id, saison="26/27", spiele=None, einsaetze=None, lehrgaenge=None):
     from db.season import replace_saison
@@ -84,7 +84,7 @@ class TestSaisons:
     def test_liste_neueste_zuerst(self, client, user, auth_header):
         _saison(user["id"], "24/25")
         _saison(user["id"], "26/27")
-        # Saisonanfang: nur Lehrgaenge, noch kein Spiel - muss trotzdem erscheinen
+        # Start of season: only courses, no match yet - must still appear
         _saison(user["id"], "25/26", spiele=[], einsaetze=[])
 
         liste = client.get("/api/saison", headers=auth_header).json()
@@ -144,7 +144,7 @@ class TestSaisons:
         _saison(user["id"], "26/27")
         bericht_id = speichere_bericht(
             user["id"], "26/27",
-            # Schreibweise wie im Spielbericht-Modul: Mannschaftsnummer dran
+            # Spelling as in the match report module: team number appended
             {"dfb_spiel_id": "S1", "datum": "2026-09-05", "uhrzeit": "15:00",
              "heim": "FC Heim 1.", "gast": "SV Gast"},
             {"kosten": {"fahrtkosten": 9.0, "spesen": 30.0}}, {},
@@ -157,11 +157,11 @@ class TestSaisons:
         assert spiele[1]["spielbericht"] is None
 
 
-# ===== Spielberichte =====
+# ===== Match reports =====
 
 @pytest.fixture
 def bericht(user, datenverzeichnis):
-    """Ein Spielbericht mit einem PDF- und einem Bild-Dokument."""
+    """A match report with a PDF and an image document."""
     from db.spielberichte import get_bericht, speichere_bericht
 
     bericht_id = speichere_bericht(
@@ -199,7 +199,7 @@ class TestSpielbericht:
         assert [d["kategorie"] for d in daten["dokumente"]] == ["Sonderbericht", "Spesendokument"]
         assert [d["dateiname"] for d in daten["dokumente"]] == \
             ["Sonderbericht Spielabbruch.pdf", "Quittung Über.jpg"]
-        # Der Pfad auf der Platte bleibt intern
+        # The path on disk stays internal
         assert all("pfad" not in d for d in daten["dokumente"])
 
     @pytest.mark.parametrize("quelle, erwartet", [
@@ -325,7 +325,7 @@ class TestSpielberichtDokument:
         assert "nicht fuer dich" not in antwort.text
 
 
-# ===== Beobachtungen =====
+# ===== Observations =====
 
 class TestBeobachtungen:
     def test_leer(self, client, user, auth_header):
@@ -362,7 +362,7 @@ class TestBeobachtungen:
         assert client.get("/api/beobachtungen", headers=auth_header).json()["beobachtungen"] == []
 
 
-# ===== Ligen =====
+# ===== Leagues =====
 
 class TestLigen:
     def test_leer(self, client, user, auth_header):

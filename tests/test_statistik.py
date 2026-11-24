@@ -1,6 +1,6 @@
 """
-Statistik ueber die eigenen Spiele: echte Wegwerf-Datenbank, Adresssuche und
-Routenplaner als Attrappen.
+Statistics about the own matches: real throwaway database, address search and
+route planner as stubs.
 """
 from datetime import date
 
@@ -15,7 +15,7 @@ from utils.statistik import statistik
 
 HEUTE = date(2026, 11, 24)
 
-# Wohnorte und Plaetze: 0,1 Grad Breite = 11,1 km
+# Home towns and pitches: 0.1 degrees of latitude = 11.1 km
 ORTE = {
     "Weg 1, 99999 Irgendwo": (50.1, 11.0),
     "Weg 2, 99999 Irgendwo": (50.2, 11.0),
@@ -100,7 +100,7 @@ class TestSpesen:
 
         assert auswerten(user["id"])["saisons"] == ["26/27", "25/26"]
         assert auswerten(user["id"], "25/26")["monate"][0]["monat"] == "2026-03"
-        # Unbekannte Saison: die neueste
+        # Unknown season: the newest
         assert auswerten(user["id"], "99/00")["saison"] == "26/27"
 
     def test_ohne_satz(self, user, dienste):
@@ -122,7 +122,7 @@ class TestFahrtkosten:
         fahrt = auswerten(user["id"])["fahrtkosten"]
 
         assert (fahrt["erfasst"], fahrt["erfasst_spiele"], fahrt["geschaetzt_spiele"]) == (14.5, 1, 0)
-        # Erfasstes wird nicht geschaetzt
+        # What was recorded is not estimated
         assert dienste == []
 
     def test_eingetragene_null_zaehlt_als_erfasst(self, user, dienste):
@@ -133,7 +133,7 @@ class TestFahrtkosten:
         assert (fahrt["erfasst"], fahrt["erfasst_spiele"], fahrt["geschaetzt_spiele"]) == (0, 1, 0)
 
     def test_schaetzt_hin_und_zurueck_vom_eigenen_wohnort(self, user, dienste):
-        anlegen(user["id"], "2026-09-05", selbst=1)   # Weg 2: 22,2 km vom Platz
+        anlegen(user["id"], "2026-09-05", selbst=1)   # Route 2: 22.2 km from the pitch
         anlegen(user["id"], "2026-09-12", selbst=1, heim="FC Zwei")
 
         ergebnis = auswerten(user["id"])
@@ -144,7 +144,7 @@ class TestFahrtkosten:
         assert fahrt["geschaetzt"] == pytest.approx(2 * 44 * 0.30)
         assert ergebnis["monate"][0]["fahrt_geschaetzt"] == pytest.approx(26.4)
         assert ergebnis["gesamt"] == pytest.approx(40 + 26.4)
-        # Ein Wohnort, ein Platz: je eine Abfrage hin und zurueck
+        # One home town, one pitch: one query each way
         assert dienste == [([(50.2, 11.0)], [(50.0, 11.0)]), ([(50.0, 11.0)], [(50.2, 11.0)])]
 
     def test_dfbnet_koordinate_des_platzes_hat_vorrang(self, user, dienste):

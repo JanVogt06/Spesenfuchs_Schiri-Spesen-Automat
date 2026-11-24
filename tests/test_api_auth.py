@@ -1,8 +1,7 @@
 """
-Registrierung, Login, /me, Token-Pruefung und das Hinterlegen der
-DFBnet-Zugangsdaten.
+Registration, login, /me, token check and storing the DFBnet credentials.
 
-Login-Sperre, Ablehnungshinweis und Passwortwechsel haben eigene Dateien
+Login lockout, rejection notice and password change have their own files
 (test_login_sperre.py, test_dfb_login_status.py, test_auth_passwort.py).
 """
 from datetime import datetime, timedelta, UTC
@@ -24,7 +23,7 @@ def _registrieren(client, email="neu@example.org", passwort="ein-passwort"):
     return client.post("/api/auth/register", json={"email": email, "password": passwort})
 
 
-# ===== Registrierung =====
+# ===== Registration =====
 
 class TestRegistrierung:
     def test_legt_nutzer_an_und_liefert_token(self, client, db):
@@ -38,7 +37,7 @@ class TestRegistrierung:
         assert daten["token_type"] == "bearer"
         assert daten["user_id"] == get_user_by_email("neu@example.org")["id"]
 
-        # Das Token taugt sofort fuer geschuetzte Endpunkte
+        # The token is immediately valid for protected endpoints
         me = client.get("/api/auth/me", headers={"Authorization": f"Bearer {daten['access_token']}"})
         assert me.status_code == 200
         assert me.json()["user_id"] == daten["user_id"]
@@ -128,7 +127,7 @@ class TestLogin:
         assert client.post("/api/auth/login", json={"email": "x", "password": "y"}).status_code == 422
 
 
-# ===== Token-Pruefung =====
+# ===== Token check =====
 
 def _token(payload: dict, secret: str = None) -> str:
     from core import security
@@ -163,9 +162,9 @@ class TestToken:
         assert fehlerbild(antwort) == {"code": "AUTHENTICATION_ERROR", "message": "Token fehlt"}
 
     @pytest.mark.parametrize("wert", [
-        "Bearer",                 # Token fehlt
-        "Bearer a b",             # zu viele Teile
-        "Basic abc",              # falsches Schema
+        "Bearer",                 # Token missing
+        "Bearer a b",             # too many parts
+        "Basic abc",              # wrong scheme
         "Token abc",
         "abc",
         "",
@@ -196,7 +195,7 @@ class TestToken:
         assert client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"}).status_code == 401
 
     def test_manipulierte_nutzlast_401(self, client, user, auth_header):
-        """Signatur bleibt, die Nutzlast zeigt auf einen anderen Nutzer."""
+        """The signature stays, the payload points to a different user."""
         import base64
         import json
 
@@ -262,15 +261,15 @@ class TestToken:
         ("post", "/api/bugreport"),
     ])
     def test_geschuetzte_endpunkte_ohne_token_401(self, client, db, methode, pfad):
-        # Das Token wird vor dem Body geprueft: auch ein unvollstaendiger
-        # Body ergibt 401 und keinen 422, der etwas ueber das Schema verraet.
+        # The token is checked before the body: even an incomplete
+        # body yields 401 and not a 422, which would reveal something about the schema.
         kwargs = {"json": {}} if methode == "post" else {}
         antwort = getattr(client, methode)(pfad, **kwargs)
         assert antwort.status_code == 401
         assert fehlerbild(antwort)["code"] == "AUTHENTICATION_ERROR"
 
 
-# ===== DFBnet-Zugangsdaten =====
+# ===== DFBnet credentials =====
 
 def _speichern(client, header, benutzer="dfb-schiri", passwort="dfb-pw"):
     return client.post("/api/auth/dfb-credentials", headers=header,
@@ -280,9 +279,8 @@ def _speichern(client, header, benutzer="dfb-schiri", passwort="dfb-pw"):
 @pytest.fixture
 def mit_bestand(user, datenverzeichnis):
     """
-    Ein Nutzer mit hinterlegtem DFBnet-Zugang und Daten in allen vier
-    Reitern, die an diesem Zugang haengen - geschrieben ueber die echten
-    DB-Funktionen.
+    A user with stored DFBnet access and data in all four tabs that depend on
+    this access - written via the real DB functions.
     """
     from db.beobachtungen import replace_beobachtungs_saison
     from db.season import replace_saison
@@ -381,7 +379,7 @@ class TestDfbZugangsdaten:
         assert vorher == {"stammdaten": True, "saisons": 1, "beobachtungen": 1,
                           "spielberichte": 1, "dateien": 1}
 
-        # DFBnet erzwingt regelmaessig ein neues Passwort - der Benutzername bleibt
+        # DFBnet regularly forces a new password - the username stays
         assert _speichern(client, auth_header, "dfb-schiri", "neues-pw").status_code == 200
 
         assert _bestand(mit_bestand["id"], datenverzeichnis) == vorher
@@ -392,7 +390,7 @@ class TestDfbZugangsdaten:
         assert _bestand(mit_bestand["id"], datenverzeichnis) == {
             "stammdaten": False, "saisons": 0, "beobachtungen": 0, "spielberichte": 0, "dateien": 0,
         }
-        # Und die Endpunkte zeigen die Leerzustaende
+        # And the endpoints show the empty states
         assert client.get("/api/stammdaten", headers=auth_header).json() is None
         assert client.get("/api/saison", headers=auth_header).json() == []
 

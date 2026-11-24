@@ -1,9 +1,9 @@
 """
-core.config: wo Daten und Secrets liegen, und das Anlegen der Secrets beim
-allerersten Start.
+core.config: where data and secrets live, and the creation of the secrets on
+the very first start.
 
-PROJECT_ROOT wird auf ein Wegwerf-Verzeichnis umgebogen, damit nie das echte
-Projekt (und erst recht nicht data/) beruehrt wird.
+PROJECT_ROOT is redirected to a throwaway directory so that the real project
+(and certainly not data/) is never touched.
 """
 import os
 import stat
@@ -26,14 +26,14 @@ PFAD_VARIABLEN = ("DATA_DIR", "ENV_FILE", "DATABASE_PATH", "OUTPUT_DIR")
 
 
 def _env_weg(monkeypatch, name):
-    """Entfernt eine Variable so, dass monkeypatch sie hinterher sicher wiederherstellt."""
+    """Removes a variable such that monkeypatch safely restores it afterwards."""
     monkeypatch.setenv(name, "platzhalter")
     monkeypatch.delenv(name)
 
 
 @pytest.fixture
 def projekt(tmp_path, monkeypatch):
-    """Ein leeres Projektverzeichnis, ohne Pfad-Variablen."""
+    """An empty project directory, without path variables."""
     root = tmp_path / "projekt"
     root.mkdir()
     monkeypatch.setattr(config, "PROJECT_ROOT", root)
@@ -48,7 +48,7 @@ def ohne_secrets(monkeypatch):
         _env_weg(monkeypatch, name)
 
 
-# ===== Pfade =====
+# ===== Paths =====
 
 class TestDatenverzeichnis:
     def test_standard_ist_data_im_projekt(self, projekt):
@@ -152,7 +152,7 @@ class TestOutputDir:
         assert get_output_dir() == projekt / "data" / "output"
 
 
-# ===== Secrets beim ersten Start =====
+# ===== Secrets on first start =====
 
 def _lies_env(pfad):
     werte = {}
@@ -178,7 +178,7 @@ class TestBootstrapSecrets:
         werte = _lies_env(env_file)
         assert set(werte) == {"JWT_SECRET_KEY", "ENCRYPTION_KEY"}
         assert len(werte["JWT_SECRET_KEY"]) >= 32
-        # Ein gueltiger Fernet-Schluessel
+        # A valid Fernet key
         Fernet(werte["ENCRYPTION_KEY"].encode())
 
     def test_setzt_die_secrets_in_die_umgebung(self, tmp_path, ohne_secrets):
@@ -235,7 +235,7 @@ class TestBootstrapSecrets:
         assert os.environ["JWT_SECRET_KEY"] == "aus-der-umgebung"
 
     def test_gleichzeitiger_start_liest_die_fremde_datei(self, tmp_path, ohne_secrets, monkeypatch):
-        # Ein zweiter Prozess hat die Datei zwischen exists() und os.open angelegt
+        # A second process created the file between exists() and os.open
         env_file = tmp_path / ".env"
         fremd = "JWT_SECRET_KEY=vom-anderen-prozess\nENCRYPTION_KEY=auch-von-dort\n"
 

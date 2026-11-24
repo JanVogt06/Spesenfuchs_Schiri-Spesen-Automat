@@ -1,9 +1,9 @@
 """
-fussball.de: Namensvergleich, Staffelsuche und Tabellen - ohne Netz.
+fussball.de: name comparison, division search and tables - without network.
 
-Jeder Abruf laeuft ueber fussball_de._hole. Die Tests ersetzen ihn durch
-eine Zuordnung URL -> HTML aus tests/fixtures/scraper; ein echter Abruf
-(urlopen) schlaegt sofort fehl.
+Every retrieval goes through fussball_de._hole. The tests replace it with a
+mapping URL -> HTML from tests/fixtures/scraper; a real retrieval (urlopen)
+fails immediately.
 """
 from pathlib import Path
 from types import SimpleNamespace
@@ -37,7 +37,7 @@ def _fixture(name: str) -> str:
 
 @pytest.fixture(autouse=True)
 def _kein_netz(monkeypatch):
-    """Ein echter Abruf waere ein Fehler im Test."""
+    """A real retrieval would be an error in the test."""
     def verboten(*args, **kwargs):
         raise AssertionError("Test wollte fussball.de wirklich abrufen")
 
@@ -45,7 +45,7 @@ def _kein_netz(monkeypatch):
 
 
 class FakeWeb:
-    """Ersetzt _hole: URL -> HTML oder Exception; merkt sich jeden Abruf."""
+    """Replaces _hole: URL -> HTML or exception; remembers every retrieval."""
 
     def __init__(self, seiten):
         self.seiten = dict(seiten)
@@ -84,7 +84,7 @@ def _staffel(staffel_id="02TESTVL00000000VS5489B3VVETK79U-G",
     )
 
 
-# ===== Mannschaftsnummer =====
+# ===== Team number =====
 
 class TestMannschaftsnummer:
     @pytest.mark.parametrize("name, nummer", [
@@ -107,7 +107,7 @@ class TestMannschaftsnummer:
         "SV 1920 Musterdorf",
         "SG Beispielstadt 46",
         "SpVgg Probehausen 04",
-        "FC Hawaii",       # endet auf "ii", aber als Teil eines Wortes
+        "FC Hawaii",       # ends in "ii", but as part of a word
         "1. FC Beispielstadt",
     ])
     def test_jahreszahlen_und_woerter_sind_keine_nummer(self, name):
@@ -118,7 +118,7 @@ class TestMannschaftsnummer:
         assert mannschaftsnummer(name) == 1
 
 
-# ===== Vereinskern =====
+# ===== Club core =====
 
 class TestVereinskern:
     def test_spielgemeinschaft_und_nummer_fallen_weg(self):
@@ -140,7 +140,7 @@ class TestVereinskern:
         assert vereinskern("FC Union Beispielstadt II") == "fc union beispielstadt"
 
     def test_zahlen_im_namen_bleiben(self):
-        # Zwei verschiedene Vereine derselben Stadt duerfen nicht zusammenfallen
+        # Two different clubs of the same town must not collapse
         assert vereinskern("SV 09 Musterdorf") != vereinskern("SV 1920 Musterdorf")
         assert vereinskern("SG Beispielstadt 46") != vereinskern("FC Beispielstadt")
 
@@ -153,7 +153,7 @@ class TestVereinskern:
         assert vereinskern(name) == ""
 
 
-# ===== Staffeln auf einer Seite =====
+# ===== Divisions on a page =====
 
 class TestStaffelnAufSeite:
     def test_verbandsliga_herren_thueringen(self):
@@ -208,13 +208,13 @@ class TestStaffelnAufSeite:
         assert fussball_de._anzeigename(html, "02XYZ") is None
 
 
-# ===== Staffeln entdecken =====
+# ===== Discovering divisions =====
 
 LK = "https://www.fussball.de/spieltagsuebersicht/landesklasse-staffel-{n}-landesklasse-herren-saison2627-thueringen/-/staffel/02TESTLK{n}0000000VS5489B3VVETK79U-G"
 
 
 def _landesklasse_seite(n, nachbarn, name=None):
-    """Eine Staffelseite, die per rel=prev/next auf ihre Nachbarn zeigt."""
+    """A division page that points to its neighbours via rel=prev/next."""
     links = "\n".join(
         f'<a rel="{richtung}" href="{LK.format(n=nachbar)}"><span class="icon-arrow"></span></a>'
         for richtung, nachbar in nachbarn
@@ -237,7 +237,7 @@ class TestEntdeckeStaffeln:
                                      mit_nachbarstaffeln=False)
 
         assert staffeln == [_staffel()]
-        # Erster Suchtreffer, und ohne Nachbarstaffeln keine Staffelseite
+        # First search hit, and without neighbouring divisions no division page
         assert fake.abrufe == [SUCHE_URL + "SV%20Gr%C3%BCn-Wei%C3%9F%20Beispielstadt", VEREIN_URL]
 
     def test_kein_suchtreffer(self, web):
@@ -262,8 +262,8 @@ class TestEntdeckeStaffeln:
             entdecke_staffeln("Beispielstadt", "verbandsliga")
 
     def test_folgt_der_kette_in_beide_richtungen(self, web):
-        # Der Anker spielt in der MITTLEREN Staffel: nur rel=next zu folgen
-        # haette Staffel 1 nie gefunden.
+        # The anchor plays in the MIDDLE division: following only rel=next
+        # would never have found division 1.
         fake = web({
             SUCHE_URL + "Beispielstadt": _fixture("fussballde_suche.html"),
             VEREIN_URL: _fixture("fussballde_verein.html"),
@@ -283,7 +283,7 @@ class TestEntdeckeStaffeln:
             "02TESTLK30000000VS5489B3VVETK79U-G",
         ]
         assert all(s.spielklasse == "landesklasse" and s.verband == "thueringen" for s in staffeln)
-        # Die Kette schliesst sich: keine Staffelseite wird endlos neu geholt
+        # The chain closes: no division page is fetched endlessly again
         assert fake.abrufe.count(LK.format(n=2)) == 1
 
     def test_nachbar_nicht_erreichbar(self, web):
@@ -296,7 +296,7 @@ class TestEntdeckeStaffeln:
 
         staffeln = entdecke_staffeln("Beispielstadt", "landesklasse")
 
-        # Staffel 3 ist bekannt, ihr Name aber nicht nachzuholen: es bleibt der Slug
+        # Division 3 is known, but its name cannot be fetched: the slug remains
         assert {s.staffel_id: s.anzeigename for s in staffeln} == {
             "02TESTLK20000000VS5489B3VVETK79U-G": "Landesklasse Staffel 2",
             "02TESTLK30000000VS5489B3VVETK79U-G":
@@ -348,7 +348,7 @@ class TestMitAnzeigename:
         assert fussball_de._mit_anzeigename(staffel) == staffel
 
 
-# ===== Tabelle =====
+# ===== Table =====
 
 class TestHoleTabelle:
     def test_liest_tabelle(self, web):
@@ -397,11 +397,11 @@ class TestZeileAuswerten:
         assert platz == Tabellenplatz(7, "FC X", "011ABC", 10, 5, 3, 2, 12, 10, 18)
 
     @pytest.mark.parametrize("rang, tore, punkte", [
-        ("", "12 : 10", "18"),      # kein Rang
-        ("7.", "12 : 10", ""),      # keine Punkte
-        ("7.", "", "18"),           # kein Torverhaeltnis
-        ("x", "12 : 10", "18"),     # Rang keine Zahl
-        ("7.", "12 : 10", "n.a."),  # Punkte keine Zahl
+        ("", "12 : 10", "18"),      # no rank
+        ("7.", "12 : 10", ""),      # no points
+        ("7.", "", "18"),           # no goal difference
+        ("x", "12 : 10", "18"),     # rank not a number
+        ("7.", "12 : 10", "n.a."),  # points not a number
     ])
     def test_halbe_zeile_wird_verworfen(self, rang, tore, punkte):
         assert fussball_de._zeile_auswerten(self.ZEILE.format(rang=rang, tore=tore, punkte=punkte)) is None
@@ -416,7 +416,7 @@ class TestZeileAuswerten:
         assert fussball_de._zeile_auswerten("<th>Pl.</th><th>Mannschaft</th>") is None
 
 
-# ===== Abruf =====
+# ===== Retrieval =====
 
 class FakeAntwort:
     def __init__(self, inhalt: bytes):
@@ -499,5 +499,5 @@ class TestHole:
         with pytest.raises(FussballDeNichtErreichbar, match="https://www.fussball.de/x"):
             fussball_de._hole("https://www.fussball.de/x")
 
-        # Auch ein Fehlschlag zaehlt fuer den Mindestabstand
+        # A failure also counts towards the minimum interval
         assert fussball_de._letzte_anfrage == zeit.jetzt

@@ -1,9 +1,9 @@
 """
-Beobachtungen aus Schiri-Beobachtung und Schiri-Portal - ohne Browser.
+Observations from Schiri-Beobachtung and Schiri-Portal - without a browser.
 
-Die alten DFBnet-Formularseiten werden durch FormularSeite nachgestellt: sie
-merkt sich die gesetzten Formularwerte, fuehrt bei "Suchen" die Suche aus und
-liefert die Ergebnisliste so, wie _LISTE_JS sie im Browser zurueckgaebe.
+The old DFBnet form pages are imitated by FormularSeite: it remembers the
+form values that were set, runs the search on "Suchen" and delivers the
+result list the way _LISTE_JS would return it in the browser.
 """
 from contextlib import contextmanager
 
@@ -25,7 +25,7 @@ LISTEN_URL = "https://www.dfbnet.org/spielplus/mod_sr_beob/webflow.do?event=OBSE
 
 
 def liste(zeilen=(), treffer=None, seiten=None, weiter=False, fehler="", keine_treffer=False):
-    """Ein Ergebnis von _LISTE_JS."""
+    """A result of _LISTE_JS."""
     zeilen = list(zeilen)
     if treffer is None:
         treffer = len(zeilen)
@@ -44,7 +44,7 @@ def zeile(datum="14.09.2025", heim="FC Beispielstadt", gast="SV Musterdorf",
           gespann=(("SR", "Muster, Max"), ("SRA1", "Beispiel, Erika"), ("SRA2", "Probe, Paul"),
                    ("BEO", "Pruefer, Hans")),
           noten=("8,4", "8,5", "8,3", ""), status=("freigegeben", "20.09.2025", "18:30")):
-    """Eine Zeile der Ergebnisliste, wie _LISTE_JS sie liefert."""
+    """A row of the result list, as _LISTE_JS delivers it."""
     return {
         "datum": datum,
         "uhrzeit": "15:00",
@@ -84,7 +84,7 @@ class FormLocator:
 
 
 class FormularSeite:
-    """Die alte DFBnet-Suchmaske samt Ergebnisliste."""
+    """The old DFBnet search form including the result list."""
 
     def __init__(self, ergebnisse=None, saisons=("26/27", "25/26", "24/25"),
                  listen_link=LISTEN_URL, menue=None):
@@ -144,7 +144,7 @@ class FormularSeite:
         raise AssertionError(f"Unerwartetes Skript: {js[:60]}")
 
 
-# ===== Noten =====
+# ===== Grades =====
 
 class TestParseNote:
     @pytest.mark.parametrize("text, note", [
@@ -181,7 +181,7 @@ class TestEigeneBeobachtung:
         }
 
     def test_zuordnung_ueber_position_nicht_ueber_namen(self):
-        # Zwei Personen gleichen Namens im Gespann: entscheidend ist die Rolle
+        # Two people of the same name in the crew: the role is what matters
         z = zeile(gespann=(("SR", "Muster, Max"), ("SRA1", "Muster, Max"), ("SRA2", "Probe, Paul")),
                   noten=("8,1", "8,6", "8,2"))
         assert eigene_beobachtung(z, "SR")["note"] == 8.1
@@ -214,7 +214,7 @@ class TestEigeneBeobachtung:
         assert ergebnis["note"] == 244.0
 
 
-# ===== Module und Liste =====
+# ===== Modules and list =====
 
 class TestFindeModule:
     def test_nur_vorhandene_module(self):
@@ -254,12 +254,12 @@ class TestOeffneListe:
         meldung = str(fehler.value)
         assert "Kein Suchformular auf /spielplus/mod_sr_beob/webflow.do" in meldung
         assert "Die aufgerufene Seite ist ungueltig" in meldung
-        # Kein Query-String (Sitzungsdaten) und nicht die ganze Seite im Protokoll
+        # No query string (session data) and not the whole page in the log
         assert "event=" not in meldung
         assert len(meldung) < 400
 
 
-# ===== Suche =====
+# ===== Search =====
 
 class TestSuche:
     def test_setzt_saisonzeitraum_und_rolle(self):
@@ -312,7 +312,7 @@ class TestSuche:
             suche(FormularSeite(), "2025", "")
 
     def test_suche_nicht_mit_gesetzten_werten(self):
-        # Eine leere Liste, die nie gesucht hat, darf nicht als "keine Treffer" gelten
+        # An empty list that never searched must not count as "no hits"
         seite = FormularSeite()
         seite.formular_echo = ["26/27", "01.07.2026", "30.06.2027", ""]
 
@@ -326,7 +326,7 @@ class TestSuche:
             suche(seite, "25/26", "")
 
 
-# ===== Eine Saison =====
+# ===== One season =====
 
 class TestLiesSaison:
     def test_leere_saison_braucht_nur_eine_suche(self):
@@ -376,7 +376,7 @@ class TestLiesSaison:
         assert lies_saison(seite, "herren", "25/26")["vollstaendig"] is False
 
 
-# ===== Ein Modul =====
+# ===== One module =====
 
 class TestLiesQuelle:
     def test_liest_die_gewuenschten_saisons(self):

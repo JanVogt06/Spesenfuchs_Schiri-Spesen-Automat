@@ -1,10 +1,10 @@
 """
-Gemeinsame Fixtures.
+Shared fixtures.
 
-Die Umgebung wird gesetzt, bevor irgendein Modul aus src importiert wird:
-core.security liest JWT_SECRET_KEY beim Import, db.database legt den
-Datenbankpfad beim Import fest. Nichts davon darf je die echte data/ im
-Projekt beruehren - deshalb zeigt alles in ein Wegwerf-Verzeichnis.
+The environment is set before any module from src is imported:
+core.security reads JWT_SECRET_KEY at import time, db.database fixes the
+database path at import time. None of this may ever touch the real data/ in
+the project - so everything points into a throwaway directory.
 """
 import os
 import tempfile
@@ -28,7 +28,7 @@ import pytest  # noqa: E402
 
 @pytest.fixture
 def db(tmp_path, monkeypatch):
-    """Eine frische, voll migrierte Datenbank je Test."""
+    """A fresh, fully migrated database per test."""
     import db.database as database
 
     pfad = tmp_path / "app.db"
@@ -40,8 +40,8 @@ def db(tmp_path, monkeypatch):
 @pytest.fixture
 def client(db):
     """
-    TestClient ohne Lifespan: der wuerde den naechtlichen Scheduler starten.
-    Die Datenbank kommt aus der db-Fixture.
+    TestClient without lifespan: that would start the nightly scheduler.
+    The database comes from the db fixture.
     """
     from fastapi.testclient import TestClient
     from api.main_api import app
@@ -51,7 +51,7 @@ def client(db):
 
 @pytest.fixture
 def user(db):
-    """Ein angelegter Nutzer mit bekanntem Passwort."""
+    """A created user with a known password."""
     from core.security import hash_password
     from db.database import create_user
 
@@ -61,7 +61,7 @@ def user(db):
 
 @pytest.fixture
 def auth_header(user):
-    """Authorization-Header fuer den Nutzer aus der user-Fixture."""
+    """Authorization header for the user from the user fixture."""
     from core.security import create_access_token
 
     return {"Authorization": f"Bearer {create_access_token(user['id'])}"}

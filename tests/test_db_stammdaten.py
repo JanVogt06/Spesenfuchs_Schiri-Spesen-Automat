@@ -1,4 +1,4 @@
-"""Stammdaten: verschluesselt gespeichert, im Klartext gelesen, leer heisst 'nichts geliefert'."""
+"""Master data: stored encrypted, read in plain text, empty means 'nothing delivered'."""
 import pytest
 
 from core.encryption import decrypt_credential
@@ -53,9 +53,9 @@ class TestRoundtrip:
         roh = _roh(user["id"])
         for feld in stammdaten._VERSCHLUESSELTE_FELDER:
             assert roh[feld] != DATEN[feld], feld
-            # Beweis fuer Verschluesselung ist das Entschluesseln. Ein
-            # Teilstring-Vergleich waere wackelig: kurze Werte wie "K1"
-            # tauchen zufaellig im Base64 des Geheimtexts auf.
+            # Proof of encryption is the decryption. A
+            # substring comparison would be flaky: short values like "K1"
+            # appear by chance in the base64 of the ciphertext.
             assert decrypt_credential(roh[feld]) == DATEN[feld], feld
 
     def test_oeffentliche_felder_im_klartext(self, user):
@@ -143,7 +143,7 @@ class TestSchluesselwechsel:
         gelesen = get_stammdaten(user["id"])
         assert gelesen["name_vorname"] == ""
         assert gelesen["strasse"] == ""
-        # Unverschluesselte Felder bleiben lesbar
+        # Unencrypted fields remain readable
         assert gelesen["verein"] == "FC Heim"
 
 

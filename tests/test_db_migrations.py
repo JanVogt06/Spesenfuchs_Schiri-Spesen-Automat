@@ -1,10 +1,10 @@
 """
-Schema-Migrationen: frische Datenbank, Transaktionen, Backups und die
-Datenmigrationen, die bestehende Zeilen umschreiben.
+Schema migrations: fresh database, transactions, backups and the data
+migrations that rewrite existing rows.
 
-Fuer die Datenmigrationen wird eine Datenbank genau bis zur Vorgaenger-
-version gebracht, dort mit Zeilen gefuellt und dann weiter migriert - so wie
-es auf einer echten Installation beim Update passiert.
+For the data migrations, a database is brought exactly to the predecessor
+version, filled with rows there and then migrated further - just as it
+happens on a real installation during an update.
 """
 import json
 import sqlite3
@@ -21,7 +21,7 @@ from db_helpers import (
 
 @pytest.fixture
 def leere_db(tmp_path, monkeypatch):
-    """Ein Datenbankpfad ohne Datei - noch nichts migriert."""
+    """A database path without a file - nothing migrated yet."""
     pfad = tmp_path / "app.db"
     monkeypatch.setattr(database, "DB_PATH", pfad)
     return pfad
@@ -39,7 +39,7 @@ def _conn():
     return database.get_connection()
 
 
-# ---------------------------------------------------------------- Struktur
+# --------------------------------------------------------------- Structure
 
 
 class TestMigrationsliste:
@@ -57,7 +57,7 @@ class TestMigrationsliste:
         assert len(set(funktionen)) == len(funktionen)
 
 
-# ---------------------------------------------------------- Frische Datenbank
+# ------------------------------------------------------------- Fresh database
 
 
 class TestFrischeDatenbank:
@@ -93,7 +93,7 @@ class TestFrischeDatenbank:
         finally:
             conn.close()
         assert {"spiele_erwartet", "vollstaendig"} <= education
-        # Migration 005: session_id darf leer sein, match_id ist neu
+        # Migration 005: session_id may be empty, match_id is new
         assert "match_id" in download
         assert download["session_id"]["notnull"] == 0
 
@@ -146,7 +146,7 @@ class TestBackup:
         sicherung = sqlite3.connect(leere_db.parent / _backups(leere_db)[0])
         try:
             assert sicherung.execute("PRAGMA user_version").fetchone()[0] == vorher
-            # Frisch committete Daten liegen im WAL - die Sicherung muss sie enthalten
+            # Freshly committed data is in the WAL - the backup must contain it
             emails = [r[0] for r in sicherung.execute("SELECT email FROM users")]
             assert emails == ["vorher@example.org"]
         finally:
@@ -159,7 +159,7 @@ class TestBackup:
         assert _backups(db) == []
 
 
-# ------------------------------------------------------------ Transaktionen
+# ------------------------------------------------------------- Transactions
 
 
 def _kaputte_migration(conn):
@@ -218,7 +218,7 @@ class TestTransaktion:
         with pytest.raises(RuntimeError):
             database.init_database()
 
-        # Schritte 1-3 sind committet, 4 ist zurueckgerollt, der Rest nie gelaufen
+        # Steps 1-3 are committed, 4 is rolled back, the rest never ran
         assert user_version() == 3
         vorhanden = tabellen()
         assert "matches" in vorhanden
@@ -226,7 +226,7 @@ class TestTransaktion:
         assert "scrape_runs" not in vorhanden
 
     def test_ddl_einer_echten_migration_wird_zurueckgerollt(self, leere_db, monkeypatch):
-        """Eine Migration, die nach CREATE TABLE scheitert, laesst keine Tabelle zurueck."""
+        """A migration that fails after CREATE TABLE leaves no table behind."""
         migriere_bis(monkeypatch, 3)
 
         def scrape_runs_und_dann_fehler(conn):
@@ -243,13 +243,13 @@ class TestTransaktion:
         assert user_version() == 3
         assert "scrape_runs" not in tabellen()
 
-        # Mit der echten Liste laeuft der Start danach sauber durch
+        # With the real list the start then runs through cleanly
         monkeypatch.setattr(migrations, "MIGRATIONS", basis)
         database.init_database()
         assert user_version() == _letzte_version()
 
 
-# ------------------------------------------------------- Datenmigrationen
+# -------------------------------------------------------- Data migrations
 
 
 class TestMigration005DownloadLog:
@@ -269,7 +269,7 @@ class TestMigration005DownloadLog:
         conn = _conn()
         try:
             zeilen = [dict(r) for r in conn.execute("SELECT * FROM download_log")]
-            # Neue Zeilen ohne Session sind jetzt erlaubt
+            # New rows without a session are now allowed
             conn.execute("""
                 INSERT INTO download_log (user_id, match_id, filename, file_type, downloaded_at)
                 VALUES (?, 7, 'b.docx', 'docx', '2025-01-02T00:00:00')
@@ -310,14 +310,14 @@ class TestMigration006Backfill:
         conn.commit()
         conn.close()
 
-        # Dasselbe Spiel in zwei Sessions - der juengere Stand (verlegt) gewinnt
+        # The same match in two sessions - the younger state (rescheduled) wins
         for name, zeit in (("session_alt", "13:00"), ("session_neu", "15:00")):
             ordner = ausgabe / name
             ordner.mkdir(parents=True)
             (ordner / "spesen_data.json").write_text(
                 json.dumps([spiel(tag="2025-11-08", zeit=zeit)]), encoding="utf-8"
             )
-        # Ein Ordner ohne Sessionzeile gehoert niemandem und wird uebersprungen
+        # A folder without a session row belongs to nobody and is skipped
         (ausgabe / "session_fremd").mkdir()
         (ausgabe / "session_fremd" / "spesen_data.json").write_text(
             json.dumps([spiel(heim="Fremd", tag="2025-11-08")]), encoding="utf-8"
@@ -357,7 +357,7 @@ class TestMigration006Backfill:
         with pytest.raises(RuntimeError, match="Session-Ordner"):
             database.init_database()
 
-        # Nichts verloren: Version und Altlast-Tabellen stehen noch
+        # Nothing lost: version and legacy tables are still there
         assert user_version() == 5
         assert {"sessions", "match_expenses"} <= tabellen()
 
@@ -438,7 +438,7 @@ class TestMigration013AlteHerren:
                         spielklasse="Kreisoberliga", sr_spesen=30.0, sra_spesen=25.0)
         spiel_einfuegen(conn, uid, "ah_richtig", mannschaftsart="Herren Ü35",
                         spielklasse="Kreisliga", sr_spesen=25.0, sra_spesen=23.0)
-        # Ein Maennerspiel mit abweichendem eingefrorenem Wert bleibt, wie es ist
+        # A men's match with a deviating frozen value stays as it is
         spiel_einfuegen(conn, uid, "herren", mannschaftsart="Herren",
                         spielklasse="Kreisoberliga", sr_spesen=99.0, sra_spesen=88.0)
         conn.close()
@@ -496,7 +496,7 @@ class TestMigration015FremdeVerbaende:
                         staffel="1. Altmark West Liga", sr_spesen=30.0, sra_spesen=25.0)
         spiel_einfuegen(conn, uid, "tfv_richtig", mannschaftsart="Herren", spielklasse="Kreisoberliga",
                         staffel="Kreisoberliga Mittelthüringen", sr_spesen=30.0, sra_spesen=25.0)
-        # Ein TFV-Punktspiel, das mit einem frueheren Satz eingefroren wurde
+        # A TFV league match that was frozen with an earlier rate
         spiel_einfuegen(conn, uid, "tfv_alt_eingefroren", mannschaftsart="Herren",
                         spielklasse="Kreisoberliga", staffel="Kreisoberliga Mittelthüringen",
                         sr_spesen=28.0, sra_spesen=22.0)
@@ -566,13 +566,13 @@ class TestMigration023DfbSpielId:
         uid = nutzer_anlegen(conn)
         fremd = nutzer_anlegen(conn, "kollege@example.org")
         anpfiff = "Sonntag · 27.09.2026 · 14:00 Uhr"
-        # Andere Schreibweise im Einsatzplan: "II" statt "U23"
+        # Different spelling in the duty roster: "II" instead of "U23"
         hertha = spiel_einfuegen(conn, uid, "hertha", datum="2026-09-27", anpfiff=anpfiff,
                                  heim_team="Hertha BSC U23", gast_team="FSV Zwickau")
-        # Zurueckgezogen: an dem Tag ein anderes Spiel gepfiffen
+        # Withdrawn: a different match was refereed on that day
         anderes = spiel_einfuegen(conn, uid, "anderes", datum="2026-09-27", anpfiff=anpfiff,
                                   heim_team="SV Musterdorf", gast_team="FC Beispiel")
-        # Gleiches Spiel beim Kollegen - dessen Bericht fehlt, also keine ID
+        # Same match at the colleague's - their report is missing, so no ID
         kollege = spiel_einfuegen(conn, fremd, "hertha", datum="2026-09-27", anpfiff=anpfiff,
                                   heim_team="Hertha BSC U23", gast_team="FSV Zwickau")
         turnier = spiel_einfuegen(conn, uid, "turnier|Halle|x", datum="2026-09-27", anpfiff=anpfiff)
@@ -603,9 +603,9 @@ class TestMigration023DfbSpielId:
             spiel_einfuegen(conn, uid, f"jugend-{zeit}", datum="2026-09-27",
                             anpfiff=f"Sonntag · 27.09.2026 · {zeit} Uhr",
                             heim_team="FC Heim", gast_team="SV Gast")
-        # Bericht ohne Anstoss: kann keins der beiden sicher sein
+        # Report without kick-off: neither of the two can be sure
         self._bericht(conn, uid, "SPIEL1", "2026-09-27", "FC Heim", "SV Gast", uhrzeit="")
-        # Mit Anstoss eindeutig
+        # Unambiguous with kick-off
         self._bericht(conn, uid, "SPIEL2", "2026-09-27", "FC Heim", "SV Gast", uhrzeit="12:00")
         conn.close()
 
@@ -621,7 +621,7 @@ class TestMigration023DfbSpielId:
 
 class TestDatenUeberlebenDasUpdate:
     def test_spiel_von_version_drei_bis_heute(self, leere_db, tmp_path, monkeypatch):
-        """Eine Zeile aus der fruehesten Spiele-Version kommt unbeschaedigt oben an."""
+        """A row from the earliest matches version arrives at the top undamaged."""
         monkeypatch.setenv("OUTPUT_DIR", str(tmp_path / "leer"))
         migriere_bis(monkeypatch, 3)
         conn = _conn()

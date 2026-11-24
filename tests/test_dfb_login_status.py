@@ -1,4 +1,4 @@
-"""Ob DFBnet die gespeicherten Zugangsdaten ablehnt - und wie lange schon."""
+"""Whether DFBnet rejects the stored credentials - and for how long."""
 from datetime import datetime, timedelta, UTC
 
 import pytest
@@ -95,7 +95,7 @@ class TestApi:
 
 
 class TestAbrufe:
-    """Beide Abrufwege - von Hand und nachts - setzen den Hinweis."""
+    """Both retrieval paths - by hand and at night - set the notice."""
 
     @pytest.fixture(params=["api", "scheduler"])
     def abruf(self, request, monkeypatch):
@@ -140,7 +140,7 @@ class TestAbrufe:
 
 
 class TestScrapeMatches:
-    """scrape_matches raeumt den Hinweis ab, sobald DFBnet den Login annimmt."""
+    """scrape_matches clears the notice as soon as DFBnet accepts the login."""
 
     class _FakeScraper:
         login_ok = True

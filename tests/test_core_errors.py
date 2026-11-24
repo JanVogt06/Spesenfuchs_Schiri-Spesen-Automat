@@ -1,9 +1,9 @@
 """
-core.errors: einheitliches Fehlerformat und die beiden globalen Handler.
+core.errors: uniform error format and the two global handlers.
 
-Die Handler werden an einer eigenen kleinen FastAPI-App geprueft, damit der
-Test nicht von den Routen der echten Anwendung abhaengt; ein Test prueft
-zusaetzlich, dass die echte App sie registriert hat.
+The handlers are tested on a small FastAPI app of their own so that the test
+does not depend on the routes of the real application; one test additionally
+checks that the real app has registered them.
 """
 import asyncio
 import json
@@ -95,7 +95,7 @@ class TestFormat:
         assert "für 1 Minute gesperrt" in LoginGesperrtError(1).detail["error"]["message"]
 
 
-# ===== Handler direkt =====
+# ===== Handler directly =====
 
 class TestHandlerDirekt:
     def test_api_error_handler(self):
@@ -118,11 +118,11 @@ class TestHandlerDirekt:
             }
         }
         assert "geheimes Detail" not in antwort.body.decode()
-        # ...aber im Protokoll steht es
+        # ...but it is in the log
         assert any("geheimes Detail" in r.getMessage() for r in caplog.records)
 
 
-# ===== Handler in einer App =====
+# ===== Handler in an app =====
 
 @pytest.fixture
 def app_client():

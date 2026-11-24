@@ -1,5 +1,5 @@
 """
-Der Zugriff auf die Schnittstelle der Ansetzungs-App - ohne Browser.
+Access to the interface of the assignment app - without a browser.
 """
 from datetime import date
 

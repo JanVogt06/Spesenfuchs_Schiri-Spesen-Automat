@@ -1,4 +1,4 @@
-"""Ligatabellen: vollstaendiger Austausch je Staffel und die misstrauische Zuordnung."""
+"""League tables: complete replacement per division and the distrustful matching."""
 import pytest
 
 import db.database as database
@@ -71,7 +71,7 @@ class TestErsetzeStaffel:
     def test_fehler_rollt_zurueck(self, db):
         ersetze_staffel(_staffel(), [_platz(1, "FC Eins")])
         with pytest.raises(Exception):
-            # Zweimal dieselbe team_id verletzt den Primaerschluessel
+            # The same team_id twice violates the primary key
             ersetze_staffel(_staffel(), [_platz(1, "X", team_id="t"), _platz(2, "Y", team_id="t")])
         assert [z["mannschaft"] for z in tabelle("vl")] == ["FC Eins"]
 

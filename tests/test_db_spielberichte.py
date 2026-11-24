@@ -1,6 +1,6 @@
 """
-Spielberichte: Speichern samt Dokumentdateien, Lesen nur fuer den Besitzer,
-und die Zuordnung eines Berichts zu einem Spiel ueber Mannschaften und Anstoss.
+Match reports: saving including document files, reading only for the owner,
+and matching a report to a match via teams and kick-off.
 """
 import pytest
 
@@ -67,7 +67,7 @@ def _dokumente_in_db():
         conn.close()
 
 
-# ---------------------------------------------------------------- Namen
+# ---------------------------------------------------------------- Names
 
 
 class TestNamen:
@@ -105,7 +105,7 @@ class TestNamen:
         assert uhrzeit_aus(text) == erwartet
 
 
-# ------------------------------------------------------------ Zuordnung
+# ------------------------------------------------------------- Matching
 
 
 def _eintrag(id_, heim, gast, datum="2026-11-22", uhrzeit="13:30"):
@@ -135,7 +135,7 @@ class TestZuordnung:
         assert z.finde("2026-11-22", "FC Heim", "SV Gast", "13:30") is None
 
     def test_zurueckgezogenes_spiel_bekommt_nicht_den_einzigen_bericht_des_tages(self):
-        """Stattdessen gepfiffen: anderer Gegner, gleiche Zeit - kein Treffer."""
+        """Refereed instead: different opponent, same time - no match."""
         z = Zuordnung([_eintrag(1, "TSV Ersatz", "SC Woanders")])
         assert z.finde("2026-11-22", "FC Heim", "SV Gast", "13:30") is None
 
@@ -161,7 +161,7 @@ class TestZuordnung:
         }
 
 
-# --------------------------------------------------------------- Schreiben
+# ----------------------------------------------------------------- Writing
 
 
 class TestSpeichern:
@@ -241,7 +241,7 @@ class TestSpeichern:
         assert (datenordner / pfad).is_file()
 
     def test_fehler_rollt_zurueck_und_raeumt_dateien_weg(self, user, datenordner):
-        # Die zweite Datei ist kein bytes-Objekt - write_bytes scheitert nach der ersten
+        # The second file is not a bytes object - write_bytes fails after the first
         with pytest.raises(TypeError):
             speichere_bericht(user["id"], "26/27", _zeile(), _daten(_dok("d1"), _dok("d2")),
                               {"d1": b"eins", "d2": "kein bytes"})
@@ -272,7 +272,7 @@ class TestSaisons:
         assert get_fertige_saisons(zweiter) == set()
 
 
-# ------------------------------------------------------------------ Lesen
+# ---------------------------------------------------------------- Reading
 
 
 class TestLesen:

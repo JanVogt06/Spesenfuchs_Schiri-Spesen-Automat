@@ -1,9 +1,9 @@
 """
-Abruf starten (/api/generate), Fortschritt pollen (/api/scrape/status),
-naechtlicher Scheduler, Health und oeffentliche Statistik.
+Starting a retrieval (/api/generate), polling progress (/api/scrape/status),
+nightly scheduler, health and public statistics.
 
-Es startet nie ein echter Prozess und nie ein Browser: multiprocessing wird
-im API-Modul durch eine Attrappe ersetzt.
+No real process and no browser is ever started: multiprocessing is replaced
+by a stub in the API module.
 """
 import types
 from datetime import datetime, timedelta, UTC
@@ -15,7 +15,7 @@ from api_hilfen import fehlerbild, nutzer, spiele_anlegen, zugang_hinterlegen
 
 
 class _Prozess:
-    """Zeichnet auf, womit ein Prozess gestartet worden waere."""
+    """Records what a process would have been started with."""
 
     erzeugt = []
 
@@ -40,7 +40,7 @@ def prozesse(monkeypatch):
 
 
 def _veralten(run_id: int, minuten: int = 31) -> None:
-    """Setzt das letzte Lebenszeichen eines Laufs in die Vergangenheit."""
+    """Sets a run's last sign of life to the past."""
     from db.database import get_connection
 
     alt = (datetime.now(UTC) - timedelta(minutes=minuten)).isoformat()
@@ -87,7 +87,7 @@ class TestGenerate:
         assert prozess.gestartet
         assert prozess.daemon is True
         assert prozess.target is modul.run_scrape_process
-        # Entschluesselte Zugangsdaten gehen als Parameter mit, nicht ueber ENV
+        # Decrypted credentials are passed as parameters, not via ENV
         assert prozess.args == ("dfb-login", "dfb-geheim", user["id"], daten["run_id"])
 
     def test_body_ist_optional_leer(self, client, user, auth_header, prozesse):
@@ -148,7 +148,7 @@ class TestGenerate:
         assert client.post("/api/generate", headers=auth_header, json={}).status_code == 200
 
 
-# ===== run_scrape_process (ohne Prozess, direkt aufgerufen) =====
+# ===== run_scrape_process (without a process, called directly) =====
 
 class TestScrapeProzess:
     def test_erfolg_schreibt_abschluss(self, user, monkeypatch):
@@ -335,14 +335,14 @@ class TestScheduler:
         assert antwort.json() == scheduler.get_status()
 
     def test_status_des_echten_nicht_gestarteten_schedulers(self, client, user, auth_header):
-        # Ohne Lifespan laeuft der Scheduler nicht - der Endpunkt sagt das
+        # Without lifespan the scheduler does not run - the endpoint says so
         daten = client.get("/api/scheduler/status", headers=auth_header).json()
         assert daten["running"] is False
         assert daten["is_processing"] is False
         assert set(daten) == {"running", "is_processing", "next_run"}
 
 
-# ===== Health und Statistik =====
+# ===== Health and statistics =====
 
 class TestHealthUndStatistik:
     def test_health(self, client, db):
@@ -361,7 +361,7 @@ class TestHealthUndStatistik:
         assert client.get("/api/stats/public").json() == {"matches_total": 0}
 
     def test_statistik_zaehlt_verschiedene_spiele(self, client, user):
-        """Dasselbe Spiel bei zwei Unparteiischen zaehlt einmal."""
+        """The same match with two referees counts once."""
         kollege = nutzer("kollege@example.org")
         gemeinsam = spiel(heim="FC Gemeinsam", gast="SV Geteilt")
 

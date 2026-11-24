@@ -1,4 +1,4 @@
-"""Saisonrechnung im DFBnet-Format ("25/26" = 01.07.2025 bis 30.06.2026)."""
+"""Season arithmetic in DFBnet format ("25/26" = 01.07.2025 to 30.06.2026)."""
 from datetime import date, datetime
 
 import pytest
@@ -13,7 +13,7 @@ from utils.saison_utils import (
 
 
 def _heute_einfrieren(monkeypatch, tag: date):
-    """Ersetzt date.today() im Modul, ohne den Konstruktor zu verlieren."""
+    """Replaces date.today() in the module without losing the constructor."""
 
     class FesterTag(date):
         @classmethod
@@ -41,7 +41,7 @@ class TestSaisonStartJahr:
         assert saison_start_jahr(saison, HEUTE) == erwartet
 
     @pytest.mark.parametrize("saison, erwartet", [
-        # Grenze: bis ein Jahr nach dem laufenden (2026 -> 27) gilt 20xx
+        # Boundary: up to one year after the current one (2026 -> 27) counts as 20xx
         ("27/28", 2027),
         ("28/29", 1928),
         ("50/51", 1950),
@@ -139,7 +139,7 @@ class TestParseDeutschesDatum:
         ("01.07.2025", date(2025, 7, 1)),
         ("29.02.2024", date(2024, 2, 29)),
         ("31.12.1999", date(1999, 12, 31)),
-        ("26.1.2019", date(2019, 1, 26)),   # strptime nimmt einstellige Felder
+        ("26.1.2019", date(2019, 1, 26)),   # strptime accepts single-digit fields
     ])
     def test_gueltig(self, text, erwartet):
         assert parse_deutsches_datum(text) == erwartet

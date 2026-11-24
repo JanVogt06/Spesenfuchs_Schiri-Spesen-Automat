@@ -1,9 +1,9 @@
 """
-Spiele: Liste, Fahrtkosten, Karte, Einzel- und Sammel-Download.
+Matches: list, travel costs, map, single and bulk download.
 
-Die Spiele entstehen ueber main.persist_matches, also genau wie nach einem
-Scrape. DOCX und XLSX werden echt gerendert; nur die PDF-Konvertierung
-(LibreOffice) und der Geocoder (Nominatim) sind ersetzt.
+The matches are created via main.persist_matches, i.e. exactly as after a
+scrape. DOCX and XLSX are really rendered; only the PDF conversion
+(LibreOffice) and the geocoder (Nominatim) are replaced.
 """
 import zipfile
 from datetime import datetime
@@ -37,7 +37,7 @@ def _downloads():
 
 
 def _dateiname_aus(header: str) -> str:
-    """Der UTF-8-Name aus filename*=UTF-8''... des Content-Disposition-Headers."""
+    """The UTF-8 name from filename*=UTF-8''... of the Content-Disposition header."""
     assert header.startswith("attachment; ")
     kodiert = header.split("filename*=UTF-8''", 1)[1]
     return unquote(kodiert)
@@ -55,7 +55,7 @@ def ein_spiel(user):
 
 @pytest.fixture
 def pdf(monkeypatch):
-    """Ersetzt LibreOffice: jedes Dokument wird zu einer erkennbaren Pseudo-PDF."""
+    """Replaces LibreOffice: every document becomes a recognizable pseudo-PDF."""
     import api.main_api as modul
 
     aufrufe = []
@@ -68,7 +68,7 @@ def pdf(monkeypatch):
     return aufrufe
 
 
-# ===== Liste =====
+# ===== List =====
 
 class TestListe:
     def test_leer(self, client, user, auth_header):
@@ -102,7 +102,7 @@ class TestListe:
         assert spesen["sra_formatted"] == format_spesen(spesen["sra"])
 
     def test_eingefrorene_saetze_gelten(self, client, user, auth_header, ein_spiel):
-        """Die Karte zeigt den Satz aus der Datenbank, nicht einen neu gerechneten."""
+        """The map shows the rate from the database, not a freshly computed one."""
         from db.database import get_connection
 
         conn = get_connection()
@@ -147,7 +147,7 @@ class TestListe:
 
     def test_zurueckgezogenes_spiel(self, client, user, auth_header):
         spiele_anlegen(user["id"], spiel(heim="FC Weg", tag="2026-12-05"), spiel(heim="FC Bleibt"))
-        # Der naechste Scrape kennt das kuenftige Spiel nicht mehr
+        # The next scrape no longer knows the future match
         spiele_anlegen(user["id"], spiel(heim="FC Bleibt"))
 
         nach_heim = {m["spiel_info"]["heim_team"]: m
@@ -182,7 +182,7 @@ class TestListe:
         assert client.get("/api/matches", headers=auth_header).json()[0]["_spielbericht"] is None
 
 
-# ===== Fahrtkosten =====
+# ===== Travel costs =====
 
 def _kosten(client, header, **felder):
     return client.post("/api/matches/expenses", headers=header, json=felder)
@@ -199,7 +199,7 @@ class TestFahrtkosten:
         assert daten["expenses"] == {"sr_km": 42.0, "sr_oevm": 7.5}
         assert daten["spesen"]["sra_count"] == 2
 
-        # Und bleibt gespeichert
+        # And stays stored
         eintrag = client.get("/api/matches", headers=auth_header).json()[0]
         assert eintrag["_expenses"] == {"sr_km": 42.0, "sr_oevm": 7.5}
 
@@ -246,7 +246,7 @@ class TestFahrtkosten:
         assert client.get("/api/matches", headers=auth_header).json()[0]["_expenses"] is None
 
     @pytest.mark.parametrize("body", [
-        {},                                   # match_id fehlt
+        {},                                   # match_id missing
         {"match_id": "abc"},
         {"match_id": 1, "sr_km": "viel"},
     ])
@@ -273,11 +273,11 @@ class TestFahrtkosten:
         assert client.get("/api/matches", headers=auth_header).json()[0]["_expenses"]["sr_km"] == 42.0
 
 
-# ===== Karte =====
+# ===== Map =====
 
 @pytest.fixture
 def geocoder(monkeypatch):
-    """Ersetzt geocode im API-Modul; Antworten je Adresse in einem Dict."""
+    """Replaces geocode in the API module; answers per address in a dict."""
     import api.main_api as modul
 
     antworten = {}
@@ -322,7 +322,7 @@ class TestKarte:
             "genauigkeit": "adresse", "eintraege": [{"rolle": "Spielort", "name": "Sportplatz Am Wald"}],
         }
         assert daten["punkte"][2]["genauigkeit"] == "ort"
-        # Spielstaette ohne eigenen Ort, Personen mit plz_ort als Rueckfall
+        # Venue without its own place, people with plz_ort as fallback
         assert aufrufe[0] == ("Waldweg 1, 99999 Irgendwo", None)
         assert aufrufe[1] == ("Weg 1, 99999 Irgendwo", "99999 Irgendwo")
 
@@ -370,12 +370,12 @@ class TestKarte:
 
         daten = client.get(f"/api/matches/{match_id}/geo", headers=auth_header).json()
 
-        # Nur Erika: kein Spielort, SRA 1 unbesetzt, SRA 2 ohne Ort
+        # Only Erika: no venue location, SRA 1 unassigned, SRA 2 without a place
         assert aufrufe == [("99999 Irgendwo", "99999 Irgendwo")]
         assert [p["eintraege"] for p in daten["punkte"]] == [[{"rolle": "SR", "name": "Erika Pfeife"}]]
 
     def test_aus_dem_zwischenspeicher_ohne_netz(self, client, user, auth_header, ein_spiel, monkeypatch):
-        """Echter Geocoder, aber alles liegt schon in geocode_cache."""
+        """Real geocoder, but everything is already in geocode_cache."""
         import utils.geocoder as geocoder_modul
         from db.geocode import store
 
@@ -389,7 +389,7 @@ class TestKarte:
         store("waldweg 1, 99999 irgendwo", provider, 50.9, 11.0)
         for nr, lat in ((1, 50.8), (2, 50.7)):
             store(f"weg {nr}, 99999 irgendwo", provider, lat, 11.0)
-        # Weg 3 ist ein frischer Fehlschlag, der Ort dagegen bekannt
+        # Route 3 is a fresh failure, the place on the other hand is known
         store("weg 3, 99999 irgendwo", provider, None, None)
         store("99999 irgendwo", provider, 50.5, 11.5)
 
@@ -410,7 +410,7 @@ class TestKarte:
         assert aufrufe == []
 
 
-# ===== Einzel-Download =====
+# ===== Single download =====
 
 class TestEinzelDownload:
     def test_docx(self, client, user, auth_header, ein_spiel):
@@ -442,12 +442,12 @@ class TestEinzelDownload:
             )
 
         assert "36,90" not in text()
-        # 123 km zu 0,30 EUR - der Wert kommt beim naechsten Download ohne Umweg mit
+        # 123 km at 0.30 EUR - the value comes along on the next download without a detour
         _kosten(client, auth_header, match_id=ein_spiel, sr_km=123)
         assert "36,90" in text()
 
     def test_xlsx_ist_alias_fuer_bearbeitbar(self, client, user, auth_header, ein_spiel):
-        """'xlsx' bei einem TFV-Spiel liefert dessen bearbeitbare Datei - ein DOCX."""
+        """'xlsx' for a TFV match returns its editable file - a DOCX."""
         antwort = client.get(f"/api/matches/{ein_spiel}/download/xlsx", headers=auth_header)
 
         assert antwort.status_code == 200
@@ -478,7 +478,7 @@ class TestEinzelDownload:
         assert _dateiname_aus(antwort.headers["content-disposition"]) == \
             "Spesen_FC Heim_vs_SV Gast_05-12-2026.pdf"
 
-        # Konvertiert wird das frisch gerenderte DOCX
+        # The freshly rendered DOCX is what gets converted
         ((name, inhalt),) = pdf[0]
         assert name.endswith(".docx")
         assert inhalt[:2] == b"PK"
@@ -506,7 +506,7 @@ class TestEinzelDownload:
         assert _downloads() == []
 
     def test_ohne_libreoffice_503(self, client, user, auth_header, ein_spiel, monkeypatch):
-        """Fehlt LibreOffice, gibt es die verstaendliche 503 statt eines 500."""
+        """If LibreOffice is missing, there is the understandable 503 instead of a 500."""
         from utils import pdf_converter
 
         def fehlt():
@@ -560,7 +560,7 @@ class TestEinzelDownload:
             "Spesen_Turnier_05-12-2026_09-30.docx"
 
 
-# ===== Sammel-Download =====
+# ===== Bulk download =====
 
 def _sammel(client, header, match_ids, file_format=None):
     body = {"match_ids": match_ids}
@@ -598,7 +598,7 @@ class TestSammelDownload:
             "Spesen_FC Carl Zeiss Jena_vs_BSG Chemie Leipzig_07-12-2026.xlsx",
             "Spesen_FC Carl Zeiss Jena_vs_BSG Chemie Leipzig_07-12-2026.pdf",
         ]
-        # Alle PDFs in EINEM Konvertierungsaufruf
+        # All PDFs in ONE conversion call
         assert len(pdf) == 1
         assert len(pdf[0]) == 3
 
@@ -612,7 +612,7 @@ class TestSammelDownload:
                     assert inhalt.startswith(b"%PDF")
                 else:
                     assert inhalt[:2] == b"PK"
-            # Umlaute stehen als UTF-8 im Archiv
+            # Umlauts are in the archive as UTF-8
             assert any(info.flag_bits & 0x800 for info in archiv.infolist() if "ß" in info.filename)
 
     def test_nur_docx_ohne_pdf_konvertierung(self, client, user, auth_header, drei_spiele, pdf):
@@ -629,7 +629,7 @@ class TestSammelDownload:
         namen = _eintraege(_sammel(client, auth_header, drei_spiele, "pdf"))
         assert len(namen) == 3
         assert all(n.endswith(".pdf") for n in namen)
-        # Das Protokoll nennt dieselbe Datei wie beim Einzel-Download
+        # The log names the same file as for the single download
         assert all(eintrag["filename"].endswith(".pdf") for eintrag in _downloads())
 
     def test_zip_name_und_header(self, client, user, auth_header, drei_spiele):
@@ -650,8 +650,8 @@ class TestSammelDownload:
         assert eintraege[2]["filename"].endswith(".xlsx")
 
     def test_gleiche_dateinamen_werden_eindeutig(self, client, user, auth_header, pdf):
-        # Gleiche Vereine am selben Tag, aber verschiedene Mannschaftsarten:
-        # zwei Spiele, derselbe Dateiname
+        # Same clubs on the same day, but different team types:
+        # two matches, the same file name
         ids = spiele_anlegen(user["id"],
                              spiel(mannschaftsart="Herren"),
                              spiel(mannschaftsart="A-Junioren", spielklasse="Kreisliga"))
@@ -724,7 +724,7 @@ class TestSammelDownload:
 
 
 
-# ===== Kilometer-Vorschlaege =====
+# ===== Kilometre suggestions =====
 
 class TestFahrten:
     def test_liefert_die_vorschlaege(self, client, user, auth_header, ein_spiel, monkeypatch):
@@ -747,7 +747,7 @@ class TestFahrten:
         assert client.get(f"/api/matches/{ein_spiel}/fahrten").status_code == 401
 
 
-# ===== Statistik =====
+# ===== Statistics =====
 
 class TestStatistik:
     def test_reicht_nutzer_und_saison_durch(self, client, user, auth_header, monkeypatch):
@@ -765,7 +765,7 @@ class TestStatistik:
         assert client.get("/api/statistik").status_code == 401
 
 
-# ===== Besuchte Spielstaetten =====
+# ===== Visited venues =====
 
 class TestSpielstaetten:
     def test_orte_mit_kachelquelle(self, client, user, auth_header, monkeypatch):

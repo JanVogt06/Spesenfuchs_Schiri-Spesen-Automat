@@ -1,4 +1,4 @@
-"""core.encryption: Fernet-Verschluesselung der DFBnet-Zugangsdaten."""
+"""core.encryption: Fernet encryption of the DFBnet credentials."""
 import pytest
 from cryptography.fernet import Fernet, InvalidToken
 
@@ -22,7 +22,7 @@ class TestSchluessel:
             get_encryption_key()
 
     def test_wird_bei_jedem_aufruf_gelesen(self, monkeypatch):
-        # Anders als JWT_SECRET_KEY nicht beim Import eingefroren
+        # Unlike JWT_SECRET_KEY, not frozen at import time
         monkeypatch.setenv("ENCRYPTION_KEY", "eins")
         assert get_encryption_key() == b"eins"
         monkeypatch.setenv("ENCRYPTION_KEY", "zwei")

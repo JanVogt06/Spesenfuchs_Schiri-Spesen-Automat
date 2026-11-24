@@ -1,4 +1,4 @@
-"""Geleitete Spiele und Saisonbilanz: saisonweise ersetzend, in einer Transaktion."""
+"""Refereed matches and season summary: replacing per season, in one transaction."""
 import pytest
 
 import db.database as database
@@ -96,7 +96,7 @@ class TestReplaceSaison:
 
         conn = database.get_connection()
         try:
-            # Keine verwaisten Gespann-Zeilen der alten Spiele
+            # No orphaned crew rows of the old matches
             assert conn.execute("SELECT COUNT(*) FROM season_match_officials").fetchone()[0] == 3
         finally:
             conn.close()

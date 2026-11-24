@@ -1,6 +1,6 @@
 """
-Karte der besuchten Spielstaetten: echte Wegwerf-Datenbank mit Ansetzungen,
-Spielberichten und geleiteten Spielen; die Adresssuche ist eine Attrappe.
+Map of the visited venues: real throwaway database with assignments,
+match reports and refereed matches; the address search is a stub.
 """
 from datetime import date
 

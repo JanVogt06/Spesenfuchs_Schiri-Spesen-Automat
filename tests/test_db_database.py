@@ -1,4 +1,4 @@
-"""Nutzer, DFB-Zugangsdaten und die Protokolle fuer die Nutzungsstatistik."""
+"""Users, DFB credentials and the logs for the usage statistics."""
 import sqlite3
 
 import pytest
@@ -167,7 +167,7 @@ class TestSpielberichtLog:
         assert len(_zeilen("spielbericht_log")) == 2
 
     def test_sperrfenster_laeuft_ab_dem_gezaehlten_eintrag(self, user, uhr):
-        """Ein verworfener Klick verlaengert das Fenster nicht."""
+        """A discarded click does not extend the window."""
         log_spielbericht(user["id"], 5, "ansehen")
         uhr.weiter(seconds=8)
         log_spielbericht(user["id"], 5, "ansehen")

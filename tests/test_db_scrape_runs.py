@@ -1,4 +1,4 @@
-"""Scrape-Laeufe: Fortschritt, juengster Lauf, Doppelstart-Sperre und verwaiste Laeufe."""
+"""Scrape runs: progress, most recent run, double-start lock and orphaned runs."""
 import pytest
 
 import db.database as database
@@ -70,7 +70,7 @@ class TestStartUndUpdate:
 
     def test_unbekannter_lauf(self, db):
         assert get_run(999) is None
-        update_run(999, status="completed")  # darf nicht scheitern
+        update_run(999, status="completed")  # must not fail
 
 
 class TestLatest:

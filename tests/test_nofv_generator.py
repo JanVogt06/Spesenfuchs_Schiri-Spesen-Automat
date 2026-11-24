@@ -1,9 +1,9 @@
 """
-NOFV-Reisekostenabrechnung (XLSX): ein Blatt je angesetzter Person.
+NOFV travel expense report (XLSX): one sheet per assigned person.
 
-Die Mappe entsteht im Speicher aus der echten Vorlage und wird mit openpyxl
-wieder geoeffnet. Formeln rechnet openpyxl nicht aus - geprueft werden deshalb
-die eingetragenen Werte und dass die Formeln an ihrem Platz stehen.
+The workbook is created in memory from the real template and reopened with
+openpyxl. openpyxl does not calculate formulas - so what is checked are the
+entered values and that the formulas are in their place.
 """
 from datetime import datetime
 from io import BytesIO
@@ -30,7 +30,7 @@ VORLAGE = Path(__file__).resolve().parent.parent / "src" / "data" / "SR-Reisekos
 
 
 def _spiel(**ueberschreiben) -> dict:
-    """Ein NOFV-Pflichtspiel in der Form, die db.matches.get_match liefert."""
+    """A NOFV compulsory match in the form db.matches.get_match delivers."""
     spiel = {
         "spiel_info": {
             "heim_team": "FC Carl Zeiss Jena",
@@ -63,7 +63,7 @@ def _mappe(generator, spiel, expenses=None):
     return load_workbook(BytesIO(generator.render_workbook(spiel, expenses)))
 
 
-# ===== Zahlwoerter =====
+# ===== Number words =====
 
 class TestZahlInWorten:
     @pytest.mark.parametrize("zahl, wort", [
@@ -103,11 +103,11 @@ class TestZahlInWorten:
         assert betrag_in_worten(betrag) == text
 
     def test_betrag_rundet_auf_cent(self):
-        # 0.1 + 0.2 ist in Gleitkomma 0.30000000000000004
+        # 0.1 + 0.2 is 0.30000000000000004 in floating point
         assert betrag_in_worten(0.1 + 0.2) == "null Euro dreißig Cent"
 
 
-# ===== Hilfen =====
+# ===== Helpers =====
 
 class TestHilfen:
     def test_ort_aus_plz_ort(self):
@@ -128,7 +128,7 @@ class TestHilfen:
         assert _datum("irgendwann") is None
 
 
-# ===== Blaetter =====
+# ===== Sheets =====
 
 class TestBlaetter:
     def test_fehlende_vorlage(self, tmp_path):
@@ -169,7 +169,7 @@ class TestBlaetter:
         blatt = mappe["SR"]
         assert blatt["E8"].value is None
         assert blatt["E12"].value is None
-        # Die Spieldaten stehen trotzdem da
+        # The match data is there anyway
         assert blatt["E14"].value == "FC Carl Zeiss Jena"
         assert blatt["J20"].value == 300
 
@@ -180,12 +180,12 @@ class TestBlaetter:
             assert blatt.print_area == f"'{blatt.title}'!$A$1:$J$48"
 
     def test_mehrfach_rendern_ohne_seiteneffekt(self, generator):
-        # Die Vorlage wird je Aufruf neu geladen, Blaetter haeufen sich nicht an
+        # The template is reloaded on each call, sheets do not accumulate
         _mappe(generator, _spiel())
         assert _mappe(generator, _spiel()).sheetnames == ["SR", "SRA 1", "SRA 2"]
 
 
-# ===== Zellen =====
+# ===== Cells =====
 
 class TestZellen:
     def test_person(self, generator):
@@ -289,7 +289,7 @@ class TestZellen:
             assert blatt[zelle].alignment.vertical is not None
 
 
-# ===== Fahrtkosten =====
+# ===== Travel costs =====
 
 class TestFahrtkosten:
     def test_ohne_fahrtkosten_nichts_eingetragen(self, generator):
@@ -316,7 +316,7 @@ class TestFahrtkosten:
         assert mappe["SRA 2"]["E32"].value == "einhundertneunundsechzig Euro zwanzig Cent"
 
     def test_null_kilometer_werden_eingetragen(self, generator):
-        # Sonst bliebe die Gesamt-Formel leer, obwohl alles erfasst ist
+        # Otherwise the total formula would stay empty although everything is recorded
         blatt = _mappe(generator, _spiel(), {"sr_km": 0})["SR"]
         assert blatt["E26"].value == 0
         assert blatt["E32"].value == "dreihundert Euro"
@@ -330,8 +330,8 @@ class TestFahrtkosten:
     def test_null_bahn_ohne_kilometer_fuellt_die_summe(self, generator):
         blatt = _mappe(generator, _spiel(), {"sr_oevm": 0})["SR"]
         assert blatt["E32"].value == "dreihundert Euro"
-        # Mindestens eins der beiden Felder muss die 0 tragen, sonst ergibt
-        # FORMEL_GESAMT "" - neben einem ausgefuellten Betrag in Worten
+        # At least one of the two fields must carry the 0, otherwise
+        # FORMEL_GESAMT yields "" - next to a filled-in amount in words
         assert blatt["E26"].value == 0 or blatt["J24"].value == 0
 
     def test_fremde_rollen_beeinflussen_blatt_nicht(self, generator):

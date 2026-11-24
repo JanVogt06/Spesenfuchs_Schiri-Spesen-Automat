@@ -1,14 +1,14 @@
 """
-DFBScraper ohne Browser.
+DFBScraper without a browser.
 
-Statt Playwright bekommt der Scraper eine Seite aus Attrappen: Loc steht fuer
-einen Locator und kennt nur die Selektoren, die ihm ein Test mitgibt. Jeder
-andere Selektor liefert einen unsichtbaren Locator, dessen wait_for in einen
-Timeout laeuft - so wie eine Seite, auf der das Element nie erscheint.
+Instead of Playwright, the scraper gets a page made of stubs: Loc stands for
+a locator and only knows the selectors a test gives it. Every other selector
+yields an invisible locator whose wait_for runs into a timeout - like a page
+on which the element never appears.
 
-Die Wartelogik laeuft gegen eine Uhr, die nur page.wait_for_timeout vorstellt.
-Damit lassen sich dfb-spinner, "erst Kopfzeilen, dann Daten" und Timeouts
-durchspielen, ohne dass ein Test wirklich wartet.
+The waiting logic runs against a clock that only page.wait_for_timeout
+advances. This allows dfb-spinner, "headers first, then data" and timeouts
+to be played through without a test actually waiting.
 """
 from datetime import date
 from types import SimpleNamespace
@@ -28,14 +28,14 @@ def _kein_browser(monkeypatch):
     monkeypatch.setattr(dfb_scraper, "sync_playwright", verboten)
 
 
-# ===== Attrappen =====
+# ===== Stubs =====
 
 class PlaywrightTimeout(Exception):
     pass
 
 
 class Loc:
-    """Ein Locator mit festem Inhalt."""
+    """A locator with fixed content."""
 
     def __init__(self, text="", visible=True, kinder=None, items=None, evaluate=None,
                  evaluate_all=None, count=None, disabled=False, wait_fehler=None,
@@ -136,7 +136,7 @@ class Uhr:
 
 
 class Seite:
-    """Eine Playwright-Seite aus Attrappen."""
+    """A Playwright page made of stubs."""
 
     def __init__(self, kinder=None, url="https://www.dfbnet.org/sria/", uhr=None):
         self.kinder = kinder or {}
@@ -292,11 +292,11 @@ class TestCookiesUndMenue:
         assert knopf.klicks == 1
 
 
-# ===== Meine Spiele =====
+# ===== My matches =====
 
 
 class TestScrapeAllMatches:
-    """Die Ansetzungen kommen aus scraper/ansetzungen.py - hier nur das Zusammenspiel."""
+    """The assignments come from scraper/ansetzungen.py - here only the interplay."""
 
     def _rohdaten(self, n):
         return {"ansetzungen": [{"id": f"A{i}", "kickoff": "2026-11-14T14:00:00+01:00"} for i in range(n)]}
@@ -325,7 +325,7 @@ class TestScrapeAllMatches:
 
         assert [s["spiel_info"]["dfb_spiel_id"] for s in spiele] == ["A0", "A2"]
         assert aufrufe == [("SCHIRI", date(2026, 6, 30), date(2027, 11, 24))]
-        # Der Aufrufer erkennt den unvollstaendigen Scrape an der Soll-Zahl
+        # The caller recognizes the incomplete scrape by the target count
         assert scraper.erwartete_spiele == 3
         assert fortschritt == [(0, 0, "Lese Ansetzungen..."), (2, 3, "2 Ansetzungen gelesen")]
 
@@ -341,10 +341,10 @@ class TestScrapeAllMatches:
             scraper_mit(Seite()).scrape_all_matches()
 
 
-# ===== Stammdaten und Saisons =====
+# ===== Master data and seasons =====
 
 class TestStammdatenUndSaisons:
-    """Die Arbeit machen scraper/stammdaten.py und saisons.py - hier nur das Zusammenspiel."""
+    """The work is done by scraper/stammdaten.py and saisons.py - here only the interplay."""
 
     def test_schiri_id_wird_einmal_ermittelt(self, monkeypatch):
         aufrufe = []
@@ -363,7 +363,7 @@ class TestStammdatenUndSaisons:
         assert len(aufrufe) == 1
 
 
-# ===== Beobachtungen und Spielberichte =====
+# ===== Observations and match reports =====
 
 class Kontext:
     def __init__(self):
@@ -444,7 +444,7 @@ class TestScrapeSpielberichte:
 
         assert ergebnis == {"saisons": zeilen, "berichte": {"A": {"daten": {}}}}
         assert aufgerufen["plan"] == "https://plan"
-        # Jedes Spiel nur einmal, auch wenn es in zwei Saisons steht
+        # Each match only once, even if it appears in two seasons
         assert aufgerufen["berichte"] == [zeilen["25/26"]["zeilen"][0]]
         assert [s.geschlossen for s in startseite.context.seiten] == [True, True]
 

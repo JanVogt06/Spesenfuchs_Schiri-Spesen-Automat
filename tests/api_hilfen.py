@@ -1,9 +1,9 @@
 """
-Gemeinsame Hilfen fuer die API-Tests (test_api_*.py).
+Shared helpers for the API tests (test_api_*.py).
 
-Enthaelt selbst keine Tests. Die anderen API-Testdateien importieren die
-Fixtures und Funktionen von hier - tests/ liegt beim Lauf auf sys.path,
-genau wie fuer db_helpers.
+Contains no tests itself. The other API test files import the fixtures and
+functions from here - tests/ is on sys.path during a run, just like for
+db_helpers.
 """
 import pytest
 
@@ -17,7 +17,7 @@ def header_fuer(user_id: int) -> dict:
 
 
 def nutzer(email: str, passwort: str = "richtig-geheim") -> dict:
-    """Legt einen Nutzer ueber die echte DB-Funktion an."""
+    """Creates a user through the real DB function."""
     from core.security import hash_password
     from db.database import create_user
 
@@ -34,8 +34,8 @@ def zugang_hinterlegen(user_id: int, benutzer: str = "dfb-schiri", passwort: str
 
 def spiele_anlegen(user_id: int, *spiele: dict) -> list:
     """
-    Schreibt Spiele ueber main.persist_matches - also genau den Weg, den ein
-    Scrape nimmt - und liefert ihre IDs in der Reihenfolge der Eingabe.
+    Writes matches via main.persist_matches - exactly the path a scrape takes -
+    and returns their IDs in input order.
     """
     from db.matches import build_match_key, get_matches_for_user
     from main import persist_matches
@@ -52,7 +52,7 @@ def spiele_anlegen(user_id: int, *spiele: dict) -> list:
 
 
 def nofv_spiel(**kwargs) -> dict:
-    """Ein NOFV-Pflichtspiel (Regionalliga Nordost) - bekommt die XLSX-Quittung."""
+    """A NOFV compulsory match (Regionalliga Nordost) - gets the XLSX receipt."""
     return spiel(
         heim=kwargs.pop("heim", "FC Carl Zeiss Jena"),
         gast=kwargs.pop("gast", "BSG Chemie Leipzig"),
@@ -64,7 +64,7 @@ def nofv_spiel(**kwargs) -> dict:
 
 
 def fehlerbild(antwort) -> dict:
-    """Der error-Block der einheitlichen Fehlerantwort."""
+    """The error block of the uniform error response."""
     daten = antwort.json()
     assert set(daten) == {"error"}, daten
     return daten["error"]
@@ -73,8 +73,8 @@ def fehlerbild(antwort) -> dict:
 @pytest.fixture
 def datenverzeichnis(tmp_path, monkeypatch):
     """
-    Eigenes DATA_DIR je Test. Spielbericht-Dokumente landen auf der Platte
-    unter DATA_DIR - ohne das teilten sich alle Tests einen Ordner.
+    Own DATA_DIR per test. Match report documents end up on disk under DATA_DIR -
+    without this, all tests would share one folder.
     """
     pfad = tmp_path / "data"
     pfad.mkdir()
@@ -84,5 +84,5 @@ def datenverzeichnis(tmp_path, monkeypatch):
 
 @pytest.fixture
 def fremder(db):
-    """Ein zweiter Nutzer, der die Daten des ersten nie sehen darf."""
+    """A second user who must never see the first one's data."""
     return nutzer("fremder@example.org")

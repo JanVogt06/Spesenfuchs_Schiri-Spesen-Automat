@@ -1,6 +1,6 @@
 """
-Ansetzungen: Schluessel, Upsert mit eingefrorenen Saetzen, Markieren statt
-Loeschen, Fahrtkosten und die Trennung zwischen Nutzern.
+Assignments: keys, upsert with frozen rates, marking instead of deleting,
+travel costs and the separation between users.
 """
 import pytest
 
@@ -55,7 +55,7 @@ def _anzahl(tabelle):
         conn.close()
 
 
-# --------------------------------------------------------------- Schluessel
+# --------------------------------------------------------------------- Keys
 
 
 class TestBuildMatchKey:
@@ -135,7 +135,7 @@ class TestUpsert:
         assert _upsert(user["id"], mit_id) == mid
         assert _zeile(mid)["dfb_spiel_id"] == "031E47FI74000000VS5489BUVUR5FS5A"
 
-        # Ein spaeterer Abruf ohne ID loescht sie nicht
+        # A later retrieval without an ID does not delete it
         _upsert(user["id"], spiel())
         assert _zeile(mid)["dfb_spiel_id"] == "031E47FI74000000VS5489BUVUR5FS5A"
         assert get_match(mid)["spiel_info"]["dfb_spiel_id"] == "031E47FI74000000VS5489BUVUR5FS5A"
@@ -157,7 +157,7 @@ class TestUpsert:
         mid = _upsert(user["id"], daten)
 
         assert get_match(mid)["selbst"] == {"rolle": "SRA 1", "seq": 0}
-        # Die Markierung steht nicht bei den Personen - die zeigt das Frontend Feld fuer Feld
+        # The marker is not on the people - the frontend shows that field by field
         assert all("selbst" not in p for p in get_match(mid)["schiedsrichter"])
 
     def test_ohne_markierung_keine_eigene_person(self, user):
@@ -240,7 +240,7 @@ class TestUpsert:
         conn = database.get_connection()
         try:
             mid = upsert_match(user["id"], spiel(), "2026-12-05", 30.0, 25.0, 0.30, conn=conn)
-            # Verbindung ist noch benutzbar und sieht die eigene Zeile
+            # The connection is still usable and sees its own row
             assert conn.execute("SELECT id FROM matches").fetchone()["id"] == mid
             conn.commit()
         finally:
@@ -248,7 +248,7 @@ class TestUpsert:
         assert _anzahl("matches") == 1
 
 
-# --------------------------------------------------------- Nutzertrennung
+# -------------------------------------------------------- User separation
 
 
 class TestNutzertrennung:
@@ -276,7 +276,7 @@ class TestNutzertrennung:
         assert get_matches_for_user(4711) == []
 
 
-# ------------------------------------------------------- DFBnet-ID als Identitaet
+# ---------------------------------------------------------- DFBnet ID as identity
 
 
 def mit_id(dfb_spiel_id, **kw):
@@ -315,8 +315,8 @@ class TestIdentitaetUeberId:
         assert _zeile(zweites)["match_key"] == "FC Heim|SV Gast|2026-12-05|Herren|Kreisoberliga|SPIEL2"
 
     def test_verlegung_auf_belegten_schluessel(self, user):
-        # Altlast: dasselbe Spiel liegt unter seinem neuen Termin schon als
-        # Zeile mit anderer ID vor - die Eindeutigkeit darf nicht reissen
+        # Legacy: the same match is already present under its new date as a
+        # row with a different ID - the uniqueness must not break
         _upsert(user["id"], mit_id("ALT", tag="2026-12-12"))
         mid = _upsert(user["id"], mit_id("SPIEL1", tag="2026-12-05"))
 
@@ -352,7 +352,7 @@ class TestSpielnummern:
 
         n = setze_spielnummern(user["id"], [
             {"spielkennung": "690047011", "dfb_spiel_id": "SPIEL1"},
-            # Kuenftig, ohne Link: Namen wie im Einsatzplan
+            # Future, without link: names as in the duty roster
             {"spielkennung": "890201022", "dfb_spiel_id": None, "datum": "2026-12-06",
              "uhrzeit": "11:00", "heim": "SG Dynamo Dresden", "gast": "RB Leipzig"},
             {"spielkennung": "", "dfb_spiel_id": "SPIEL1"},
@@ -361,7 +361,7 @@ class TestSpielnummern:
         assert n == 2
         assert _zeile(mit)["spielnummer"] == "690047011"
         assert get_match(ohne)["spielnummer"] == "890201022"
-        # Unveraendert zaehlt nicht
+        # Unchanged does not count
         assert setze_spielnummern(user["id"], [{"spielkennung": "690047011", "dfb_spiel_id": "SPIEL1"}]) == 0
 
     def test_kein_treffer_und_fremde_id(self, user, zweiter):
@@ -369,18 +369,18 @@ class TestSpielnummern:
         _upsert(zweiter, mit_id("SPIEL9"))
 
         assert setze_spielnummern(user["id"], [
-            # Anderer Tag
+            # Different day
             {"spielkennung": "1", "datum": "2026-12-06", "heim": "FC Heim", "gast": "SV Gast"},
-            # Gleiche Teams, aber eine andere DFBnet-ID
+            # Same teams, but a different DFBnet ID
             {"spielkennung": "2", "dfb_spiel_id": "SPIEL2", "datum": "2026-12-05",
              "heim": "FC Heim", "gast": "SV Gast"},
-            # ID eines anderen Nutzers
+            # Another user's ID
             {"spielkennung": "3", "dfb_spiel_id": "SPIEL9"},
         ]) == 0
         assert _zeile(mid)["spielnummer"] is None
 
 
-# -------------------------------------------------------- Fehlende Spiele
+# -------------------------------------------------------- Missing matches
 
 
 class TestMarkMissing:
@@ -448,7 +448,7 @@ class TestMarkMissing:
         assert len(alle) == 3 and len(aktiv) == 1
 
 
-# ---------------------------------------------------------------- Lesen
+# -------------------------------------------------------------- Reading
 
 
 class TestLesen:
@@ -473,7 +473,7 @@ class TestLesen:
         assert get_match(999) is None
 
 
-# ------------------------------------------------------------- Fahrtkosten
+# ------------------------------------------------------------ Travel costs
 
 
 class TestFahrtkosten:
@@ -524,7 +524,7 @@ class TestFahrtkosten:
         mid = _upsert(user["id"], spiel())
         set_official_expenses(mid, {"sr_km": 42.0, "sra2_km": 17.0})
 
-        # Assistent 2 faellt im naechsten Scrape weg
+        # Assistant 2 drops out in the next scrape
         _upsert(user["id"], spiel(schiedsrichter=[
             {"rolle": "SR", "name": "Erika Pfeife"}, {"rolle": "SRA 1", "name": "Max Fahne"},
         ]))
@@ -532,7 +532,7 @@ class TestFahrtkosten:
         assert "sra2_km" not in e
         assert _anzahl("official_expenses") == 2
 
-        # ... und kommt zurueck - der Wert ist wieder da
+        # ... and comes back - the value is there again
         _upsert(user["id"], spiel())
         assert get_match(mid)["expenses"]["sra2_km"] == 17.0
 
@@ -549,7 +549,7 @@ class TestFahrtkosten:
         assert get_match(mid)["expenses"] is None
 
 
-# ---------------------------------------------------------------- Zaehlen
+# --------------------------------------------------------------- Counting
 
 
 class TestCountDistinct:
@@ -563,7 +563,7 @@ class TestCountDistinct:
         assert count_distinct_matches() == 2
 
 
-# ------------------------------------------------- Offene Saetze nachtragen
+# ---------------------------------------------------- Filling in open rates
 
 
 class TestErgaenzeOffeneSaetze:

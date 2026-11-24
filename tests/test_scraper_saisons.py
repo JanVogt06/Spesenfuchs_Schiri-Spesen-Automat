@@ -1,8 +1,8 @@
 """
-Saisonzusammenfassung aus der Schnittstelle - ohne Browser (Daten erfunden).
+Season summary from the interface - without a browser (data invented).
 
-Die erwarteten Werte haben die Form, die die alte Tabellen-Lesung in die
-Datenbank geschrieben hat ("-" fuer leer, "2 : 0", "Beo." im Gespann).
+The expected values have the form the old table reading wrote to the
+database ("-" for empty, "2 : 0", "Beo." in the crew).
 """
 from datetime import date, datetime, timezone
 
@@ -207,7 +207,7 @@ class TestLiesSaisons:
         assert list(ergebnis) == ["26/27"]
 
     def test_seiten_mit_langsamen_spielen_werden_geteilt(self):
-        # Wie am 24.11.2026: zwei langsame Spiele auf einer Seite -> 500
+        # As on 24.11.2026: two slow matches on one page -> 500
         alle = [{**SPIEL, "id": f"S{i:02d}"} for i in range(45)]
         langsam = {25, 27}
         abrufe = []
@@ -229,8 +229,8 @@ class TestLiesSaisons:
 
         assert [z["datum_text"] for z in ergebnis["26/27"]["spiele"]] == ["22.11.26, 13:30"] * 45
         assert ergebnis["26/27"]["erwartet"] == 45
-        # Jede scheiternde Seite bekommt einen zweiten Versuch (der Server
-        # cacht), erst dann wird geteilt. Die ersten Abrufe gehoeren zu 26/27.
+        # Every failing page gets a second attempt (the server
+        # caches), only then is it split. The first retrievals belong to 26/27.
         assert abrufe[:15] == [(20, 0), (20, 1), (20, 1), (10, 2), (10, 2), (5, 4), (5, 5), (5, 5),
                                (1, 25), (1, 26), (1, 27), (1, 28), (1, 29), (10, 3), (20, 2)]
         assert seite.pausen == [3000, 3000, 3000]
@@ -251,7 +251,7 @@ class TestBisInDieDatenbank:
     def test_persist_saisons_versteht_das_ergebnis(self, user):
         ergebnis = lies_saisons(schnittstelle({"26/27": [SPIEL]}), "SCHIRI42", jetzt=JETZT)
 
-        # 25/26 ist im Test leer, laut Bilanz aber nicht - sie bleibt aussen vor
+        # 25/26 is empty in the test, but not according to the summary - it is left out
         assert ergebnis["25/26"]["vollstaendig"] is False
         assert persist_saisons(user["id"], ergebnis) == 1
 
@@ -260,6 +260,6 @@ class TestBisInDieDatenbank:
         assert (spiel["datum"], spiel["uhrzeit"], spiel["ergebnis"], spiel["eigene_rolle"]) == \
             ("2026-11-22", "13:30", "2 : 0", "SRA 2")
         assert spiel["heim_gelb"] == 1
-        # get_saison sortiert das Gespann nach Rolle
+        # get_saison sorts the crew by role
         assert [(p["rolle"], p["ist_selbst"]) for p in spiel["gespann"]] == [
             ("Beo.", False), ("SR", False), ("SRA 1", False), ("SRA 2", True)]

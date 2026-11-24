@@ -1,7 +1,7 @@
 """
-Die Persistenz-Schicht in main.py: was ein Scrape in die Datenbank schreibt,
-und was er bewusst stehen laesst. scrape_matches laeuft gegen einen falschen
-DFBScraper - Playwright startet hier nie.
+The persistence layer in main.py: what a scrape writes to the database,
+and what it deliberately leaves alone. scrape_matches runs against a fake
+DFBScraper - Playwright never starts here.
 """
 from datetime import date, timedelta
 
@@ -21,7 +21,7 @@ from db_helpers import feste_uhr, spiel
 
 @pytest.fixture
 def uhr(monkeypatch):
-    """Heute ist der 23.11.2026 - auch fuer mark_missing_matches."""
+    """Today is 23.11.2026 - also for mark_missing_matches."""
     return feste_uhr(monkeypatch, db_matches)
 
 
@@ -121,7 +121,7 @@ class TestPersistStammdaten:
             raise RuntimeError("DB weg")
 
         monkeypatch.setattr(main, "upsert_stammdaten", kaputt)
-        main.persist_stammdaten(user["id"], {"verein": "FC Heim"})  # wirft nicht
+        main.persist_stammdaten(user["id"], {"verein": "FC Heim"})  # does not raise
 
 
 # ----------------------------------------------------------- persist_saisons
@@ -170,7 +170,7 @@ class TestPersistSaisons:
         assert get_saison(user["id"], "24/25") is None
 
 
-# ----------------------------------------------------- Beobachtungs-Saisons
+# ------------------------------------------------------ Observation seasons
 
 
 class TestWaehleBeobachtungsSaisons:
@@ -227,7 +227,7 @@ class TestPersistBeobachtungen:
         }) == 1
 
 
-# ------------------------------------------------------------ Spielberichte
+# ------------------------------------------------------------ Match reports
 
 
 HEUTE = date(2026, 11, 23)
@@ -334,7 +334,7 @@ class TestPersistSpielberichte:
         assert _fertig_vermerkt(user["id"], "25/26")[1] == 1
 
     def test_wartet_auf_freigabe_haelt_saison_offen(self, user, datenordner):
-        """Vergangenes Spiel ohne Freigabe, juenger als 60 Tage: Saison bleibt offen."""
+        """Past match without release, younger than 60 days: season stays open."""
         heute = date(2026, 8, 15)
         z = _bzeile("B", "2026-06-20", status=())
         main.persist_spielberichte(user["id"], {"saisons": {"25/26": {"zeilen": [z]}}, "berichte": {}},
@@ -370,7 +370,7 @@ class TestPersistSpielberichte:
         a = _bzeile("A", "2025-05-01")
         b = _bzeile("B", "2024-03-01")
         main.persist_spielberichte(user["id"], {
-            # A steht in der Liste von 25/26 (etwa ein Nachholspiel) - die Liste gewinnt
+            # A is in the 25/26 list (e.g. a make-up match) - the list wins
             "saisons": {"25/26": {"zeilen": [a]}},
             "berichte": {"A": _bericht(a), "B": _bericht(b)},
         }, heute=HEUTE)
@@ -395,7 +395,7 @@ class TestPersistSpielberichte:
 
 
 class FakeScraper:
-    """Spielt DFBScraper nach - jede Methode protokolliert sich selbst."""
+    """Imitates DFBScraper - every method logs itself."""
 
     spiele: list = []
     erwartet = None
@@ -425,9 +425,9 @@ class FakeScraper:
                  "navigate_to_schiriansetzung"}
 
     def __getattr__(self, name):
-        # Die reinen Navigationsschritte werden nur mitgeschrieben. Alles andere
-        # fehlt wirklich - sonst faende getattr(scraper, "erwartete_spiele", ...)
-        # eine Funktion statt des Defaults.
+        # The pure navigation steps are only recorded. Everything else
+        # really is missing - otherwise getattr(scraper, "erwartete_spiele", ...)
+        # would find a function instead of the default.
         if name not in self._SCHRITTE:
             raise AttributeError(name)
 
@@ -546,5 +546,5 @@ class TestScrapeMatches:
 
     def test_beobachtungen_ab_schiedsrichter_seit(self, user, fake, uhr):
         main.scrape_matches("n", "p", user["id"])
-        # Seit 2010 - "05/06" kann es nicht geben
+        # Since 2010 - "05/06" cannot exist
         assert fake.letzter.beobachtungen_auswahl == ["26/27"]

@@ -1,9 +1,9 @@
 """
-utils.logger: Konsole plus Protokolldatei unter LOG_FILE.
+utils.logger: console plus log file under LOG_FILE.
 
-Der Datei-Handler ist ein Prozess-Singleton. Tests, die ihn neu anlegen
-lassen, setzen ihn per monkeypatch zurueck und schliessen ihren eigenen
-Handler wieder - die anderen Tests schreiben weiter in den urspruenglichen.
+The file handler is a process singleton. Tests that have it recreated reset
+it via monkeypatch and close their own handler again - the other tests keep
+writing to the original one.
 """
 import logging
 import os
@@ -23,7 +23,7 @@ def _eindeutiger_name():
 
 @pytest.fixture
 def eigener_handler(monkeypatch):
-    """Sorgt dafuer, dass der naechste Aufruf einen neuen Datei-Handler anlegt."""
+    """Makes sure the next call creates a new file handler."""
     monkeypatch.setattr(logmodul, "_datei_handler", None)
     erzeugt = []
     yield erzeugt
@@ -64,7 +64,7 @@ class TestSchreiben:
         datei_handler[0].flush()
         pfad = Path(datei_handler[0].baseFilename)
 
-        # Niemals ins echte data/ des Projekts
+        # Never into the project's real data/
         projekt_data = Path(logmodul.__file__).resolve().parent.parent.parent / "data"
         assert projekt_data not in pfad.parents
         assert marke in pfad.read_text(encoding="utf-8")
@@ -151,7 +151,7 @@ class TestHandler:
         assert logmodul._hole_datei_handler() is erster
 
     def test_nicht_beschreibbar_nur_konsole(self, monkeypatch, tmp_path, eigener_handler, capsys):
-        # Ein Ordner kann nicht unter einer Datei angelegt werden
+        # A folder cannot be created beneath a file
         sperre = tmp_path / "datei"
         sperre.write_text("")
         monkeypatch.setenv("LOG_FILE", str(sperre / "logs" / "x.log"))
@@ -160,7 +160,7 @@ class TestHandler:
         assert logmodul._datei_handler is False
         assert "nicht beschreibbar" in capsys.readouterr().err
 
-        # Kein zweiter Versuch
+        # No second attempt
         monkeypatch.setenv("LOG_FILE", str(tmp_path / "geht.log"))
         assert logmodul._hole_datei_handler() is None
 

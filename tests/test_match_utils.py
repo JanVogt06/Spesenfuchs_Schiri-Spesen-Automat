@@ -1,4 +1,4 @@
-"""Reine Hilfsfunktionen fuer Spieldaten: Dateinamen, Anpfiff, Datumsspalten."""
+"""Pure helper functions for match data: file names, kick-off, date columns."""
 import pytest
 
 from utils.match_utils import (
@@ -166,7 +166,7 @@ class TestParseSaisonDatum:
     @pytest.mark.parametrize("text, erwartet", [
         ("20.09.26, 15:00", ("2026-09-20", "15:00")),
         ("01.07.25, 9:30", ("2025-07-01", "9:30")),
-        ("31.12.99, 23:59", ("2099-12-31", "23:59")),   # zweistellig ist immer 20xx
+        ("31.12.99, 23:59", ("2099-12-31", "23:59")),   # two-digit is always 20xx
         ("20.09.26", ("2026-09-20", "")),
         ("Sa, 20.09.26 15:00", ("2026-09-20", "15:00")),
     ])
@@ -174,7 +174,7 @@ class TestParseSaisonDatum:
         assert parse_saison_datum(text) == erwartet
 
     @pytest.mark.parametrize("text, uhrzeit", [
-        # Vierstelliges Jahr gehoert nicht in diese Spalte
+        # A four-digit year does not belong in this column
         ("20.09.2026, 15:00", "15:00"),
         ("", ""),
         (None, ""),

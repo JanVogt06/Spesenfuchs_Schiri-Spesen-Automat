@@ -1,28 +1,27 @@
 """
-Ein kompletter Abruf gegen das echte DFBnet - Ende zu Ende.
+A complete retrieval against the real DFBnet - end to end.
 
-Laeuft nur, wenn SPESENFUCHS_E2E=1 gesetzt ist und Zugangsdaten in
-DFB_USERNAME/DFB_PASSWORD stehen (in der Pipeline aus den GitHub-Secrets,
-siehe .github/workflows/e2e.yml). Sonst wird er uebersprungen - ein normales
-pytest loggt sich nie bei DFBnet ein.
+Runs only if SPESENFUCHS_E2E=1 is set and credentials are in
+DFB_USERNAME/DFB_PASSWORD (in the pipeline from the GitHub secrets, see
+.github/workflows/e2e.yml). Otherwise it is skipped - a normal pytest never
+logs in to DFBnet.
 
-Was passiert: Login, Ansetzungen, Stammdaten, Saisons, Beobachtungen und
-Spielberichte, alles in eine frische Wegwerf-Datenbank, danach eine
-Spesenquittung. Wie im Nachtlauf wird nur die laufende Saison gelesen: der
-Test meldet alle frueheren als bereits fertig. Ein Lauf ueber alle Saisons
-seit dem ersten Einsatz (samt hunderter Spielberichte) waere fuer jeden Push
-zu schwer, fuer DFBnet wie fuer die Laufzeit.
+What happens: login, assignments, master data, seasons, observations and
+match reports, all into a fresh throwaway database, then an expense
+receipt. As in the nightly run, only the current season is read: the test
+reports all earlier ones as already done. A run over all seasons since the
+first assignment (including hundreds of match reports) would be too heavy
+for every push, both for DFBnet and for the run time.
 
-DATENSCHUTZ: Das Repository ist oeffentlich, die Logs der Pipeline auch. Aus
-diesem Test darf NICHTS nach aussen, was bei DFBnet gelesen wurde - keine
-Namen, Teams, Termine und auch keine Anzahlen. Deshalb:
+PRIVACY: The repository is public, and so are the pipeline logs. NOTHING
+that was read from DFBnet may leave this test - no names, teams, dates and
+not even counts. Therefore:
 
-- keine nackten asserts: pytest wuerde deren Werte ausgeben ("assert 0 > 0").
-  Gemeldet werden nur die Namen der fehlgeschlagenen Pruefungen, fest im Code.
-- jede Ausnahme wird auf ihren Typ reduziert; ihre Meldung koennte Daten
-  enthalten.
-- die Pipeline ruft pytest mit --show-capture=no und --tb=no auf: die Logger
-  des Scrapers schreiben Teams und Termine, und die erscheinen so nirgends.
+- no bare asserts: pytest would print their values ("assert 0 > 0").
+  Only the names of the failed checks are reported, fixed in the code.
+- every exception is reduced to its type; its message might contain data.
+- the pipeline calls pytest with --show-capture=no and --tb=no: the
+  scraper's loggers write teams and dates, and this way they appear nowhere.
 """
 import os
 import re
@@ -59,7 +58,7 @@ def _anzahl(sql: str, *parameter) -> int:
 
 
 def _entpackt(inhalt: bytes) -> bytes:
-    """DOCX und XLSX sind ZIP-Archive - die Kennung steht in deren XML."""
+    """DOCX and XLSX are ZIP archives - the identifier is in their XML."""
     import io
     import zipfile
 
@@ -68,7 +67,7 @@ def _entpackt(inhalt: bytes) -> bytes:
 
 
 def _gesamtlauf(user_id: int, monkeypatch) -> dict:
-    """Der Abruf und alle Pruefungen; Pruefung -> bestanden (nur Ja/Nein)."""
+    """The retrieval and all checks; check -> passed (only yes/no)."""
     import main
     from db.matches import get_match, get_matches_for_user
     from db.season import get_saison
@@ -81,7 +80,7 @@ def _gesamtlauf(user_id: int, monkeypatch) -> dict:
     heute = date.today()
     frueher = _alle_frueheren_saisons(heute)
 
-    # Nur die laufende Saison lesen, wie im Nachtlauf
+    # Read only the current season, as in the nightly run
     monkeypatch.setattr(main, "get_komplette_saisons", lambda uid: set(frueher))
     monkeypatch.setattr(main, "get_fertige_beobachtungs_saisons", lambda uid, quelle: set(frueher))
     monkeypatch.setattr(main, "get_fertige_bericht_saisons", lambda uid: set(frueher))
@@ -114,7 +113,7 @@ def _gesamtlauf(user_id: int, monkeypatch) -> dict:
             "SELECT COUNT(*) FROM spielbericht_saisons WHERE user_id = ?", user_id) > 0,
     }
 
-    # Eine Quittung aus einem gespeicherten Spiel mit Spielkennung
+    # A receipt from a stored match with a match identifier
     quittung_ok = False
     kandidat = next((s for s in spiele if s.get("spielnummer") and s["heim_team"]), None)
     if kandidat:
@@ -134,7 +133,7 @@ def test_gesamtlauf(user, monkeypatch):
     try:
         pruefungen = _gesamtlauf(user["id"], monkeypatch)
     except Exception as fehler:
-        # Nur der Typ - die Meldung koennte gelesene Daten enthalten
+        # Only the type - the message might contain data that was read
         pytest.fail(f"Gesamtlauf abgebrochen ({type(fehler).__name__})", pytrace=False)
 
     fehlgeschlagen = [name for name, ok in pruefungen.items() if not ok]

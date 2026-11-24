@@ -1,10 +1,10 @@
 """
-TFV-Formular (DOCX): Platzhalter, Kaestchen, Fahrtkosten und Summen.
+TFV form (DOCX): placeholders, checkboxes, travel costs and totals.
 
-Die Dokumente entstehen im Speicher aus der echten Vorlage und werden mit
-python-docx wieder geoeffnet. Welcher Platzhalter in welcher Tabellenzelle
-steht, wird einmal aus der Vorlage gelesen - die Tests fragen dann genau
-diese Zelle im Ergebnis ab, statt nur irgendwo im Dokument nach Text zu suchen.
+The documents are created in memory from the real template and reopened with
+python-docx. Which placeholder is in which table cell is read once from the
+template - the tests then query exactly that cell in the result, instead of
+just searching for text anywhere in the document.
 """
 import re
 from io import BytesIO
@@ -28,7 +28,7 @@ ANPFIFF = "Samstag · 08.11.2025 · 13:00 Uhr"
 
 
 def _platzhalter_positionen() -> dict:
-    """Platzhalter -> (zeile, spalte, absatz) fuer Zellen mit genau einem Platzhalter."""
+    """Placeholder -> (row, column, paragraph) for cells with exactly one placeholder."""
     tabelle = Document(VORLAGE).tables[0]
     gesehen = []
     positionen = {}
@@ -48,7 +48,7 @@ POSITIONEN = _platzhalter_positionen()
 
 
 def _felder(content: bytes) -> dict:
-    """Liest die ersetzten Werte an den Platzhalter-Positionen der Vorlage."""
+    """Reads the replaced values at the template's placeholder positions."""
     tabelle = Document(BytesIO(content)).tables[0]
     return {
         name: tabelle.cell(zi, si).paragraphs[ai].text
@@ -57,13 +57,13 @@ def _felder(content: bytes) -> dict:
 
 
 def _kaestchen_zeilen(content: bytes) -> str:
-    """Die drei Zeilen mit den Kaestchen als ein Text."""
+    """The three rows with the checkboxes as one text."""
     tabelle = Document(BytesIO(content)).tables[0]
     return "\n".join(tabelle.cell(z, 0).paragraphs[0].text for z in range(3))
 
 
 def _angekreuzt(content: bytes) -> set:
-    """Die Beschriftungen aller angekreuzten Kaestchen."""
+    """The labels of all ticked checkboxes."""
     text = _kaestchen_zeilen(content)
     return set(re.findall(rf"{CHECKBOX_CHECKED} ([^\t\n]+)", text))
 
@@ -79,7 +79,7 @@ def _gesamter_text(content: bytes) -> str:
 
 
 def _spiel(**ueberschreiben) -> dict:
-    """Ein Spiel in der Form, die db.matches.get_match liefert."""
+    """A match in the form db.matches.get_match delivers."""
     spiel = {
         "spiel_info": {
             "heim_team": "FC Rot-Weiß Erfurt II",
@@ -108,7 +108,7 @@ def generator():
     return SpesenGenerator(str(VORLAGE))
 
 
-# ===== Namen =====
+# ===== Names =====
 
 class TestNamensformat:
     def test_vorname_nachname_wird_umgedreht(self):
@@ -127,7 +127,7 @@ class TestNamensformat:
         assert format_name_nachname_vorname("  Max   Mustermann  ") == "Mustermann, Max"
 
 
-# ===== Grunddaten =====
+# ===== Basic data =====
 
 class TestStammdaten:
     def test_vorlage_kennt_alle_erwarteten_platzhalter(self):
@@ -218,7 +218,7 @@ class TestStammdaten:
         assert felder["SPIELORT"] == "\n"
 
 
-# ===== Spesensaetze =====
+# ===== Expense rates =====
 
 class TestSpesen:
     def test_berechnete_saetze_verbandsliga(self, generator):
@@ -234,7 +234,7 @@ class TestSpesen:
         assert felder["SR2_Spesen"] == "22,50 €"
 
     def test_eingefroren_ohne_satz_wird_nicht_neu_gerechnet(self, generator):
-        # Ein eingefrorenes None ist eine Aussage ("kein Satz"), kein fehlender Wert
+        # A frozen None is a statement ("no rate"), not a missing value
         felder = _felder(generator.render_document(_spiel(sr_spesen=None, sra_spesen=None)))
         assert felder["SR_Spesen"] == ""
         assert felder["SR1_Spesen"] == ""
@@ -262,7 +262,7 @@ class TestSpesen:
         assert felder["SR1_Spesen"] == ""
 
 
-# ===== Fahrtkosten und Summen =====
+# ===== Travel costs and totals =====
 
 class TestFahrtkosten:
     def test_ohne_fahrtkosten_keine_summen(self, generator):
@@ -305,7 +305,7 @@ class TestFahrtkosten:
         assert felder["SR_Summe"] == "92,50 €"
         assert felder["SRA1_Kilometer"] == "15,00 €"
         assert felder["SRA1_Summe"] == "55,00 €"
-        # 0 km ist erfasst: Feld leer, aber die Summe steht
+        # 0 km is recorded: field empty, but the total is there
         assert felder["SRA2_Kilometer"] == ""
         assert felder["SRA2_Summe"] == "40,00 €"
         assert felder["Summe"] == "187,50 €"
@@ -345,7 +345,7 @@ class TestFahrtkosten:
         assert felder["Summe"] == "53,00 €"
 
     def test_ohne_satz_keine_summe(self, generator):
-        # Fahrtkosten allein saehen wie der Endbetrag aus
+        # Travel costs alone would look like the final amount
         expenses = {"sr_km": 100, "sra1_km": 50, "sra2_km": 10}
         felder = _felder(generator.render_document(_spiel(sr_spesen=None, sra_spesen=None), expenses))
         assert felder["SR_Spesen"] == ""
@@ -355,7 +355,7 @@ class TestFahrtkosten:
         assert felder["Summe"] == ""
 
     def test_ohne_assistentensatz_summe_aus_fahrtkosten(self, generator):
-        # Juniorinnen: SR-Satz bekannt, fuer Assistenten keiner vorgesehen
+        # Junior girls: referee rate known, none provided for assistants
         spiel = _spiel(sr_spesen=20.0, sra_spesen=None)
         spiel["schiedsrichter"] = spiel["schiedsrichter"][:2]
         felder = _felder(generator.render_document(spiel, {"sr_km": 10, "sra1_km": 20}))
@@ -369,7 +369,7 @@ class TestFahrtkosten:
             _felder(generator.render_document(_spiel(), None))
 
 
-# ===== Kaestchen =====
+# ===== Checkboxes =====
 
 class TestKaestchen:
     @pytest.mark.parametrize("spielklasse, erwartet", [
@@ -410,8 +410,8 @@ class TestKaestchen:
         assert angekreuzt == {"Punktspiel", erwartet}
 
     def test_juniorinnen_nicht_als_junioren(self, generator):
-        # "a-juniorinnen" enthaelt nicht "a-junioren" - aber die Reihenfolge der
-        # Zweige muss trotzdem Maedchen vor den Altersklassen pruefen
+        # "a-juniorinnen" does not contain "a-junioren" - but the order of the
+        # branches must still check girls before the age groups
         spiel = _spiel(sr_spesen=None, sra_spesen=None)
         spiel["spiel_info"]["mannschaftsart"] = "A-Juniorinnen"
         assert "A-Junioren" not in _angekreuzt(generator.render_document(spiel))
@@ -435,14 +435,14 @@ class TestKaestchen:
             assert run.font.name == CHECKBOX_FONT
 
     def test_ueber_runs_verteiltes_kaestchen_wird_ersetzt(self, generator):
-        # {{CHECKBOX_SONSTIGE}} steht in der Vorlage auf drei Runs verteilt
+        # {{CHECKBOX_SONSTIGE}} is spread over three runs in the template
         spiel = _spiel(sr_spesen=None, sra_spesen=None)
         spiel["spiel_info"]["mannschaftsart"] = "Freizeitsport"
         text = _kaestchen_zeilen(generator.render_document(spiel))
         assert f"{CHECKBOX_CHECKED} Sonstige" in text
 
 
-# ===== Ersetzung ueber Run-Grenzen =====
+# ===== Replacement across run boundaries =====
 
 class TestRunGrenzen:
     def _absatz(self, *teile):
@@ -499,7 +499,7 @@ class TestRunGrenzen:
         }
 
 
-# ===== Dateien =====
+# ===== Files =====
 
 class TestDateien:
     def test_fehlende_vorlage(self, tmp_path):

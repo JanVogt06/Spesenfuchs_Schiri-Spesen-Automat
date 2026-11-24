@@ -1,10 +1,10 @@
 """
-Naechtlicher Ligen-Abgleich: Ankervereine aus den eigenen Ansetzungen,
-Staffelsuche, Schreiben der Tabellen - und was danach aus einem DFBnet-Namen
-wird.
+Nightly league reconciliation: anchor clubs from the own assignments,
+division search, writing the tables - and what a DFBnet name becomes
+afterwards.
 
-fussball.de wird nie abgerufen: entdecke_staffeln und hole_tabelle sind
-ersetzt. Die Datenbank kommt aus der db-Fixture.
+fussball.de is never fetched: entdecke_staffeln and hole_tabelle are
+replaced. The database comes from the db fixture.
 """
 from datetime import datetime, UTC
 
@@ -27,7 +27,7 @@ def _kein_netz(monkeypatch):
 
 def _ansetzung(user_id, heim, datum, spielklasse="Verbandsliga", staffel="Verbandsliga",
                mannschaftsart="Herren", nummer=[0]):
-    """Legt eine Ansetzung mit dem Noetigsten an."""
+    """Creates an assignment with the bare minimum."""
     nummer[0] += 1
     jetzt = datetime.now(UTC).isoformat()
     conn = get_connection()
@@ -65,7 +65,7 @@ def _platz(platz, mannschaft, team_id):
 
 
 class FakeFussballDe:
-    """Ersetzt entdecke_staffeln und hole_tabelle."""
+    """Replaces entdecke_staffeln and hole_tabelle."""
 
     def __init__(self, staffeln_je_verein, tabellen):
         self.staffeln_je_verein = staffeln_je_verein
@@ -103,7 +103,7 @@ VERBANDSLIGA = Ziel("verbandsliga", "thueringen", "Verbandsliga", True)
 OBERLIGA = Ziel("oberliga", "deutschland", "Oberliga", False)
 
 
-# ===== Ankervereine =====
+# ===== Anchor clubs =====
 
 class TestAnkervereine:
     def test_nur_herren_dieser_spielklasse_mit_heimmannschaft(self, user):
@@ -129,8 +129,8 @@ class TestAnkervereine:
         assert ligen_aktualisieren._ankervereine("Verbandsliga") == ["D", "C", "B"]
 
     def test_reihum_aus_parallelen_staffeln(self, user):
-        # Die vier juengsten Ansetzungen stammen alle aus "Nord" - trotzdem
-        # muss "Sued" mit seinem besten Anker frueh drankommen.
+        # The four most recent assignments all come from "Nord" - still,
+        # "Sued" with its best anchor must come up early.
         for tag, verein in enumerate(["N1", "N2", "N3", "N4"], start=5):
             _ansetzung(user["id"], verein, f"2026-10-0{tag}", spielklasse="Oberliga", staffel="Nord")
         _ansetzung(user["id"], "S1", "2026-09-01", spielklasse="Oberliga", staffel="Sued")
@@ -146,7 +146,7 @@ class TestAnkervereine:
         assert ligen_aktualisieren._ankervereine("Verbandsliga") == []
 
 
-# ===== Eine Liga abgleichen =====
+# ===== Reconciling one league =====
 
 class TestAktualisiereLiga:
     def test_ohne_anker_bleibt_liga_unbekannt(self, db, fussball):
@@ -222,7 +222,7 @@ class TestAktualisiereLiga:
         assert aktualisiere_liga(OBERLIGA) == 2
         assert [g[0] for g in fake.gesucht] == ["FC Nord", "FC Sued"]
         assert all(g[3] is False for g in fake.gesucht)
-        # Jede Staffel nur einmal abgerufen, auch wenn zwei Anker sie kennen
+        # Each division fetched only once, even if two anchors know it
         assert sorted(fake.abgerufen) == sorted([nord.staffel_id, sued.staffel_id])
 
     def test_kein_anker_gefunden(self, user, fussball):
@@ -268,7 +268,7 @@ class TestAktualisiereLiga:
         assert finde_mannschaft("SV Absteiger") is None
 
 
-# ===== Was danach aus einem DFBnet-Namen wird =====
+# ===== What a DFBnet name becomes afterwards =====
 
 class TestZuordnungNachAbgleich:
     @pytest.fixture
@@ -302,7 +302,7 @@ class TestZuordnungNachAbgleich:
         ("SG FC Beispielstadt I", "verbandsliga"),
         ("FC Beispielstadt II", "landesklasse"),
         ("FC Beispielstadt 2.", "landesklasse"),
-        ("SV Gruen-Weiss Musterdorf", None),   # andere Schreibweise: kein Treffer
+        ("SV Gruen-Weiss Musterdorf", None),   # different spelling: no hit
         ("SV Grün-Weiß Musterdorf", "verbandsliga"),
         ("SV 1920 Probehausen", "landesklasse"),
     ])
@@ -311,7 +311,7 @@ class TestZuordnungNachAbgleich:
         assert (treffer and treffer["spielklasse"]) == spielklasse
 
     def test_falsche_mannschaftsnummer_ergibt_nichts(self, ligen):
-        # Dritte Mannschaft steht in keiner Tabelle - NICHT die erste nehmen
+        # Third team is in no table - do NOT take the first
         assert finde_mannschaft("FC Beispielstadt III") is None
         assert finde_mannschaft("SG FC Beispielstadt 3.") is None
 
@@ -327,7 +327,7 @@ class TestZuordnungNachAbgleich:
         assert finde_mannschaft("") is None
 
 
-# ===== Alle Ligen =====
+# ===== All leagues =====
 
 class TestAktualisiereAlle:
     def test_fehler_in_einer_liga_stoppt_die_anderen_nicht(self, monkeypatch):

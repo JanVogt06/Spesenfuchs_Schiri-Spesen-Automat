@@ -1,4 +1,4 @@
-"""Passwort aendern."""
+"""Changing the password."""
 
 
 def _aendern(client, header, aktuell, neu):
@@ -8,7 +8,7 @@ def _aendern(client, header, aktuell, neu):
 
 def test_falsches_aktuelles_passwort_meldet_nicht_ab(client, user, auth_header):
     antwort = _aendern(client, auth_header, "falsch", "ganz-neues-passwort")
-    # 401 wuerde das Frontend als abgelaufene Sitzung deuten und abmelden
+    # The frontend would interpret a 401 as an expired session and log out
     assert antwort.status_code == 400
     assert antwort.json()["error"]["message"] == "Aktuelles Passwort ist falsch"
 

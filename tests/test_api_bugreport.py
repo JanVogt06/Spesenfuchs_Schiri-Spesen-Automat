@@ -1,8 +1,8 @@
 """
-Fehlerberichte: Status und Versand.
+Bug reports: status and sending.
 
-Es geht nie Post hinaus - entweder ist sende_bug_report ersetzt, oder
-smtplib im Mailer-Modul ist eine Attrappe, die nur mitschreibt.
+No mail ever goes out - either sende_bug_report is replaced, or smtplib in
+the mailer module is a stub that only records.
 """
 import smtplib
 import types
@@ -28,7 +28,7 @@ def postausgang(monkeypatch):
 
 
 class _Smtp:
-    """Ein SMTP-Server, der nichts verschickt, sondern mitschreibt."""
+    """An SMTP server that sends nothing but records."""
 
     verschickt = []
     fehler = None
@@ -70,7 +70,7 @@ def smtp(monkeypatch):
 
 @pytest.fixture
 def versand(monkeypatch):
-    """Ersetzt sende_bug_report im API-Modul und merkt sich die Aufrufe."""
+    """Replaces sende_bug_report in the API module and remembers the calls."""
     aufrufe = []
     monkeypatch.setattr("api.main_api.sende_bug_report", lambda **kwargs: aufrufe.append(kwargs))
     return aufrufe
@@ -108,7 +108,7 @@ class TestSenden:
     def test_ohne_postausgang_klarer_fehler(self, client, user, auth_header, smtp):
         antwort = _melden(client, auth_header)
 
-        # Nicht still verschluckt: der Nutzer erfaehrt, dass nichts ankam
+        # Not silently swallowed: the user learns that nothing arrived
         assert antwort.status_code == 503
         fehler = fehlerbild(antwort)
         assert fehler["code"] == "MAIL_NOT_CONFIGURED"
@@ -181,6 +181,6 @@ class TestSenden:
         assert fehler["code"] == "MAIL_SEND_FAILED"
         assert "smtp.example.org hat die Zugangsdaten abgelehnt" in fehler["message"]
         assert fehler["details"] == "SMTPAuthenticationError"
-        # Der Fehlertext des Servers (kann Zugangsdaten enthalten) geht nicht hinaus
+        # The server's error text (may contain credentials) does not go out
         assert "smtp-geheim" not in antwort.text
         assert smtp.verschickt == []

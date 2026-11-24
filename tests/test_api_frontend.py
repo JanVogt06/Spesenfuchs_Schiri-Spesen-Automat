@@ -1,9 +1,8 @@
 """
-Auslieferung des Frontends (Catch-All), allgemeiner Fehler-Handler und CORS.
+Serving the frontend (catch-all), general error handler and CORS.
 
-FRONTEND_DIR zeigt in conftest auf ein nicht vorhandenes Verzeichnis; fuer
-die Faelle mit Frontend wird es im API-Modul auf einen Wegwerf-Ordner
-umgebogen.
+FRONTEND_DIR points to a non-existent directory in conftest; for the cases
+with a frontend it is redirected to a throwaway folder in the API module.
 """
 import pytest
 
@@ -113,7 +112,7 @@ class TestMitFrontend:
 
         assert client.get("/").json() == {"detail": "Frontend not found"}
         assert client.get("/einstellungen").json() == {"detail": "Frontend not found"}
-        # Wurzeldateien gehen weiterhin
+        # Root files still work
         assert client.get("/sw.js").status_code == 200
 
     def test_api_routen_gewinnen_gegen_catch_all(self, client, db, frontend):

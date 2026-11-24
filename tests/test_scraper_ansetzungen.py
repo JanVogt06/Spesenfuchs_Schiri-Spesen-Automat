@@ -1,9 +1,10 @@
 """
-Ansetzungen aus der JSON-Schnittstelle der Schiriansetzung - ohne Browser.
+Assignments from the JSON interface of the referee assignment - without a
+browser.
 
-Die Seite ist eine Attrappe: page.evaluate bekommt das Abruf-Skript samt
-{url, methode, body} und antwortet aus einem Woerterbuch, so wie die
-Schnittstelle am 24.11.2026 geantwortet hat (Daten erfunden).
+The page is a stub: page.evaluate receives the retrieval script along with
+{url, methode, body} and answers from a dictionary, the way the interface
+answered on 24.11.2026 (data invented).
 """
 from datetime import date
 from urllib.parse import parse_qs, urlparse
@@ -52,7 +53,7 @@ ROHDATEN = {
               "TEAMG": {"id": "TEAMG", "name": "FSV Muster"}},
     "staetten": {"PLATZ1": {"id": "PLATZ1", "name": "Kunstrasen An der Aue", "type": "ARTIFICIAL_PITCH",
                             "address": {"street": "Auenweg", "zipCode": "07318", "city": "Saalfeld/Saale"}}},
-    # Bewusst ein Pokal: die Spielklasse kommt aus dem Wettbewerb, nicht aus dem Team
+    # Deliberately a cup: the league class comes from the competition, not from the team
     "wettbewerbe": {2067: {"id": "2067", "name": "Kreispokal", "leagueLevelName": "Kreispokal",
                            "teamTypeName": "Herren", "areaType": "COUNTY"}},
 }
@@ -164,7 +165,7 @@ class TestZeitraum:
 
 
 class Seite:
-    """Antwortet auf das Abruf-Skript aus einer Tabelle Pfad -> Antwort."""
+    """Answers the retrieval script from a table of path -> response."""
 
     def __init__(self, antworten=None, url="https://sria.dfbnet.org/referee/SCHIRI42/matches"):
         self.antworten = antworten or {}

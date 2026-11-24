@@ -1,20 +1,20 @@
 """
-Hilfen fuer die Tests der Datenbankschicht.
+Helpers for the database layer tests.
 
-Kein Test-Modul (der Name beginnt nicht mit test_), pytest sammelt hier also
-nichts ein. Die Test-Dateien importieren es direkt - tests/ liegt beim Lauf
-auf sys.path.
+Not a test module (the name does not start with test_), so pytest collects
+nothing here. The test files import it directly - tests/ is on sys.path
+during a run.
 """
 from datetime import datetime, timedelta, UTC
 
 
 class Uhr:
     """
-    Eine stehende Uhr fuer Module, die datetime.now() aufrufen.
+    A stopped clock for modules that call datetime.now().
 
-    Ersetzt im Zielmodul den Namen `datetime` durch eine Unterklasse, deren
-    now() die eingestellte Zeit liefert. Alles andere (fromisoformat,
-    Konstruktor, Vergleiche) bleibt das echte datetime.
+    Replaces the name `datetime` in the target module with a subclass whose
+    now() returns the configured time. Everything else (fromisoformat,
+    constructor, comparisons) remains the real datetime.
     """
 
     def __init__(self, jetzt: datetime):
@@ -37,12 +37,12 @@ class Uhr:
 
 
 def feste_uhr(monkeypatch, *module, jetzt=None) -> Uhr:
-    """Uhr auf 23.11.2026 12:00 UTC (oder jetzt) in den angegebenen Modulen."""
+    """Clock set to 23.11.2026 12:00 UTC (or now) in the given modules."""
     return Uhr(jetzt or datetime(2026, 11, 23, 12, 0, tzinfo=UTC)).einbauen(monkeypatch, *module)
 
 
 def anpfiff(tag: str, zeit: str = "13:00") -> str:
-    """'2026-12-05' -> 'Samstag · 05.12.2026 · 13:00 Uhr' (Wochentag egal)."""
+    """'2026-12-05' -> 'Samstag · 05.12.2026 · 13:00 Uhr' (weekday irrelevant)."""
     jahr, monat, t = tag.split("-")
     return f"Samstag · {t}.{monat}.{jahr} · {zeit} Uhr"
 
@@ -61,7 +61,7 @@ def spiel(
     platz_typ="Rasen",
     schiedsrichter=None,
 ) -> dict:
-    """Ein Spiel in der Struktur, die der Scraper liefert."""
+    """A match in the structure the scraper delivers."""
     if schiedsrichter is None:
         schiedsrichter = [
             {"rolle": "SR", "name": "Erika Pfeife", "telefon": "1", "email": "sr@example.org",
@@ -87,7 +87,7 @@ def spiel(
 
 
 def nutzer_anlegen(conn, email="schiri@example.org") -> int:
-    """Legt per SQL einen Nutzer an - funktioniert auf jeder Schema-Version."""
+    """Creates a user via SQL - works on any schema version."""
     cursor = conn.execute(
         "INSERT INTO users (email, password_hash, created_at) VALUES (?, ?, ?)",
         (email, "hash", "2025-01-01T00:00:00+00:00"),
@@ -97,7 +97,7 @@ def nutzer_anlegen(conn, email="schiri@example.org") -> int:
 
 
 def spiel_einfuegen(conn, user_id, match_key, **felder) -> int:
-    """Eine Zeile direkt in matches (ab Schema-Version 3)."""
+    """A row directly in matches (from schema version 3)."""
     werte = {
         "user_id": user_id,
         "match_key": match_key,
@@ -116,10 +116,10 @@ def spiel_einfuegen(conn, user_id, match_key, **felder) -> int:
 
 def migriere_bis(monkeypatch, version: int) -> int:
     """
-    Bringt die Datenbank unter database.DB_PATH genau auf `version`.
+    Brings the database at database.DB_PATH to exactly `version`.
 
-    Dafuer wird MIGRATIONS kurzzeitig auf die ersten Schritte gekuerzt und
-    danach wiederhergestellt - es laeuft also der echte Runner.
+    For this, MIGRATIONS is temporarily cut down to the first steps and restored
+    afterwards - so the real runner is what executes.
     """
     import db.database as database
     import db.migrations as migrations
