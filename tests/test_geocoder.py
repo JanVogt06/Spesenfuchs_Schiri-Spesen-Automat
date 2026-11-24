@@ -378,3 +378,45 @@ class TestMindestabstand:
         uhr.jetzt += 0.1
         geocode("Hauptstr. 1")
         assert uhr.geschlafen == []
+
+
+# ===== Nur aus dem Zwischenspeicher =====
+
+class TestGeocodeBekannt:
+    def test_noch_nie_gefragt_ist_offen(self, dienst):
+        assert geocoder.geocode_bekannt("Waldweg 1, 99999 Irgendwo") == (None, True)
+        assert dienst.anfragen == []
+
+    def test_treffer_aus_dem_speicher(self, dienst):
+        dienst.standard = _treffer(50.1, 11.2)
+        geocode("Waldweg 1, 99999 Irgendwo")
+        dienst.anfragen.clear()
+
+        treffer, offen = geocoder.geocode_bekannt("Waldweg 1, 99999 Irgendwo")
+
+        assert (treffer, offen) == ({"lat": 50.1, "lon": 11.2, "genauigkeit": "adresse"}, False)
+        assert dienst.anfragen == []
+
+    def test_faellt_auf_den_ort_zurueck(self, dienst):
+        dienst.antwort("waldweg 1, 99999 irgendwo", [])
+        dienst.antwort("99999 irgendwo", _treffer(50.0, 11.0))
+        geocode("Waldweg 1, 99999 Irgendwo")
+
+        treffer, offen = geocoder.geocode_bekannt("Waldweg 1, 99999 Irgendwo")
+        assert treffer["genauigkeit"] == "ort"
+        assert offen is False
+
+    def test_bekannter_fehlschlag_ist_nicht_offen(self, dienst):
+        geocode("Waldweg 1, 99999 Irgendwo")
+        assert geocoder.geocode_bekannt("Waldweg 1, 99999 Irgendwo") == (None, False)
+
+    def test_alter_fehlschlag_ist_offen(self, dienst):
+        alt = (datetime.now(UTC) - timedelta(days=MISS_GUELTIG_TAGE + 1)).isoformat()
+        geocode("Waldweg 1, 99999 Irgendwo")
+        from db.database import get_connection
+        conn = get_connection()
+        conn.execute("UPDATE geocode_cache SET resolved_at = ?", (alt,))
+        conn.commit()
+        conn.close()
+
+        assert geocoder.geocode_bekannt("Waldweg 1, 99999 Irgendwo") == (None, True)

@@ -73,6 +73,7 @@ from db.database import (
 from db.stammdaten import get_stammdaten
 from utils.geocoder import geocode, GeocoderNichtErreichbar
 from utils.fahrten import vorschlaege_fuer_spiel
+from utils.statistik import statistik
 from db.season import get_saisons, get_saison
 from db.beobachtungen import get_beobachtungen
 from db.spielberichte import get_bericht, get_dokument, get_index, Zuordnung, kurzinfo
@@ -628,6 +629,18 @@ async def get_match_fahrten(match_id: int, current_user: dict = Depends(get_curr
     """
     match = _owned_match(match_id, current_user['id'])
     return await run_in_threadpool(vorschlaege_fuer_spiel, match)
+
+
+@app.get("/api/statistik")
+async def get_statistik(saison: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    """
+    Spesen und Fahrtkosten der eigenen vergangenen Spiele einer Saison.
+
+    Geschaetzte Fahrtkosten brauchen Adresssuche und Routenplaner. Was
+    innerhalb weniger Sekunden nicht nachzuschlagen war, meldet "offen" -
+    das Frontend fragt dann noch einmal und bekommt den Rest.
+    """
+    return await run_in_threadpool(statistik, current_user['id'], saison)
 
 
 # ===== Download-Endpunkte: Dokumente entstehen bei jedem Abruf neu =====

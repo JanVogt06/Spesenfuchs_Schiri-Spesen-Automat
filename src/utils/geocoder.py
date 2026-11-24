@@ -224,6 +224,35 @@ def geocode(adresse: str, ort: Optional[str] = None) -> Optional[Dict]:
     return None
 
 
+def geocode_bekannt(adresse: str, ort: Optional[str] = None) -> Tuple[Optional[Dict], bool]:
+    """
+    Wie geocode, aber nur aus dem Zwischenspeicher - ohne jede Anfrage.
+
+    Rueckgabe (Treffer oder None, offen). offen heisst: mindestens eine
+    Stufe wurde noch nie (oder vor zu langer Zeit erfolglos) gefragt, ein
+    Aufruf von geocode() koennte also noch etwas finden. Fuer Auswertungen
+    ueber viele Adressen, die den oeffentlichen Dienst nicht in einem Rutsch
+    befragen duerfen.
+    """
+    kandidaten: List[Tuple[str, str]] = [(adresse, "adresse")]
+    grober_ort = ort or _ort_aus_adresse(adresse)
+    if grober_ort and _normalisieren(grober_ort) != _normalisieren(adresse):
+        kandidaten.append((grober_ort, "ort"))
+
+    provider = basis_url()
+    for kandidat, genauigkeit in kandidaten:
+        schluessel = _normalisieren(kandidat or "")
+        if not schluessel:
+            continue
+        eintrag = get_cached(schluessel, provider)
+        if not eintrag or (eintrag["lat"] is None and _fehlschlag_abgelaufen(eintrag["resolved_at"])):
+            return None, True
+        if eintrag["lat"] is not None and eintrag["lon"] is not None:
+            return {"lat": eintrag["lat"], "lon": eintrag["lon"], "genauigkeit": genauigkeit}, False
+
+    return None, False
+
+
 def _ort_aus_adresse(adresse: str) -> Optional[str]:
     """
     Schneidet aus "Strasse, PLZ Ort" den hinteren Teil heraus.

@@ -745,3 +745,21 @@ class TestFahrten:
 
     def test_ohne_anmeldung(self, client, ein_spiel):
         assert client.get(f"/api/matches/{ein_spiel}/fahrten").status_code == 401
+
+
+# ===== Statistik =====
+
+class TestStatistik:
+    def test_reicht_nutzer_und_saison_durch(self, client, user, auth_header, monkeypatch):
+        import api.main_api as modul
+        aufrufe = []
+        monkeypatch.setattr(modul, "statistik", lambda uid, saison: aufrufe.append((uid, saison)) or {"spiele": 3})
+
+        antwort = client.get("/api/statistik", params={"saison": "25/26"}, headers=auth_header)
+
+        assert antwort.status_code == 200
+        assert antwort.json() == {"spiele": 3}
+        assert aufrufe == [(user["id"], "25/26")]
+
+    def test_ohne_anmeldung(self, client):
+        assert client.get("/api/statistik").status_code == 401

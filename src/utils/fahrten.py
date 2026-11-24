@@ -140,15 +140,22 @@ def _personen_mit_anschrift(match: Dict) -> List[Dict]:
     return personen
 
 
-def spielort(match: Dict) -> Optional[Tuple[float, float]]:
-    """Koordinate des Spielorts: aus DFBnet, sonst ueber die Adresse."""
+def spielort_aus(match: Dict, suche) -> Optional[Tuple[float, float]]:
+    """
+    Koordinate des Spielorts: aus DFBnet, sonst ueber die Adresse. suche(adresse)
+    liefert einen Punkt oder None - geocode direkt oder mit Zeitbudget.
+    """
     if match.get("staette_lat") is not None and match.get("staette_lon") is not None:
         return match["staette_lat"], match["staette_lon"]
     adresse = ((match.get("spielstaette") or {}).get("adresse") or "").strip()
-    if not adresse:
-        return None
-    treffer = geocode(adresse)
-    return (treffer["lat"], treffer["lon"]) if treffer else None
+    return suche(adresse) if adresse else None
+
+
+def spielort(match: Dict) -> Optional[Tuple[float, float]]:
+    def suche(adresse):
+        treffer = geocode(adresse)
+        return (treffer["lat"], treffer["lon"]) if treffer else None
+    return spielort_aus(match, suche)
 
 
 def vorschlaege_fuer_spiel(match: Dict) -> Dict:
