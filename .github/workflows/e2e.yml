@@ -1,0 +1,82 @@
+name: End-to-end (DFBnet)
+
+# Ein echter Abruf mit dem Konto aus den Repository-Secrets DFB_USERNAME und
+# DFB_PASSWORD: Login, Ansetzungen, Stammdaten, Saisons, Beobachtungen,
+# Spielberichte, Quittungen (tests/e2e). Nicht bei jedem Push auf jeden
+# Branch - jeder Lauf ist ein Login bei DFBnet.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  # Der Release-Workflow ruft diesen auf, bevor er ein Image baut
+  workflow_call:
+    secrets:
+      DFB_USERNAME:
+        required: false
+      DFB_PASSWORD:
+        required: false
+
+permissions:
+  contents: read
+
+# Nie zwei Logins mit demselben Konto gleichzeitig
+concurrency:
+  group: e2e-dfbnet
+  cancel-in-progress: false
+
+jobs:
+  dfbnet:
+    name: Gesamtlauf gegen DFBnet
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DFB_USERNAME: ${{ secrets.DFB_USERNAME }}
+      DFB_PASSWORD: ${{ secrets.DFB_PASSWORD }}
+    steps:
+      # Forks und Repos ohne Secrets: ueberspringen statt rot werden
+      - name: Check credentials
+        id: zugang
+        run: |
+          if [ -n "$DFB_USERNAME" ] && [ -n "$DFB_PASSWORD" ]; then
+            echo "vorhanden=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::DFB_USERNAME/DFB_PASSWORD sind nicht als Secrets hinterlegt - Gesamtlauf uebersprungen"
+            echo "vorhanden=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout code
+        if: steps.zugang.outputs.vorhanden == 'true'
+        uses: actions/checkout@v7
+
+      # Dieselbe Version wie im Dockerfile
+      - name: Set up Python
+        if: steps.zugang.outputs.vorhanden == 'true'
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        if: steps.zugang.outputs.vorhanden == 'true'
+        run: |
+          pip install -r requirements-dev.txt
+          python -m playwright install --with-deps chromium
+
+      # Das Repository ist oeffentlich und damit auch dieses Log. Hier darf
+      # NICHTS erscheinen, was bei DFBnet gelesen wurde - auch keine Anzahlen.
+      # --show-capture=no: die Logger des Scrapers schreiben Teams und
+      # Termine; --tb=no und -p no:warnings: keine Werte aus Tracebacks oder
+      # Warnungen. Der Test meldet nur bestanden oder die Namen der
+      # fehlgeschlagenen Pruefungen. Keine Artefakte, keine Zusammenfassung -
+      # die Wegwerf-Datenbank enthaelt echte Daten und bleibt im Runner.
+      - name: Run end-to-end test
+        if: steps.zugang.outputs.vorhanden == 'true'
+        env:
+          SPESENFUCHS_E2E: '1'
+        run: >
+          python -m pytest tests/e2e -m e2e -q
+          -p no:cacheprovider -p no:warnings --show-capture=no --tb=no
+          -o addopts="--strict-markers -rfE"
