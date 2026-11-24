@@ -8,7 +8,7 @@ liefert und der Generator erwartet ('spiel_info', 'schiedsrichter',
 """
 import sqlite3
 from datetime import datetime, UTC
-from typing import Dict, List, Optional
+from typing import Dict, Iterable, List, Optional
 
 from db.database import get_connection
 from utils.logger import setup_logger
@@ -33,9 +33,10 @@ def build_match_key(spiel_info: Dict, spielstaette: Dict, datum: str) -> str:
     """
     Baut die kanonische Identitaet eines Spiels.
 
-    DFBnet liefert derzeit keine Spielnummer, also bleibt nur Heim + Gast +
-    Datum. Sobald die Spielnummer verfuegbar ist, wird sie hier zum Schluessel
-    und alles andere bleibt unveraendert.
+    Seit November 2026 bringt jedes gelesene Spiel seine DFBnet-ID mit
+    (Spalte dfb_spiel_id), und die ist dann seine Identitaet - siehe
+    _schreibe_mit_id. Dieser Schluessel bleibt fuer Zeilen ohne ID, fuer das
+    Uebernehmen solcher Zeilen und fuer die Eindeutigkeit je Nutzer.
 
     Mannschaftsart und Spielklasse gehoeren dazu, weil dieselben zwei Vereine
     am selben Tag zwei verschiedene Ansetzungen haben koennen - etwa ein
@@ -75,6 +76,92 @@ def _expense_prefix(rolle: str, seq: int) -> Optional[str]:
     return None
 
 
+def _merge_sets(quelle: str) -> str:
+    # Nur nicht-leere Werte uebernehmen; '' bedeutet "Scraper hat nichts
+    # geliefert", nicht "Feld ist jetzt leer".
+    return ",\n                ".join(
+        f"{field} = COALESCE(NULLIF({quelle}{field}, ''), matches.{field})"
+        for field in _MERGE_FIELDS
+    )
+
+
+def _schreibe_ohne_id(conn: sqlite3.Connection, values: Dict) -> int:
+    """Alter Weg ohne DFBnet-ID: das Spiel ist, was denselben match_key hat."""
+    columns = ", ".join(values)
+    placeholders = ", ".join(f":{name}" for name in values)
+
+    conn.execute(f"""
+        INSERT INTO matches ({columns})
+        VALUES ({placeholders})
+        ON CONFLICT (user_id, match_key) DO UPDATE SET
+            {_merge_sets("excluded.")},
+            datum = COALESCE(NULLIF(excluded.datum, '1900-01-01'), matches.datum),
+            scraped_at = excluded.scraped_at,
+            missing_since = NULL
+    """, values)
+
+    # Nicht lastrowid verwenden: nach ON CONFLICT DO UPDATE zeigt es nicht
+    # zuverlaessig auf die aktualisierte Zeile.
+    return conn.execute(
+        "SELECT id FROM matches WHERE user_id = ? AND match_key = ?",
+        (values["user_id"], values["match_key"]),
+    ).fetchone()["id"]
+
+
+def _freier_key(conn: sqlite3.Connection, user_id: int, match_key: str,
+                dfb_spiel_id: str, eigene_id: Optional[int]) -> str:
+    """
+    Der match_key fuer ein Spiel mit ID. Gehoert der Schluessel schon einer
+    anderen Zeile - ein anderes DFBnet-Spiel mit denselben Teams, Datum und
+    Klasse, oder eine Altlast nach einer Verlegung -, wird die ID angehaengt.
+    Die Eindeutigkeit (user_id, match_key) bleibt so erhalten.
+    """
+    belegt = conn.execute(
+        "SELECT 1 FROM matches WHERE user_id = ? AND match_key = ? AND id IS NOT ?",
+        (user_id, match_key, eigene_id),
+    ).fetchone()
+    return f"{match_key}|{dfb_spiel_id}" if belegt else match_key
+
+
+def _schreibe_mit_id(conn: sqlite3.Connection, values: Dict, dfb_spiel_id: str) -> int:
+    """
+    Die DFBnet-ID ist die Identitaet des Spiels. Gesucht wird erst nach ihr,
+    dann nach einer Zeile aus der Zeit vor den IDs mit demselben match_key -
+    die bekommt die ID und ist ab dann dieses Spiel. Eine Verlegung, auch auf
+    einen anderen Tag, bleibt so in derselben Zeile samt Fahrtkosten.
+    """
+    user_id = values["user_id"]
+
+    zeile = conn.execute(
+        "SELECT id FROM matches WHERE user_id = ? AND dfb_spiel_id = ?",
+        (user_id, dfb_spiel_id),
+    ).fetchone() or conn.execute(
+        "SELECT id FROM matches WHERE user_id = ? AND match_key = ? AND dfb_spiel_id IS NULL",
+        (user_id, values["match_key"]),
+    ).fetchone()
+
+    if zeile is None:
+        neu = {**values, "dfb_spiel_id": dfb_spiel_id,
+               "match_key": _freier_key(conn, user_id, values["match_key"], dfb_spiel_id, None)}
+        columns = ", ".join(neu)
+        placeholders = ", ".join(f":{name}" for name in neu)
+        return conn.execute(f"INSERT INTO matches ({columns}) VALUES ({placeholders})", neu).lastrowid
+
+    match_id = zeile["id"]
+    conn.execute(f"""
+        UPDATE matches SET
+            {_merge_sets(":")},
+            match_key = :match_key,
+            dfb_spiel_id = :dfb_spiel_id,
+            datum = COALESCE(NULLIF(:datum, '1900-01-01'), matches.datum),
+            scraped_at = :scraped_at,
+            missing_since = NULL
+        WHERE id = :id
+    """, {**values, "id": match_id, "dfb_spiel_id": dfb_spiel_id,
+          "match_key": _freier_key(conn, user_id, values["match_key"], dfb_spiel_id, match_id)})
+    return match_id
+
+
 def upsert_match(
     user_id: int,
     match_data: Dict,
@@ -98,6 +185,9 @@ def upsert_match(
 
     Die erfassten Fahrtkosten haengen an (match_id, rolle, seq) in einer
     eigenen Tabelle und ueberleben das Ersetzen der Unparteiischen.
+
+    Bringt das Spiel eine DFBnet-ID mit (spiel_info['dfb_spiel_id']), ist sie
+    die Identitaet; sonst der match_key (siehe _schreibe_mit_id).
 
     Returns:
         Die ID des Spiels.
@@ -133,33 +223,13 @@ def upsert_match(
         "scraped_at": scraped_at,
     }
 
-    # Nur nicht-leere Werte uebernehmen; '' bedeutet "Scraper hat nichts
-    # geliefert", nicht "Feld ist jetzt leer".
-    merge_sets = ",\n            ".join(
-        f"{field} = COALESCE(NULLIF(excluded.{field}, ''), matches.{field})"
-        for field in _MERGE_FIELDS
-    )
-
-    columns = ", ".join(values)
-    placeholders = ", ".join(f":{name}" for name in values)
+    dfb_spiel_id = (spiel_info.get("dfb_spiel_id") or "").strip()
 
     try:
-        conn.execute(f"""
-            INSERT INTO matches ({columns})
-            VALUES ({placeholders})
-            ON CONFLICT (user_id, match_key) DO UPDATE SET
-                {merge_sets},
-                datum = COALESCE(NULLIF(excluded.datum, '1900-01-01'), matches.datum),
-                scraped_at = excluded.scraped_at,
-                missing_since = NULL
-        """, values)
-
-        # Nicht lastrowid verwenden: nach ON CONFLICT DO UPDATE zeigt es nicht
-        # zuverlaessig auf die aktualisierte Zeile.
-        match_id = conn.execute(
-            "SELECT id FROM matches WHERE user_id = ? AND match_key = ?",
-            (user_id, match_key),
-        ).fetchone()["id"]
+        if dfb_spiel_id:
+            match_id = _schreibe_mit_id(conn, values, dfb_spiel_id)
+        else:
+            match_id = _schreibe_ohne_id(conn, values)
 
         # Schnappschuss der Unparteiischen ersetzen - aber nur, wenn der
         # Scrape welche geliefert hat. Sonst bliebe das Dokument namenlos.
@@ -203,7 +273,8 @@ def upsert_match(
             conn.close()
 
 
-def mark_missing_matches(user_id: int, seen_keys: List[str], now: Optional[str] = None) -> int:
+def mark_missing_matches(user_id: int, seen_keys: List[str], now: Optional[str] = None,
+                         seen_ids: Iterable[int] = ()) -> int:
     """
     Markiert kuenftige Ansetzungen, die im letzten Scrape nicht mehr auftauchten.
 
@@ -222,10 +293,18 @@ def mark_missing_matches(user_id: int, seen_keys: List[str], now: Optional[str] 
     mitverschwinden. Taucht das Spiel wieder auf, raeumt upsert_match die
     Markierung weg.
 
+    Args:
+        seen_keys: match_keys aus dem Scrape (alter Weg)
+        seen_ids: Zeilen-IDs, die upsert_match geliefert hat. Seit Spiele mit
+            DFBnet-ID auch bei geaendertem Schluessel in ihrer Zeile bleiben,
+            ist das der verlaessliche Weg.
+
     Returns:
         Anzahl neu markierter Spiele.
     """
-    if not seen_keys:
+    seen_keys = list(seen_keys or [])
+    seen_ids = [int(i) for i in seen_ids or []]
+    if not seen_keys and not seen_ids:
         # Leerer Scrape: nichts markieren. Ein Login-Fehler oder eine
         # spielfreie Woche darf nicht die ganze Historie entwerten.
         return 0
@@ -235,13 +314,15 @@ def mark_missing_matches(user_id: int, seen_keys: List[str], now: Optional[str] 
     conn = get_connection()
 
     try:
-        placeholders = ",".join("?" * len(seen_keys))
+        keys = ",".join("?" * len(seen_keys))
+        ids = ",".join("?" * len(seen_ids))
         cursor = conn.execute(f"""
             UPDATE matches SET missing_since = ?
             WHERE user_id = ? AND missing_since IS NULL
               AND datum >= ?
-              AND match_key NOT IN ({placeholders})
-        """, [now, user_id, today, *seen_keys])
+              AND match_key NOT IN ({keys})
+              AND id NOT IN ({ids})
+        """, [now, user_id, today, *seen_keys, *seen_ids])
 
         conn.commit()
         return cursor.rowcount
@@ -295,6 +376,7 @@ def _rows_to_matches(match_rows, official_rows, expense_rows) -> List[Dict]:
                 "spielklasse": match["spielklasse"],
                 "staffel": match["staffel"],
                 "spieltag": match["spieltag"],
+                "dfb_spiel_id": match.get("dfb_spiel_id") or "",
             },
             "schiedsrichter": [
                 {

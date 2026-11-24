@@ -551,6 +551,74 @@ class TestMigration018Nofv:
         }
 
 
+class TestMigration023DfbSpielId:
+    def _bericht(self, conn, uid, spiel_id, datum, heim, gast, uhrzeit="14:00", kennung=""):
+        conn.execute("""
+            INSERT INTO spielberichte (user_id, dfb_spiel_id, saison, datum, uhrzeit, heim, gast,
+                                       spielkennung, daten, scraped_at)
+            VALUES (?, ?, '26/27', ?, ?, ?, ?, ?, '{}', '2026-11-01')
+        """, (uid, spiel_id, datum, uhrzeit, heim, gast, kennung))
+        conn.commit()
+
+    def test_ids_und_kennungen_aus_den_berichten(self, leere_db, monkeypatch):
+        migriere_bis(monkeypatch, 22)
+        conn = _conn()
+        uid = nutzer_anlegen(conn)
+        fremd = nutzer_anlegen(conn, "kollege@example.org")
+        anpfiff = "Sonntag · 27.09.2026 · 14:00 Uhr"
+        # Andere Schreibweise im Einsatzplan: "II" statt "U23"
+        hertha = spiel_einfuegen(conn, uid, "hertha", datum="2026-09-27", anpfiff=anpfiff,
+                                 heim_team="Hertha BSC U23", gast_team="FSV Zwickau")
+        # Zurueckgezogen: an dem Tag ein anderes Spiel gepfiffen
+        anderes = spiel_einfuegen(conn, uid, "anderes", datum="2026-09-27", anpfiff=anpfiff,
+                                  heim_team="SV Musterdorf", gast_team="FC Beispiel")
+        # Gleiches Spiel beim Kollegen - dessen Bericht fehlt, also keine ID
+        kollege = spiel_einfuegen(conn, fremd, "hertha", datum="2026-09-27", anpfiff=anpfiff,
+                                  heim_team="Hertha BSC U23", gast_team="FSV Zwickau")
+        turnier = spiel_einfuegen(conn, uid, "turnier|Halle|x", datum="2026-09-27", anpfiff=anpfiff)
+        self._bericht(conn, uid, "SPIEL1", "2026-09-27", "Hertha BSC II", "FSV Zwickau", kennung="690047011")
+        self._bericht(conn, uid, "SPIEL2", "2026-09-28", "Hertha BSC II", "FSV Zwickau")
+        conn.close()
+
+        migriere_bis(monkeypatch, 23)
+
+        conn = _conn()
+        try:
+            zeilen = {r["id"]: (r["dfb_spiel_id"], r["spielnummer"])
+                      for r in conn.execute("SELECT id, dfb_spiel_id, spielnummer FROM matches")}
+            with pytest.raises(sqlite3.IntegrityError):
+                conn.execute("UPDATE matches SET dfb_spiel_id = 'SPIEL1' WHERE id = ?", (anderes,))
+        finally:
+            conn.close()
+        assert zeilen[hertha] == ("SPIEL1", "690047011")
+        assert zeilen[anderes] == (None, None)
+        assert zeilen[kollege] == (None, None)
+        assert zeilen[turnier] == (None, None)
+
+    def test_mehrdeutig_bleibt_ohne_id(self, leere_db, monkeypatch):
+        migriere_bis(monkeypatch, 22)
+        conn = _conn()
+        uid = nutzer_anlegen(conn)
+        for zeit in ("10:00", "12:00"):
+            spiel_einfuegen(conn, uid, f"jugend-{zeit}", datum="2026-09-27",
+                            anpfiff=f"Sonntag · 27.09.2026 · {zeit} Uhr",
+                            heim_team="FC Heim", gast_team="SV Gast")
+        # Bericht ohne Anstoss: kann keins der beiden sicher sein
+        self._bericht(conn, uid, "SPIEL1", "2026-09-27", "FC Heim", "SV Gast", uhrzeit="")
+        # Mit Anstoss eindeutig
+        self._bericht(conn, uid, "SPIEL2", "2026-09-27", "FC Heim", "SV Gast", uhrzeit="12:00")
+        conn.close()
+
+        migriere_bis(monkeypatch, 23)
+
+        conn = _conn()
+        try:
+            ids = {r["match_key"]: r["dfb_spiel_id"] for r in conn.execute("SELECT * FROM matches")}
+        finally:
+            conn.close()
+        assert ids == {"jugend-10:00": None, "jugend-12:00": "SPIEL2"}
+
+
 class TestDatenUeberlebenDasUpdate:
     def test_spiel_von_version_drei_bis_heute(self, leere_db, tmp_path, monkeypatch):
         """Eine Zeile aus der fruehesten Spiele-Version kommt unbeschaedigt oben an."""

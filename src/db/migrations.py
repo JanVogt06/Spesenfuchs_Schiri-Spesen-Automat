@@ -16,6 +16,7 @@ die Ordner fehlen, obwohl die Datenbank Sessions kennt.
 """
 import json
 import os
+import re
 import sqlite3
 from datetime import datetime, UTC
 from pathlib import Path
@@ -1121,6 +1122,86 @@ def _migration_022_dfb_login_abgelehnt(conn: sqlite3.Connection) -> None:
     """)
 
 
+def _migration_023_dfb_spiel_id(conn: sqlite3.Connection) -> None:
+    """
+    Die DFBnet-ID wird zur Identitaet eines Spiels.
+
+    Seit die Ansetzungen ueber die JSON-Schnittstelle gelesen werden, kommt
+    zu jedem Spiel dessen ID mit - dieselbe, unter der auch der Spielbericht
+    steht (spielberichte.dfb_spiel_id). Mit ihr bleibt ein verlegtes Spiel in
+    seiner Zeile, statt als neues aufzutauchen.
+
+    Bestehende Spiele bekommen ihre ID hier aus den gespeicherten
+    Spielberichten (gleicher Nutzer, gleicher Tag, beide Teams oder ein Team
+    plus Anstosszeit - wie beim Verknuepfen der Berichte in der Liste), dazu die
+    Spielkennung fuer die Spesenquittungen. Was keinen Bericht hat - vor allem
+    kuenftige Spiele -, ordnet der naechste Abruf ueber den match_key zu
+    (db.matches._schreibe_mit_id).
+
+    Mehrdeutige Faelle bleiben ohne ID: lieber spaeter zuordnen als falsch.
+    """
+    _run_script(conn, """
+        ALTER TABLE matches ADD COLUMN dfb_spiel_id TEXT;
+    """)
+
+    # Eigene Kopie der Zuordnung aus db.spielberichte (team_kern, Zuordnung):
+    # eine Migration darf sich nicht mit spaeteren Aenderungen am Code
+    # mitveraendern. Die Namen sind in den DFBnet-Modulen verschieden
+    # geschrieben ("Hertha BSC II" / "Hertha BSC U23", "... 1911" / "... 1911 e.V.").
+    zusatz = re.compile(r"^(u\d{1,2}|i{1,3}|iv|\d{1,2}|e|v|ev)$")
+
+    def kern(name):
+        text = (name or "").replace("\u00ad", "").casefold()
+        return "".join(w for w in re.split(r"[\W_]+", text) if w and not zusatz.match(w))
+
+    def gleich(a, b):
+        ka, kb = kern(a), kern(b)
+        if not ka or not kb:
+            return False
+        kurz, lang = sorted((ka, kb), key=len)
+        return ka == kb or (len(kurz) >= 8 and kurz in lang)
+
+    def zeit(text):
+        t = re.search(r"(\d{1,2}):(\d{2})", text or "")
+        return f"{int(t.group(1)):02d}:{t.group(2)}" if t else ""
+
+    spiele = {}
+    for match_id, user_id, datum, heim, gast, anpfiff in conn.execute(
+        "SELECT id, user_id, datum, heim_team, gast_team, anpfiff FROM matches "
+        "WHERE heim_team <> '' AND gast_team <> ''"
+    ):
+        spiele.setdefault((user_id, datum), []).append((match_id, heim, gast, zeit(anpfiff)))
+
+    belegt_spiel, belegt_id = set(), set()
+    zugeordnet = 0
+    for user_id, spiel_id, datum, uhrzeit, heim, gast, kennung in conn.execute(
+        "SELECT user_id, dfb_spiel_id, datum, uhrzeit, heim, gast, spielkennung FROM spielberichte"
+    ).fetchall():
+        kandidaten = [k for k in spiele.get((user_id, datum), []) if k[0] not in belegt_spiel]
+        beide = [k for k in kandidaten if gleich(k[1], heim) and gleich(k[2], gast)]
+        zur_zeit = [k for k in kandidaten if uhrzeit and k[3] == zeit(uhrzeit)]
+        if len(beide) > 1:
+            beide = [k for k in beide if k in zur_zeit]
+        if not beide:
+            beide = [k for k in zur_zeit if gleich(k[1], heim) or gleich(k[2], gast)]
+        if len(beide) != 1 or (user_id, spiel_id) in belegt_id:
+            continue
+
+        belegt_spiel.add(beide[0][0])
+        belegt_id.add((user_id, spiel_id))
+        zugeordnet += conn.execute(
+            "UPDATE matches SET dfb_spiel_id = ?, spielnummer = COALESCE(NULLIF(?, ''), spielnummer) "
+            "WHERE id = ? AND dfb_spiel_id IS NULL",
+            (spiel_id, kennung or "", beide[0][0]),
+        ).rowcount
+
+    _run_script(conn, """
+        CREATE UNIQUE INDEX idx_matches_user_dfb_spiel_id
+            ON matches (user_id, dfb_spiel_id) WHERE dfb_spiel_id IS NOT NULL;
+    """)
+    logger.info(f"DFBnet-ID aus Spielberichten zugeordnet: {zugeordnet} Spiele")
+
+
 # (Version, Beschreibung, Funktion) - aufsteigend, Luecken sind nicht erlaubt.
 MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "baseline schema", _migration_001_baseline),
@@ -1145,6 +1226,7 @@ MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (20, "log how match reports and their documents are opened", _migration_020_spielbericht_log),
     (21, "lock the login after repeated failed attempts", _migration_021_login_sperren),
     (22, "remember since when dfbnet rejects the stored credentials", _migration_022_dfb_login_abgelehnt),
+    (23, "identify matches by their dfbnet id", _migration_023_dfb_spiel_id),
 ]
 
 

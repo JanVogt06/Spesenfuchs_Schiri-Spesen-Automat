@@ -15,7 +15,7 @@ from scraper.dfb_scraper import DFBScraper
 from generator.docx_generator import KM_SATZ_EURO
 from generator.spesen_calculator import calculate_spesen
 from db.database import dfb_login_angenommen
-from db.matches import upsert_match, mark_missing_matches, build_match_key
+from db.matches import upsert_match, mark_missing_matches
 from db.stammdaten import upsert_stammdaten, get_stammdaten
 from db.beobachtungen import (
     replace_beobachtungs_saison, count_beobachtungen, get_fertige_beobachtungs_saisons,
@@ -55,13 +55,12 @@ def persist_matches(user_id: int, matches_data: List[dict], vollstaendig: bool =
     Returns:
         Anzahl gespeicherter Spiele.
     """
-    seen_keys = []
+    seen_ids = []
     saved = 0
 
     for match_data in matches_data:
         try:
             spiel_info = match_data.get('spiel_info', {}) or {}
-            spielstaette = match_data.get('spielstaette', {}) or {}
             datum = extract_iso_date_from_anpfiff(spiel_info.get('anpfiff', ''))
 
             sr_spesen, sra_spesen = calculate_spesen(
@@ -72,19 +71,20 @@ def persist_matches(user_id: int, matches_data: List[dict], vollstaendig: bool =
                 spiel_info.get('gast_team', '')
             )
 
-            upsert_match(user_id, match_data, datum, sr_spesen, sra_spesen, KM_SATZ_EURO)
-            seen_keys.append(build_match_key(spiel_info, spielstaette, datum))
+            seen_ids.append(
+                upsert_match(user_id, match_data, datum, sr_spesen, sra_spesen, KM_SATZ_EURO)
+            )
             saved += 1
 
         except Exception as e:
             logger.error(f"Spiel konnte nicht gespeichert werden: {e}")
             continue
 
-    if seen_keys and vollstaendig:
-        markiert = mark_missing_matches(user_id, seen_keys)
+    if seen_ids and vollstaendig:
+        markiert = mark_missing_matches(user_id, [], seen_ids=seen_ids)
         if markiert:
             logger.info(f"{markiert} Spiele nicht mehr in der Ansetzung - markiert")
-    elif seen_keys:
+    elif seen_ids:
         logger.warning(
             "Scrape war unvollstaendig - es wird kein Spiel als zurueckgezogen markiert"
         )

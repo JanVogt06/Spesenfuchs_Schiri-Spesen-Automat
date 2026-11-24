@@ -124,6 +124,21 @@ class TestUpsert:
         assert zeile["staffel"] == "Kreisoberliga Mittelthueringen"
         assert zeile["spieltag"] == "12"
 
+    def test_dfb_spiel_id_wird_gespeichert_und_bleibt(self, user):
+        mit_id = spiel()
+        mit_id["spiel_info"]["dfb_spiel_id"] = "031E47FI74000000VS5489BUVUR5FS5A"
+
+        mid = _upsert(user["id"], spiel())
+        assert _zeile(mid)["dfb_spiel_id"] is None
+
+        assert _upsert(user["id"], mit_id) == mid
+        assert _zeile(mid)["dfb_spiel_id"] == "031E47FI74000000VS5489BUVUR5FS5A"
+
+        # Ein spaeterer Abruf ohne ID loescht sie nicht
+        _upsert(user["id"], spiel())
+        assert _zeile(mid)["dfb_spiel_id"] == "031E47FI74000000VS5489BUVUR5FS5A"
+        assert get_match(mid)["spiel_info"]["dfb_spiel_id"] == "031E47FI74000000VS5489BUVUR5FS5A"
+
     def test_verlegung_aktualisiert_anpfiff(self, user):
         mid = _upsert(user["id"], spiel(zeit="13:00"))
         _upsert(user["id"], spiel(zeit="15:00", adresse="Neue Str. 2"))
@@ -237,6 +252,74 @@ class TestNutzertrennung:
         assert get_matches_for_user(4711) == []
 
 
+# ------------------------------------------------------- DFBnet-ID als Identitaet
+
+
+def mit_id(dfb_spiel_id, **kw):
+    daten = spiel(**kw)
+    daten["spiel_info"]["dfb_spiel_id"] = dfb_spiel_id
+    return daten
+
+
+class TestIdentitaetUeberId:
+    def test_alte_zeile_wird_ueber_den_schluessel_uebernommen(self, user):
+        alt = _upsert(user["id"], spiel())
+        set_official_expenses(alt, {"sr_km": 42.0})
+
+        assert _upsert(user["id"], mit_id("SPIEL1")) == alt
+        assert _zeile(alt)["dfb_spiel_id"] == "SPIEL1"
+        assert _anzahl("matches") == 1
+
+    def test_verlegung_auf_anderen_tag_bleibt_in_der_zeile(self, user):
+        mid = _upsert(user["id"], mit_id("SPIEL1", tag="2026-12-05"))
+        set_official_expenses(mid, {"sr_km": 42.0, "sr_oevm": 3.0})
+
+        assert _upsert(user["id"], mit_id("SPIEL1", tag="2026-12-12", zeit="15:00")) == mid
+
+        zeile = _zeile(mid)
+        assert _anzahl("matches") == 1
+        assert zeile["datum"] == "2026-12-12"
+        assert zeile["match_key"] == "FC Heim|SV Gast|2026-12-12|Herren|Kreisoberliga"
+        assert get_match(mid)["expenses"]["sr_km"] == 42.0
+
+    def test_zeile_mit_anderer_id_wird_nicht_uebernommen(self, user):
+        erstes = _upsert(user["id"], mit_id("SPIEL1"))
+        zweites = _upsert(user["id"], mit_id("SPIEL2"))
+
+        assert erstes != zweites
+        assert _zeile(erstes)["match_key"] == "FC Heim|SV Gast|2026-12-05|Herren|Kreisoberliga"
+        assert _zeile(zweites)["match_key"] == "FC Heim|SV Gast|2026-12-05|Herren|Kreisoberliga|SPIEL2"
+
+    def test_verlegung_auf_belegten_schluessel(self, user):
+        # Altlast: dasselbe Spiel liegt unter seinem neuen Termin schon als
+        # Zeile mit anderer ID vor - die Eindeutigkeit darf nicht reissen
+        _upsert(user["id"], mit_id("ALT", tag="2026-12-12"))
+        mid = _upsert(user["id"], mit_id("SPIEL1", tag="2026-12-05"))
+
+        _upsert(user["id"], mit_id("SPIEL1", tag="2026-12-12"))
+
+        assert _zeile(mid)["match_key"] == "FC Heim|SV Gast|2026-12-12|Herren|Kreisoberliga|SPIEL1"
+        assert _zeile(mid)["datum"] == "2026-12-12"
+
+    def test_leere_felder_ueberschreiben_nichts(self, user):
+        mid = _upsert(user["id"], mit_id("SPIEL1"))
+        _upsert(user["id"], mit_id("SPIEL1", staette="", spieltag=""))
+        assert _zeile(mid)["staette_name"] == "Sportplatz Am Wald"
+        assert _zeile(mid)["spieltag"] == "12"
+
+    def test_saetze_bleiben_eingefroren_und_markierung_geht(self, user):
+        mid = _upsert(user["id"], mit_id("SPIEL1"), sr=30.0)
+        mark_missing_matches(user["id"], ["x"], now="2026-11-23T12:00:00+00:00")
+
+        _upsert(user["id"], mit_id("SPIEL1"), sr=99.0)
+
+        assert _zeile(mid)["sr_spesen"] == 30.0
+        assert _zeile(mid)["missing_since"] is None
+
+    def test_nutzer_sind_getrennt(self, user, zweiter):
+        assert _upsert(user["id"], mit_id("SPIEL1")) != _upsert(zweiter, mit_id("SPIEL1"))
+
+
 # -------------------------------------------------------- Fehlende Spiele
 
 
@@ -288,6 +371,12 @@ class TestMarkMissing:
         _, _, kuenftig = self._drei(user["id"])
         mark_missing_matches(user["id"], ["x"])
         assert _zeile(kuenftig)["missing_since"] == "2026-11-23T12:00:00+00:00"
+
+    def test_gesehene_ids(self, user):
+        vergangen, heute, kuenftig = self._drei(user["id"])
+        assert mark_missing_matches(user["id"], [], now=self.JETZT, seen_ids=[kuenftig]) == 1
+        assert _zeile(heute)["missing_since"] == self.JETZT
+        assert _zeile(kuenftig)["missing_since"] is None
 
     def test_include_missing(self, user):
         _, _, kuenftig = self._drei(user["id"])
