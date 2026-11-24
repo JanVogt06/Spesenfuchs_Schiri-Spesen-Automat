@@ -6,7 +6,10 @@ import {InstallCard} from '@/components/pwa/InstallHinweis';
 
 export function SettingsPage() {
     return (
-        <AppShell>
+        <AppShell
+            titel="Einstellungen"
+            beschreibung="DFBnet-Zugang, Passwort, Darstellung und Installation als App."
+        >
             {/* Settings Cards Grid */}
             <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2 xl:grid-cols-3">
                 {/* DFB Credentials */}

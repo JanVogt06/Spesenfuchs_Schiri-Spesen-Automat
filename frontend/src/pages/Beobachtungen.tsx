@@ -60,7 +60,11 @@ export function BeobachtungenPage() {
     const displayError = error || ladeFehler;
 
     return (
-        <AppShell actions={<AktualisierenButton run={run} laeuft={isStarting || isRunning} onClick={startGeneration}/>}>
+        <AppShell
+            titel="Beobachtungen"
+            beschreibung="Deine Noten aus Schiri-Beobachtung und Schiri-Portal, je Saison und Rolle."
+            actions={<AktualisierenButton run={run} laeuft={isStarting || isRunning} onClick={startGeneration}/>}
+        >
             {displayError && (
                 <div className="mb-6 flex items-start gap-2 rounded-lg bg-destructive/10 px-4 py-3 ring-1 ring-destructive/20">
                     <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive"/>

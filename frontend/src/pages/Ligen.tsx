@@ -88,7 +88,17 @@ export function LigenPage() {
     const staffel = daten?.staffeln.find((eintrag) => eintrag.staffel_id === gewaehlt) ?? null;
 
     return (
-        <AppShell>
+        <AppShell
+            titel="Ligen"
+            beschreibung={(
+                <>
+                    Grundlage der Spesen bei Pokal- und Freundschaftsspielen im Herrenbereich.
+                    {daten?.bestand.aktualisiert_at && (
+                        <> Zuletzt abgeglichen am {abgeglichen(daten.bestand.aktualisiert_at)}.</>
+                    )}
+                </>
+            )}
+        >
             {ladeFehler && (
                 <div className="mb-6 flex items-start gap-2 rounded-lg bg-destructive/10 px-4 py-3 ring-1 ring-destructive/20">
                     <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive"/>
@@ -115,16 +125,6 @@ export function LigenPage() {
                 </div>
             ) : (
                 <div className="space-y-4">
-                    <div>
-                        <h1 className="text-lg font-semibold tracking-tight">Ligen</h1>
-                        <p className="text-sm text-muted-foreground">
-                            Grundlage der Spesen bei Pokal- und Freundschaftsspielen im Herrenbereich.
-                            {daten.bestand.aktualisiert_at && (
-                                <> Zuletzt abgeglichen am {abgeglichen(daten.bestand.aktualisiert_at)}.</>
-                            )}
-                        </p>
-                    </div>
-
                     <div className="flex flex-wrap gap-1.5">
                         {daten.staffeln.map((eintrag) => (
                             <Button

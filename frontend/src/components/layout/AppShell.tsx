@@ -11,6 +11,10 @@ import {DfbLoginHinweis} from '@/components/layout/DfbLoginHinweis';
 
 interface AppShellProps {
     children: ReactNode;
+    /** Ueberschrift der Seite; steht auch im Browser-Tab */
+    titel?: string;
+    /** Eine Zeile unter der Ueberschrift, wozu die Seite da ist */
+    beschreibung?: ReactNode;
     /** Optionale Aktions-Elemente rechts in der Navbar (z.B. der Aktualisieren-Knopf) */
     actions?: ReactNode;
 }
@@ -67,12 +71,25 @@ function useSichereRaender() {
     }, []);
 }
 
-export function AppShell({children, actions}: AppShellProps) {
+/** Seitentitel im Browser-Tab und im App-Umschalter, solange die Seite offen ist */
+function useDokumentTitel(titel?: string) {
+    useEffect(() => {
+        if (!titel) return;
+        const vorher = document.title;
+        document.title = `${titel} · Spesenfuchs`;
+        return () => {
+            document.title = vorher;
+        };
+    }, [titel]);
+}
+
+export function AppShell({children, titel, beschreibung, actions}: AppShellProps) {
     const navigate = useNavigate();
     const location = useLocation();
     const [mehrOffen, setMehrOffen] = useState(false);
     const dfbAbgelehntSeit = useDfbLoginStatus();
     useSichereRaender();
+    useDokumentTitel(titel);
 
     useEffect(() => {
         if (!mehrOffen) return;
@@ -156,6 +173,14 @@ export function AppShell({children, actions}: AppShellProps) {
 
             <main className="app-rahmen app-unten mx-auto w-full max-w-[96rem] flex-1 pt-6 sm:pt-8">
                 {dfbAbgelehntSeit && <DfbLoginHinweis abgelehntSeit={dfbAbgelehntSeit}/>}
+                {titel && (
+                    <div className="mb-6">
+                        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{titel}</h1>
+                        {beschreibung && (
+                            <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{beschreibung}</p>
+                        )}
+                    </div>
+                )}
                 {children}
             </main>
 

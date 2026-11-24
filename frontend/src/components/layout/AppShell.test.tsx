@@ -238,6 +238,34 @@ describe('AppShell - Navigation', () => {
     });
 });
 
+describe('AppShell - Seitenkopf', () => {
+    it('zeigt Ueberschrift und Beschreibung vor dem Inhalt und setzt den Tab-Titel', async () => {
+        getRouten({'/api/auth/me': {user_id: 1, email: 'sr@example.org', has_dfb_credentials: true, dfb_login_abgelehnt_seit: null}});
+        document.title = 'Spesenfuchs';
+        const {unmount} = render(
+            <MemoryRouter>
+                <AppShell titel="Spiele" beschreibung="Alle Ansetzungen"><p>Seiteninhalt</p></AppShell>
+            </MemoryRouter>,
+        );
+        await waitFor(() => expect(apiGet).toHaveBeenCalled());
+
+        const ueberschrift = screen.getByRole('heading', {level: 1, name: 'Spiele'});
+        expect(screen.getByText('Alle Ansetzungen')).toBeInTheDocument();
+        expect(ueberschrift.compareDocumentPosition(screen.getByText('Seiteninhalt')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(document.title).toBe('Spiele · Spesenfuchs');
+
+        unmount();
+        expect(document.title).toBe('Spesenfuchs');
+    });
+
+    it('laesst den Kopf ohne Titel weg', async () => {
+        zeige('/dashboard');
+        await waitFor(() => expect(apiGet).toHaveBeenCalled());
+
+        expect(screen.queryByRole('heading', {level: 1})).not.toBeInTheDocument();
+    });
+});
+
 describe('AppShell - sichere Raender', () => {
     it('setzt viewport-fit=cover und stellt den alten Wert beim Abbau wieder her', async () => {
         const meta = document.createElement('meta');

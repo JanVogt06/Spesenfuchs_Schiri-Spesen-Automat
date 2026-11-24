@@ -54,17 +54,17 @@ export function BugReportPage() {
     }
 
     return (
-        <AppShell>
-            <div className="mx-auto w-full max-w-2xl space-y-6">
-                <div>
-                    <h1 className="text-lg font-semibold tracking-tight">Fehler melden</h1>
-                    <p className="text-sm text-muted-foreground">
-                        Etwas stimmt nicht? Dieser Bericht geht direkt an die Entwicklung
-                        {status?.empfaenger ? ` (${status.empfaenger})` : ''}. Die eigene
-                        Mailadresse wird als Absender mitgeschickt, damit eine Rückfrage möglich ist.
-                    </p>
-                </div>
-
+        <AppShell
+            titel="Fehler melden"
+            beschreibung={(
+                <>
+                    Etwas stimmt nicht? Dieser Bericht geht direkt an die Entwicklung
+                    {status?.empfaenger ? ` (${status.empfaenger})` : ''}. Die eigene
+                    Mailadresse wird als Absender mitgeschickt, damit eine Rückfrage möglich ist.
+                </>
+            )}
+        >
+            <div className="w-full max-w-2xl space-y-6">
                 {status && !status.verfuegbar && (
                     <div className="flex items-start gap-2 rounded-lg bg-destructive/10 px-4 py-3 ring-1 ring-destructive/20">
                         <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive"/>

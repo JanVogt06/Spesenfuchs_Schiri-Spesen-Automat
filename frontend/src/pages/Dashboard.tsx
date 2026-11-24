@@ -132,7 +132,11 @@ export function DashboardPage() {
     const displayError = error || ladeFehler;
 
     return (
-        <AppShell actions={<AktualisierenButton run={run} laeuft={isStarting || isRunning} onClick={startGeneration}/>}>
+        <AppShell
+            titel="Übersicht"
+            beschreibung="Die nächsten Ansetzungen und die laufende Saison auf einen Blick."
+            actions={<AktualisierenButton run={run} laeuft={isStarting || isRunning} onClick={startGeneration}/>}
+        >
             <InstallBanner/>
 
             {displayError && (
