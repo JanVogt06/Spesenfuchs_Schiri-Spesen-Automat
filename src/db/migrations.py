@@ -1224,6 +1224,35 @@ def _migration_024_platz_und_eigene_rolle(conn: sqlite3.Connection) -> None:
     """)
 
 
+def _migration_025_strecken_cache(conn: sqlite3.Connection) -> None:
+    """
+    Zwischenspeicher fuer Strassenentfernungen zwischen zwei Koordinaten.
+
+    Kilometer-Vorschlaege und die geschaetzten Fahrtkosten der Statistik
+    fragen einen Routenplaner. Der oeffentliche Dienst von OpenStreetMap
+    Deutschland erlaubt eine Anfrage je Sekunde; dieselben Wege (Wohnort ->
+    Heimplatz des Nachbarvereins) wiederholen sich aber staendig. Jede
+    Strecke wird deshalb einmal gefragt und dann hier behalten.
+
+    Die Koordinaten stehen auf vier Nachkommastellen gerundet im Schluessel
+    (gut zehn Meter): genauer unterscheidet keine Strassenentfernung. Die
+    Richtung zaehlt - Einbahnstrassen machen Hin- und Rueckweg verschieden.
+    meter NULL heisst "der Dienst kennt keinen Weg", wie beim Geocoder.
+    """
+    _run_script(conn, """
+        CREATE TABLE strecken_cache (
+            von_lat REAL NOT NULL,
+            von_lon REAL NOT NULL,
+            nach_lat REAL NOT NULL,
+            nach_lon REAL NOT NULL,
+            provider TEXT NOT NULL,
+            meter REAL,
+            resolved_at TEXT NOT NULL,
+            PRIMARY KEY (von_lat, von_lon, nach_lat, nach_lon, provider)
+        );
+    """)
+
+
 MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (1, "baseline schema", _migration_001_baseline),
     (2, "wal journal mode", _migration_002_wal),
@@ -1249,6 +1278,7 @@ MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
     (22, "remember since when dfbnet rejects the stored credentials", _migration_022_dfb_login_abgelehnt),
     (23, "identify matches by their dfbnet id", _migration_023_dfb_spiel_id),
     (24, "venue coordinates and the own role per match", _migration_024_platz_und_eigene_rolle),
+    (25, "cache road distances for mileage suggestions", _migration_025_strecken_cache),
 ]
 
 
