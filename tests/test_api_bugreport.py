@@ -179,7 +179,7 @@ class TestSenden:
         assert antwort.status_code == 502
         fehler = fehlerbild(antwort)
         assert fehler["code"] == "MAIL_SEND_FAILED"
-        assert "smtp.example.org" in fehler["message"]
+        assert "smtp.example.org hat die Zugangsdaten abgelehnt" in fehler["message"]
         assert fehler["details"] == "SMTPAuthenticationError"
         # Der Fehlertext des Servers (kann Zugangsdaten enthalten) geht nicht hinaus
         assert "smtp-geheim" not in antwort.text
