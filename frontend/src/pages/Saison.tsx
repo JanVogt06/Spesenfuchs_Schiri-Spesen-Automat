@@ -4,6 +4,7 @@ import {AppShell} from '@/components/layout/AppShell';
 import {AktualisierenButton} from '@/components/layout/AktualisierenButton';
 import {SaisonBilanz} from '@/components/saison/SaisonBilanz';
 import {SaisonSpiele} from '@/components/saison/SaisonSpiele';
+import {SpesenStatistik} from '@/components/saison/SpesenStatistik';
 import {useScrapeRun} from '@/hooks/useScrapeRun';
 import {getSaisons, getSaison, type SaisonUebersicht, type SaisonDetails} from '@/lib/saison';
 import {AlertCircle, Loader2, Trophy} from 'lucide-react';
@@ -147,6 +148,7 @@ export function SaisonPage() {
                     ) : details ? (
                         <div className={cn('space-y-4', isLoadingDetails && 'opacity-60')}>
                             <SaisonBilanz einsaetze={details.einsaetze} lehrgaenge={details.lehrgaenge}/>
+                            <SpesenStatistik key={details.saison} saison={details.saison}/>
                             <SaisonSpiele spiele={details.spiele}/>
                         </div>
                     ) : null}

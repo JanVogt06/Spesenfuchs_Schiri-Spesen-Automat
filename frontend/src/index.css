@@ -31,6 +31,8 @@
   --color-ring: var(--ring);
   --color-nacht: var(--nacht);
   --color-flutlicht: var(--flutlicht);
+  --color-diagramm-spesen: var(--diagramm-spesen);
+  --color-diagramm-fahrt: var(--diagramm-fahrt);
 }
 
 :root {
@@ -54,6 +56,10 @@
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.62 0.11 155);
+
+  /* Zwei Reihen der Spesen-Statistik, gegen die Flaeche geprueft (Farbsehschwaeche, Kontrast) */
+  --diagramm-spesen: #2e7d4f;
+  --diagramm-fahrt: #3570b5;
 
   /*
     Der dunkle Block der Landingpage. Er sieht in beiden Themes gleich aus
@@ -83,6 +89,8 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.6 0.12 155);
+  --diagramm-spesen: #3fa86e;
+  --diagramm-fahrt: #5c8fd6;
 }
 
 @layer base {
