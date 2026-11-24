@@ -12,7 +12,7 @@ import {Link} from 'react-router-dom';
 import {formatEuro as formatDfbEuro, spielberichtPfad} from '@/lib/spielberichte';
 import {Calendar, ChevronDown, ChevronUp, Download, Users, MapPin, Map, Euro, Car, Check, Loader2, Info, FileText, Paperclip} from 'lucide-react';
 
-/** "12,5" oder "12.5" -> 12.5; leer -> null; ungültig -> undefined */
+/** "12,5" or "12.5" -> 12.5; empty -> null; invalid -> undefined */
 function parseGermanNumber(value: string): number | null | undefined {
     const trimmed = value.trim();
     if (trimmed === '') return null;
@@ -42,11 +42,11 @@ interface MatchCardProps {
     match: MatchData & { _spesen?: SpesenInfo };
     index: number;
     onDownload: (fileFormat: 'docx' | 'pdf') => void;
-    /** Formate, deren Download für dieses Spiel gerade läuft */
+    /** Formats whose download is currently running for this match */
     laufendeFormate: readonly ('docx' | 'pdf')[];
     selected?: boolean;
     onToggleSelected?: () => void;
-    /** Wird nach erfolgreichem Speichern aufgerufen, damit die Liste nachzieht */
+    /** Called after a successful save so the list catches up */
     onSaved?: () => void;
 }
 
@@ -56,7 +56,7 @@ export function MatchCard({
                           }: MatchCardProps) {
     const [isExpanded, setIsExpanded] = useState(false);
 
-    // Fahrtkosten/ÖVM-Eingaben (als Strings, deutsche Kommaeingabe erlaubt)
+    // Travel cost/ÖVM inputs (as strings, German comma input allowed)
     const [expenseInputs, setExpenseInputs] = useState<Record<string, string>>({
         sr_km: toInputValue(match._expenses?.sr_km),
         sr_oevm: toInputValue(match._expenses?.sr_oevm),
@@ -69,13 +69,13 @@ export function MatchCard({
     const [saveMessage, setSaveMessage] = useState('');
     const [saveError, setSaveError] = useState('');
 
-    // Sobald der Nutzer etwas tippt, dürfen neu geladene Serverwerte die
-    // Eingaben nicht mehr überschreiben
+    // As soon as the user types something, freshly loaded server values must
+    // no longer overwrite the inputs
     const hatEigeneEingaben = useRef(false);
 
-    // Wer ist tatsächlich angesetzt? Anzeige und Speichern müssen dieselbe
-    // Antwort verwenden, sonst werden Werte gespeichert, für die es kein
-    // Eingabefeld gibt.
+    // Who is actually assigned? Display and saving must use the same
+    // answer, otherwise values get saved for which there is no
+    // input field.
     const hasSRA1 = !!match.schiedsrichter?.some(sr => sr.rolle === 'SRA 1' && sr.name);
     const hasSRA2 = !!match.schiedsrichter?.some(sr => sr.rolle === 'SRA 2' && sr.name);
     const sichtbareRollen: Record<string, boolean> = {
@@ -84,10 +84,10 @@ export function MatchCard({
         sra2_km: hasSRA2, sra2_oevm: hasSRA2,
     };
 
-    // Lädt die Liste neu (z.B. nach einem Scrape oder einer Änderung auf einem
-    // anderen Gerät), müssen die Felder nachziehen. Ohne das behielte die Karte
-    // ihre Werte vom ersten Rendern und schriebe sie beim nächsten Speichern
-    // über den neueren Stand.
+    // When the list reloads (e.g. after a scrape or a change on another
+    // device), the fields have to catch up. Without that the card would keep
+    // its values from the first render and overwrite the newer state with
+    // them on the next save.
     useEffect(() => {
         if (hatEigeneEingaben.current) return;
         setExpenseInputs({
@@ -106,10 +106,10 @@ export function MatchCard({
             return;
         }
 
-        // Eingaben parsen und validieren. Für Rollen ohne Eingabefeld wird
-        // ausdrücklich null geschickt: ist eine Assistenz nachträglich
-        // abgesetzt worden, stünden ihre Kilometer sonst weiter im Dokument,
-        // ohne dass es ein Feld gäbe, um sie zu löschen.
+        // Parse and validate the inputs. For roles without an input field, null
+        // is sent explicitly: if an assistant was removed from the match
+        // afterwards, their kilometres would otherwise stay in the document
+        // with no field to delete them.
         const expenses: MatchExpenses = {};
         for (const key of Object.keys(expenseInputs) as (keyof MatchExpenses)[]) {
             if (!sichtbareRollen[key]) {
@@ -154,7 +154,7 @@ export function MatchCard({
                 const anpfiff = match.spiel_info.anpfiff;
                 let date: Date | null = null;
 
-                // Format: "Samstag · 22.11.2025 · 11:00 Uhr" (DFBnet Format)
+                // Format: "Samstag · 22.11.2025 · 11:00 Uhr" (DFBnet format)
                 if (anpfiff.includes('·')) {
                     const parts = anpfiff.split('·').map(p => p.trim());
                     // parts[0] = "Samstag", parts[1] = "22.11.2025", parts[2] = "11:00 Uhr"
@@ -166,7 +166,7 @@ export function MatchCard({
                             date = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${timePart}`);
                         }
                     } else if (parts.length === 2) {
-                        // Nur Datum ohne Zeit: "Samstag · 22.11.2025"
+                        // Date only, no time: "Samstag · 22.11.2025"
                         const datePart = parts[1];
                         const [day, month, year] = datePart.split('.');
                         if (day && month && year) {
@@ -174,11 +174,11 @@ export function MatchCard({
                         }
                     }
                 }
-                // ISO 8601 Format (z.B. "2025-11-20T15:00:00")
+                // ISO 8601 format (e.g. "2025-11-20T15:00:00")
                 else if (anpfiff.includes('T') || (anpfiff.includes('-') && !anpfiff.includes('.'))) {
                     date = new Date(anpfiff);
                 }
-                // Deutsches Format ohne Wochentag (z.B. "20.11.2025 15:00")
+                // German format without weekday (e.g. "20.11.2025 15:00")
                 else if (anpfiff.includes('.')) {
                     const parts = anpfiff.split(' ');
                     if (parts.length >= 2) {
@@ -186,22 +186,22 @@ export function MatchCard({
                         const time = parts[1].replace('Uhr', '').trim() || '00:00';
                         date = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${time}`);
                     } else {
-                        // Nur Datum ohne Uhrzeit
+                        // Date only, no time of day
                         const [day, month, year] = parts[0].split('.');
                         date = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`);
                     }
                 }
-                // Falls bereits ein Timestamp
+                // In case it is already a timestamp
                 else if (!isNaN(Number(anpfiff))) {
                     date = new Date(Number(anpfiff));
                 } else {
-                    // Fallback: Versuche direktes Parsen
+                    // Fallback: try parsing directly
                     date = new Date(anpfiff);
                 }
 
-                // Prüfe, ob das Datum gültig ist
+                // Check whether the date is valid
                 if (!date || isNaN(date.getTime())) {
-                    // Kein Fehler loggen, einfach Original zurückgeben
+                    // Do not log an error, just return the original
                     return anpfiff;
                 }
 
@@ -214,7 +214,7 @@ export function MatchCard({
                     minute: '2-digit',
                 }) + ' Uhr';
             } catch {
-                // Bei Fehlern einfach den Original-String zurückgeben
+                // On errors just return the original string
                 return match.spiel_info.anpfiff;
             }
         }
@@ -250,7 +250,7 @@ export function MatchCard({
             return null;
         }
 
-        // Felder die wir immer anzeigen wollen (auch wenn leer für Konsistenz)
+        // Fields we always want to show (even if empty, for consistency)
         const priorityFields = ['spielklasse', 'staffel', 'mannschaftsart', 'spieltag'];
         const fieldsToShow = Object.entries(match.spiel_info)
             .filter(([key, value]) =>
@@ -263,7 +263,7 @@ export function MatchCard({
             return null;
         }
 
-        // Sortiere Felder: Prioritäts-Felder zuerst
+        // Sort fields: priority fields first
         fieldsToShow.sort((a, b) => {
             const aIndex = priorityFields.indexOf(a[0]);
             const bIndex = priorityFields.indexOf(b[0]);
@@ -298,12 +298,12 @@ export function MatchCard({
             return null;
         }
 
-        // Keine Anzeige wenn keine Spesen berechnet wurden und kein Hinweis vorhanden
+        // No display if no expenses were calculated and there is no notice
         if (!spesen.sr_formatted && !spesen.hinweis) {
             return null;
         }
 
-        // Prüfe ob SRAs angesetzt sind
+        // Check whether assistant referees (SRAs) are assigned
         const hasSRA = match.schiedsrichter?.some(sr => sr.rolle?.startsWith('SRA'));
 
         return (
@@ -336,9 +336,9 @@ export function MatchCard({
         );
     };
 
-    // Was DFBnet im Spielbericht an Kosten fuehrt - nur die Summen des ganzen
-    // Gespanns. Reine Anzeige: welcher Anteil die eigenen Fahrtkosten waren,
-    // laesst sich daraus nicht ablesen, also wird nichts uebernommen.
+    // The costs DFBnet lists in the match report - only the totals for the whole
+    // crew. Display only: the share that was the user's own travel costs
+    // cannot be derived from it, so nothing is adopted.
     const renderDfbKosten = () => {
         const bericht = match._spielbericht;
         if (!bericht || (bericht.fahrtkosten === null && bericht.spesen === null)) return null;
@@ -363,7 +363,7 @@ export function MatchCard({
         );
     };
 
-    /** Füllt die km-Felder aus einem Vorschlag; Mitfahrer bekommen 0 */
+    /** Fills the km fields from a suggestion; passengers get 0 */
     const uebernehmeKilometer = (km: Partial<Record<RollenPraefix, number>>) => {
         hatEigeneEingaben.current = true;
         setExpenseInputs((vorher) => {
@@ -378,14 +378,14 @@ export function MatchCard({
     };
 
     const renderExpenses = () => {
-        // Nur Rollen anzeigen, die tatsächlich angesetzt sind (SR immer)
+        // Only show roles that are actually assigned (SR always)
         const rows = [
             {label: 'SR', kmKey: 'sr_km', oevmKey: 'sr_oevm'},
             ...(hasSRA1 ? [{label: 'SRA 1', kmKey: 'sra1_km', oevmKey: 'sra1_oevm'}] : []),
             ...(hasSRA2 ? [{label: 'SRA 2', kmKey: 'sra2_km', oevmKey: 'sra2_oevm'}] : []),
         ];
 
-        // Eine Person gilt als erfasst, sobald km oder ÖVM eingetragen ist (auch 0)
+        // A person counts as recorded as soon as km or ÖVM is entered (even 0)
         const erfasstProZeile = rows.map(({kmKey, oevmKey}) =>
             expenseInputs[kmKey].trim() !== '' || expenseInputs[oevmKey].trim() !== ''
         );
@@ -470,10 +470,10 @@ export function MatchCard({
                     </p>
 
                     {/*
-                      Die Karte schluckt ihre Klicks: ein Zug an der Karte darf die
-                      Spielkarte nicht für den Sammel-Download auswählen. Die Ausnahmen
-                      in handleCardClick greifen hier nicht, weil Leaflet auf Flächen
-                      reagiert, nicht auf Bedienelemente.
+                      The map swallows its clicks: dragging the map must not select the
+                      match card for the bulk download. The exceptions in
+                      handleCardClick do not apply here, because Leaflet reacts to
+                      areas, not to controls.
                     */}
                     {match._id && (
                         <div onClick={(e) => e.stopPropagation()}>
@@ -489,7 +489,7 @@ export function MatchCard({
         );
     };
 
-    /** Telefon und E-Mail der Kollegen zum Antippen - am Handy ruft das direkt an */
+    /** Colleagues' phone and e-mail to tap - on a phone this calls directly */
     const renderKontakt = (key: string, value: string) => {
         const linkClass = 'break-words text-primary underline-offset-2 hover:underline';
         if (key === 'telefon') {
@@ -559,12 +559,12 @@ export function MatchCard({
         );
     };
 
-    // Kompakte Spesen-Anzeige im Header (nur wenn vorhanden)
+    // Compact expenses display in the header (only if present)
     const renderHeaderSpesen = () => {
         const spesen = match._spesen;
         if (!spesen?.sr_formatted) return null;
 
-        // Prüfe ob SRAs angesetzt sind
+        // Check whether assistant referees (SRAs) are assigned
         const hasSRA = match.schiedsrichter?.some(sr => sr.rolle?.startsWith('SRA'));
 
         return (
@@ -576,11 +576,11 @@ export function MatchCard({
     };
 
     /**
-     * Ein Klick auf die Karte waehlt sie fuer den Sammel-Download aus.
+     * A click on the card selects it for the bulk download.
      *
-     * Klicks auf Bedienelemente sind ausgenommen - sonst wuerde jeder Download,
-     * jedes Aufklappen und jede Eingabe im Kilometerfeld die Auswahl mit
-     * umschalten.
+     * Clicks on controls are excluded - otherwise every download,
+     * every expand and every input in the kilometre field would also
+     * toggle the selection.
      */
     const handleCardClick = (event: React.MouseEvent) => {
         if (!onToggleSelected) return;

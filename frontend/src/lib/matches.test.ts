@@ -36,7 +36,7 @@ describe('triggerBrowserDownload', () => {
         expect(download.createObjectURL).toHaveBeenCalledWith(blob);
         expect(download.klicks).toEqual([{href: 'blob:test/1', download: 'Spesen.pdf', imDokument: true}]);
         expect(download.revokeObjectURL).toHaveBeenCalledWith('blob:test/1');
-        // Erst nach dem Klick freigeben, sonst laedt der Browser nichts
+        // Only revoke after the click, otherwise the browser downloads nothing
         expect(download.revokeObjectURL.mock.invocationCallOrder[0])
             .toBeGreaterThan(download.createObjectURL.mock.invocationCallOrder[0]);
     });
@@ -134,8 +134,8 @@ describe('Endpunkte', () => {
         expect(apiPost.mock.calls[0][1]).toEqual({match_ids: [5], file_format: 'docx'});
     });
 
-    // Der Dateiname nimmt das lokale Datum, nicht UTC: wer in Deutschland kurz
-    // nach Mitternacht herunterlaedt, bekommt sonst das Datum von gestern.
+    // The file name uses the local date, not UTC: anyone downloading in Germany
+    // shortly after midnight would otherwise get yesterday's date.
     it('downloadMatchesAsZip nimmt kurz nach Mitternacht das lokale Datum', async () => {
         vi.stubEnv('TZ', 'Europe/Berlin');
         vi.useFakeTimers({toFake: ['Date']});

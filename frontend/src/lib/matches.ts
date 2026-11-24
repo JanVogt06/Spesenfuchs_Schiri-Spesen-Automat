@@ -1,7 +1,7 @@
 import {api} from './api';
 import type {SpielberichtKurz} from './spielberichte';
 
-// Match Data Types - basierend auf tatsächlicher DFBnet-Struktur
+// Match data types - based on the actual DFBnet structure
 export interface SpielInfo {
     anpfiff?: string;
     heim_team?: string;
@@ -46,14 +46,14 @@ export interface MatchData {
     spiel_info: SpielInfo;
     schiedsrichter: Schiedsrichter[];
     spielstaette: Spielstaette;
-    // Metadata von Backend
+    // Metadata from the backend
     _id: number;
     _datum?: string;
     _filename?: string;
     _expenses?: MatchExpenses | null;
-    /** Gesetzt, wenn eine künftige Ansetzung nicht mehr in DFBnet steht */
+    /** Set when a future assignment no longer appears in DFBnet */
     _missing_since?: string | null;
-    /** Der Spielbericht aus DFBnet, sobald das Spiel vorbei und der Bericht gelesen ist */
+    /** The match report from DFBnet, once the match is over and the report has been read */
     _spielbericht?: SpielberichtKurz | null;
 }
 
@@ -64,10 +64,10 @@ export interface SaveExpensesResult {
 }
 
 /**
- * Speichert Fahrtkosten/ÖVM für ein Spiel.
+ * Saves travel costs/public transport costs (ÖVM) for a match.
  *
- * Es wird nichts mehr neu generiert: Dokumente entstehen erst beim Download
- * und tragen den gespeicherten Wert dann automatisch.
+ * Nothing is regenerated any more: documents are only created on download
+ * and then carry the stored value automatically.
  */
 export async function saveMatchExpenses(
     matchId: number,
@@ -80,7 +80,7 @@ export async function saveMatchExpenses(
     return response.data;
 }
 
-/** Eine Person oder die Spielstätte an einem Punkt der Karte */
+/** A person or the venue at a point on the map */
 export interface GeoEintrag {
     rolle: string;
     name: string;
@@ -91,33 +91,33 @@ export interface GeoPunkt {
     adresse: string;
     lat: number;
     lon: number;
-    /** 'ort' heißt: nur der Ortsmittelpunkt, die genaue Anschrift war nicht auffindbar */
+    /** 'ort' means: only the centre of the town, the exact address could not be found */
     genauigkeit: 'adresse' | 'ort';
-    /** Mehrere, wenn zwei Angesetzte unter derselben Anschrift wohnen */
+    /** Several if two assigned officials live at the same address */
     eintraege: GeoEintrag[];
 }
 
 export interface GeoDaten {
     punkte: GeoPunkt[];
     ohne_treffer: { rolle: string; name: string; adresse: string }[];
-    /** Der Geocoder hat nicht geantwortet - ein erneuter Versuch kann klappen */
+    /** The geocoder did not respond - trying again may work */
     gestoert: boolean;
     kacheln: { url: string; attribution: string };
 }
 
 /**
- * Koordinaten der Anschriften eines Spiels für die Karte.
+ * Coordinates of a match's addresses for the map.
  *
- * Der erste Aufruf zu einem Spiel kann ein paar Sekunden dauern: die
- * Adressen werden dann einmalig beim Geocoder nachgeschlagen. Danach
- * antwortet der Server aus seinem Zwischenspeicher.
+ * The first call for a match can take a few seconds: the addresses
+ * are then looked up once at the geocoder. After that the server
+ * answers from its cache.
  */
 export async function getMatchGeo(matchId: number): Promise<GeoDaten> {
     const response = await api.get<GeoDaten>(`/api/matches/${matchId}/geo`);
     return response.data;
 }
 
-/** Formular-Praefix einer Rolle: sr, sra1, sra2 */
+/** Form prefix of a role: sr, sra1, sra2 */
 export type RollenPraefix = 'sr' | 'sra1' | 'sra2';
 
 /** An approximate point on the driver's way where the others join */
@@ -147,9 +147,9 @@ export interface Fahrgemeinschaft {
     ersparnis: number;
 }
 
-/** Kilometer-Vorschläge eines Spiels, jeweils Hin- und Rückfahrt in ganzen km */
+/** Kilometre suggestions for a match, each round trip in whole km */
 export interface FahrtVorschlaege {
-    /** strasse: Routenplaner; luftlinie: Notbehelf ohne Routenplaner; gestoert: Adresssuche ausgefallen */
+    /** strasse: route planner; luftlinie: fallback without a route planner; gestoert: address search unavailable */
     quelle: 'strasse' | 'luftlinie' | 'gestoert';
     selbst: RollenPraefix | null;
     einzeln: {km: Partial<Record<RollenPraefix, number>>; gesamt: number};
@@ -158,19 +158,19 @@ export interface FahrtVorschlaege {
     ohne_spielort: boolean;
 }
 
-/** Fragt beim ersten Mal Adresssuche und Routenplaner - das kann Sekunden dauern */
+/** The first time, this queries the address search and route planner - that can take seconds */
 export async function getFahrtVorschlaege(matchId: number): Promise<FahrtVorschlaege> {
     const response = await api.get<FahrtVorschlaege>(`/api/matches/${matchId}/fahrten`);
     return response.data;
 }
 
-// API Funktionen
+// API functions
 export async function getAllMatches(): Promise<MatchData[]> {
     const response = await api.get<MatchData[]>('/api/matches');
     return response.data;
 }
 
-/** Lädt die Abrechnung eines Spiels - wird serverseitig frisch erzeugt */
+/** Downloads the statement of a match - freshly generated on the server */
 export async function downloadMatchDocument(
     matchId: number,
     fileFormat: 'docx' | 'pdf',
@@ -182,7 +182,7 @@ export async function downloadMatchDocument(
     triggerBrowserDownload(response.data, filename);
 }
 
-/** Lädt mehrere ausgewählte Spiele gebündelt als ZIP */
+/** Downloads several selected matches bundled as a ZIP */
 export async function downloadMatchesAsZip(
     matchIds: number[],
     fileFormat: 'docx' | 'pdf' | 'both' = 'both'
@@ -192,7 +192,7 @@ export async function downloadMatchesAsZip(
         {match_ids: matchIds, file_format: fileFormat},
         {responseType: 'blob'},
     );
-    // Lokales Datum: toISOString waere UTC, kurz nach Mitternacht also gestern
+    // Local date: toISOString would be UTC, i.e. yesterday shortly after midnight
     const jetzt = new Date();
     const datum = [
         jetzt.getFullYear(),
@@ -203,11 +203,11 @@ export async function downloadMatchesAsZip(
 }
 
 /**
- * Liest die Fehlermeldung des Servers aus einer fehlgeschlagenen Anfrage.
+ * Reads the server's error message from a failed request.
  *
- * Downloads laufen mit responseType 'blob', deshalb liefert axios auch den
- * JSON-Fehlerkörper als Blob - ein direkter Zugriff auf error.response.data.error
- * ergäbe undefined. Der Blob muss erst asynchron gelesen werden.
+ * Downloads use responseType 'blob', so axios also returns the JSON error
+ * body as a Blob - accessing error.response.data.error directly would
+ * yield undefined. The blob has to be read asynchronously first.
  */
 export async function extractApiError(error: unknown, fallback: string): Promise<string> {
     const antwort = (error as {response?: {data?: unknown}})?.response?.data;
