@@ -101,7 +101,9 @@ export function Datenschutz() {
                             Dienst von OpenStreetMap Deutschland (routing.openstreetmap.de, FOSSGIS
                             e.V.). Übertragen werden allein Koordinaten, also Punkte auf der Karte,
                             ohne Namen, Anschrift oder Spiel. Jede Strecke wird dauerhaft in der
-                            Datenbank gespeichert und nur ein einziges Mal gefragt.
+                            Datenbank gespeichert und nur ein einziges Mal gefragt. Schlägt die
+                            Anwendung einen Treffpunkt unterwegs vor, fragt sie beim Geocoding-Dienst
+                            einmalig nach dem Ort rund um diesen Punkt.
                         </li>
                         <li>
                             Die Kartenbilder lädt dein Browser direkt beim Kachelserver von
