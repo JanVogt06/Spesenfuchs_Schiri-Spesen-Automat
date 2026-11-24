@@ -3,7 +3,7 @@ import {useNavigate, useLocation, Link} from 'react-router-dom';
 import {Button} from '@/components/ui/button';
 import {logout} from '@/lib/auth';
 import {
-    Receipt, Settings, LogOut, LayoutDashboard, IdCard, Trophy, FileText, Table2, Bug, Ellipsis, ClipboardCheck,
+    Receipt, Settings, LogOut, LayoutDashboard, IdCard, Trophy, CalendarDays, Table2, Bug, Ellipsis, ClipboardCheck,
 } from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {useDfbLoginStatus} from '@/hooks/useDfbLoginStatus';
@@ -24,7 +24,7 @@ interface NavItem {
 // Die vier Reiter, die am Handy direkt in der Tab-Leiste stehen
 const hauptItems: NavItem[] = [
     {label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard},
-    {label: 'Spesen', path: '/spesen', icon: FileText},
+    {label: 'Spiele', path: '/spiele', icon: CalendarDays},
     {label: 'Saison', path: '/saison', icon: Trophy},
     {label: 'Ligen', path: '/ligen', icon: Table2},
 ];

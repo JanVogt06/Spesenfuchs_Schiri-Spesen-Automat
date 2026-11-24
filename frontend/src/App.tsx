@@ -5,7 +5,7 @@ import {RegisterPage} from './pages/Register';
 import {LandingPage} from './pages/Landing';
 import {DashboardPage} from './pages/Dashboard';
 import {SettingsPage} from './pages/Settings';
-import {SpesenPage} from './pages/Spesen';
+import {SpielePage} from './pages/Spiele';
 import {SaisonPage} from './pages/Saison';
 import {SpielberichtPage} from './pages/Spielbericht';
 import {BeobachtungenPage} from './pages/Beobachtungen';
@@ -59,13 +59,16 @@ function App() {
                 />
 
                 <Route
-                    path="/spesen"
+                    path="/spiele"
                     element={
                         <ProtectedRoute>
-                            <SpesenPage/>
+                            <SpielePage/>
                         </ProtectedRoute>
                     }
                 />
+
+                {/* Der Reiter hiess frueher "Spesen" - alte Lesezeichen fuehren weiter */}
+                <Route path="/spesen" element={<Navigate to="/spiele" replace/>}/>
 
                 <Route
                     path="/saison"

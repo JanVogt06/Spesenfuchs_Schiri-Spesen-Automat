@@ -9,7 +9,7 @@ import {getAllMatches, type MatchData} from '@/lib/matches';
 import {AlertCircle, Loader2} from 'lucide-react';
 import {cn} from '@/lib/utils';
 
-export function SpesenPage() {
+export function SpielePage() {
     const [matches, setMatches] = useState<MatchData[]>([]);
     const [isLoadingMatches, setIsLoadingMatches] = useState(true);
     const [matchesError, setMatchesError] = useState('');

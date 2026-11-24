@@ -193,7 +193,7 @@ export function DashboardPage() {
                                     <Calendar className="size-4 text-muted-foreground"/>
                                     <CardTitle className="text-sm">Nächste Ansetzungen</CardTitle>
                                 </div>
-                                <Button variant="ghost" size="sm" onClick={() => navigate('/spesen')}>
+                                <Button variant="ghost" size="sm" onClick={() => navigate('/spiele')}>
                                     Alle Spiele
                                     <ArrowRight className="size-3.5"/>
                                 </Button>

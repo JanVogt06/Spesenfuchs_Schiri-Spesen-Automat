@@ -85,7 +85,7 @@ describe('AppShell - DFBnet-Hinweis', () => {
     });
 
     it('steht oberhalb des Seiteninhalts', async () => {
-        zeige('/spesen', SEIT);
+        zeige('/spiele', SEIT);
 
         const hinweis = await screen.findByRole('alert');
         const inhalt = screen.getByText('Seiteninhalt');
@@ -119,7 +119,7 @@ describe('AppShell - Navigation', () => {
 
         const aktiv = kopfzeile().getByRole('button', {name: 'Saison'});
         expect(aktiv).toHaveClass('bg-primary/10', 'text-primary');
-        for (const name of ['Dashboard', 'Spesen', 'Ligen', 'Beobachtungen', 'Stammdaten', 'Fehler melden', 'Einstellungen']) {
+        for (const name of ['Dashboard', 'Spiele', 'Ligen', 'Beobachtungen', 'Stammdaten', 'Fehler melden', 'Einstellungen']) {
             expect(kopfzeile().getByRole('button', {name})).not.toHaveClass('text-primary');
         }
     });
@@ -138,7 +138,7 @@ describe('AppShell - Navigation', () => {
         zeige('/stammdaten');
         await waitFor(() => expect(apiGet).toHaveBeenCalled());
 
-        for (const name of ['Dashboard', 'Spesen', 'Saison', 'Ligen']) {
+        for (const name of ['Dashboard', 'Spiele', 'Saison', 'Ligen']) {
             expect(tabLeiste().getByRole('button', {name})).not.toHaveAttribute('aria-current');
         }
         const mehr = tabLeiste().getByRole('button', {name: /Mehr/});
@@ -155,8 +155,8 @@ describe('AppShell - Navigation', () => {
         zeige('/dashboard');
         await waitFor(() => expect(apiGet).toHaveBeenCalled());
 
-        await userEvent.click(kopfzeile().getByRole('button', {name: 'Spesen'}));
-        expect(screen.getByTestId('ort')).toHaveTextContent('/spesen');
+        await userEvent.click(kopfzeile().getByRole('button', {name: 'Spiele'}));
+        expect(screen.getByTestId('ort')).toHaveTextContent('/spiele');
 
         await userEvent.click(tabLeiste().getByRole('button', {name: 'Saison'}));
         expect(screen.getByTestId('ort')).toHaveTextContent('/saison');

@@ -289,13 +289,13 @@ describe('DashboardPage - Naechste Ansetzungen', () => {
         expect(kennzahl('Nächstes Spiel')).toMatchObject({wert: '–', zusatz: 'keine offene Ansetzung'});
     });
 
-    it('fuehrt ueber "Alle Spiele" zu den Spesen', async () => {
+    it('fuehrt ueber "Alle Spiele" zu den Spielen', async () => {
         zeige();
         await geladen();
 
         await userEvent.click(screen.getByRole('button', {name: 'Alle Spiele'}));
 
-        expect(screen.getByTestId('ort')).toHaveTextContent('/spesen');
+        expect(screen.getByTestId('ort')).toHaveTextContent('/spiele');
     });
 });
 

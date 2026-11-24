@@ -71,7 +71,7 @@ describe('DfbLoginHinweis', () => {
     });
 
     it('fuehrt ausserhalb der Einstellungen zur Zugangsdaten-Karte', async () => {
-        zeige('2026-11-20T12:00:00Z', '/spesen');
+        zeige('2026-11-20T12:00:00Z', '/spiele');
 
         await userEvent.click(screen.getByRole('button', {name: 'Zugangsdaten erneuern'}));
 

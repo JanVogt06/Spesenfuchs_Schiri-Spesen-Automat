@@ -18,7 +18,7 @@ describe('getBugReportStatus', () => {
 });
 
 describe('sendeBugReport', () => {
-    const bericht = {titel: 'Karte leer', beschreibung: 'Keine Punkte', bereich: 'Spesen', schritte: '1. Oeffnen'};
+    const bericht = {titel: 'Karte leer', beschreibung: 'Keine Punkte', bereich: 'Spiele', schritte: '1. Oeffnen'};
 
     it('schickt den Bericht unveraendert an /api/bugreport', async () => {
         apiPost.mockResolvedValue({data: {}});
