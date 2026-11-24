@@ -9,9 +9,10 @@ fetch, the application also reads your own master data from DFB.net and shows
 it in the *Stammdaten* (master data) tab; the personal details below it are
 stored encrypted in the database. The *Saison* (season) tab shows all matches
 you officiated per season with result, card statistics and crew, plus
-assignment balance and training evenings, your own expenses and travel costs
-for the season (missing travel costs are estimated and marked as estimated),
-and a map of all venues where you have already officiated.
+assignment balance and training evenings. The *Statistik* (statistics) tab
+shows your own expenses and travel costs per season (missing travel costs are
+estimated and marked as estimated) and a map of all venues where you have
+already officiated.
 The *Beobachtungen* (observations) tab shows your own grades from referee
 observations (men's football, from the season of "Schiedsrichter seit", i.e.
 referee since) and — for those who have it — from the Schiri-Portal (DFB
@@ -30,9 +31,9 @@ night; the *Ligen* (leagues) tab shows them. If a team cannot be matched
 unambiguously, or a team playing at supra-regional level is involved, the
 expense field stays empty rather than guessed.
 
-The interface has four main tabs: *Übersicht* (overview), *Spiele* (matches)
+The interface has five main tabs: *Übersicht* (overview), *Spiele* (matches)
 with all assignments – upcoming and past, searchable, each match with a claim
-to download –, *Saison* and *Beobachtungen*. Behind *Mehr* (more) are *Ligen*,
+to download –, *Saison*, *Statistik* and *Beobachtungen*. Behind *Mehr* (more) are *Ligen*,
 *Stammdaten*, *Einstellungen* (settings) and *Fehler melden* (report a bug).
 Next to the *Aktualisieren* (refresh) button at the top right it shows when
 DFB.net was last read.
@@ -173,7 +174,7 @@ into the fields; saving works as usual. To do this, it asks a route planner for
 the road kilometres between the places of residence and the venue; only
 coordinates are transmitted. The venue's coordinate is supplied by DFBnet
 itself, which is more accurate than an address search. The statistics in the
-*Saison* tab use the same routes to estimate travel costs where none have been
+*Statistik* tab use the same routes to estimate travel costs where none have been
 entered (alone from your own place of residence, round trip). Each route, too,
 is only asked for once and then kept in `app.db`; evaluations over many matches
 only query for a few seconds per call and fetch the rest on the next one.
