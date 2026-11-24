@@ -1,19 +1,19 @@
 """
-Adresse -> Koordinate, ueber Nominatim.
+Address -> coordinate, via Nominatim.
 
-Gefragt wird nur, was nicht schon in der Datenbank steht (db.geocode). Das
-ist keine Optimierung, sondern die Betriebsgrundlage: der oeffentliche
-Nominatim-Dienst erlaubt eine Anfrage pro Sekunde aus einem einzelnen Thread
-und verbietet Massenabfragen. Mit dem Zwischenspeicher bleibt es bei
-geschaetzt hundert Anfragen ueber die Lebensdauer eines Kontos - die eigene
-Anschrift ist eine einzige, Kollegen und Spielstaetten wiederholen sich.
+Only what is not already in the database (db.geocode) is requested. This is
+not an optimisation but the operating basis: the public Nominatim service
+allows one request per second from a single thread and forbids bulk
+queries. With the cache it stays at an estimated hundred requests over the
+lifetime of an account - one's own address is a single one, colleagues and
+venues repeat.
 
-NOMINATIM_URL zeigt auf einen eigenen Dienst, wenn gewuenscht; die
-Voreinstellung ist der oeffentliche. Ein eigener Dienst darf schneller
-gefragt werden, dafuer gibt es GEOCODER_MIN_INTERVAL.
+NOMINATIM_URL points to a self-hosted service if desired; the default is
+the public one. A self-hosted service may be queried faster, which is what
+GEOCODER_MIN_INTERVAL is for.
 
-Bewusst mit urllib statt requests/httpx: eine einzige GET-Anfrage rechtfertigt
-keine zusaetzliche Abhaengigkeit.
+Deliberately urllib instead of requests/httpx: a single GET request does not
+justify an additional dependency.
 """
 import json
 import os
@@ -34,35 +34,35 @@ logger = setup_logger("geocoder")
 
 STANDARD_URL = "https://nominatim.openstreetmap.org"
 
-# Nach dieser Zeit wird eine erfolglose Adresse noch einmal versucht. OSM
-# waechst; was heute niemand kennt, kann in vier Wochen eingetragen sein.
+# After this time an unsuccessful address is tried again. OSM keeps
+# growing; what nobody knows today may have been added in four weeks.
 MISS_GUELTIG_TAGE = 30
 
-# Nominatim verlangt einen sprechenden User-Agent mit Kontaktmoeglichkeit.
-# Ohne den antwortet der oeffentliche Dienst mit 403.
+# Nominatim requires a descriptive User-Agent with a way to get in touch.
+# Without it the public service answers with 403.
 USER_AGENT = f"Spesenfuchs/{APP_VERSION} (+https://github.com/JanVogt06/dfb-spesen-generator)"
 
 TIMEOUT_SEKUNDEN = 10
 
-# Serialisiert alle Anfragen dieses Prozesses. Die Karte loest bis zu vier
-# Adressen auf einmal auf, und mehrere Karten koennen gleichzeitig offen
-# sein - ohne Schloss waeren das parallele Anfragen an einen Dienst, der
-# ausdruecklich einen einzelnen Thread verlangt.
+# Serialises all requests of this process. The map resolves up to four
+# addresses at once, and several maps can be open at the same time -
+# without the lock those would be parallel requests to a service that
+# explicitly demands a single thread.
 _schloss = threading.Lock()
 _letzte_anfrage = 0.0
 
 
 class GeocoderNichtErreichbar(Exception):
-    """Der Dienst hat nicht geantwortet - anders als "Adresse unbekannt"."""
+    """The service did not respond - as opposed to "address unknown"."""
 
 
 def basis_url() -> str:
-    """Der konfigurierte Dienst, ohne abschliessenden Schraegstrich."""
+    """The configured service, without a trailing slash."""
     return (os.getenv("NOMINATIM_URL") or STANDARD_URL).rstrip("/")
 
 
 def _min_intervall() -> float:
-    """Mindestabstand zwischen zwei Anfragen an denselben Dienst."""
+    """Minimum interval between two requests to the same service."""
     try:
         return max(0.0, float(os.getenv("GEOCODER_MIN_INTERVAL", "1.0")))
     except ValueError:
@@ -70,17 +70,17 @@ def _min_intervall() -> float:
 
 
 def _normalisieren(adresse: str) -> str:
-    """Vereinheitlicht den Schluessel, unter dem eine Adresse zwischenliegt."""
+    """Normalises the key under which an address is cached."""
     return re.sub(r"\s+", " ", adresse).strip(" ,").lower()
 
 
 def _abfragen(adresse: str) -> Optional[Tuple[float, float]]:
     """
-    Eine Anfrage an den Geocoder, unter Einhaltung des Mindestabstands.
+    One request to the geocoder, observing the minimum interval.
 
-    Gibt None zurueck, wenn der Dienst die Adresse nicht kennt. Antwortet er
-    gar nicht, fliegt GeocoderNichtErreichbar - das darf nicht als "Adresse
-    unbekannt" im Zwischenspeicher landen.
+    Returns None if the service does not know the address. If it does not
+    respond at all, GeocoderNichtErreichbar is raised - that must not end up
+    in the cache as "address unknown".
     """
     global _letzte_anfrage
 
@@ -123,24 +123,24 @@ def _abfragen(adresse: str) -> Optional[Tuple[float, float]]:
 
 def _plz_passt(adresse: str, treffer: dict) -> bool:
     """
-    Prueft, ob der Treffer in der angefragten Postleitzahl liegt.
+    Checks whether the hit lies in the requested postcode.
 
-    Die Freitextsuche von Nominatim raet lieber, als nichts zu liefern: auf
-    eine erfundene Adresse antwortet sie mit irgendeinem entfernt aehnlichen
-    Ort. Ein falscher Pin faellt auf einer Karte aber niemandem auf - er
-    sieht genauso aus wie ein richtiger. Deshalb wird gegengeprueft.
+    Nominatim's free-text search would rather guess than return nothing: for
+    an invented address it answers with some vaguely similar place. A wrong
+    pin goes unnoticed on a map, though - it looks exactly like a right one.
+    That is why the result is cross-checked.
 
-    Nur ein *widersprechender* Treffer wird verworfen. Meldet der Dienst gar
-    keine Postleitzahl, bleibt es beim Treffer: ein selbst gehosteter
-    Geocoder liefert nicht zwingend dieselben Details.
+    Only a *contradicting* hit is discarded. If the service reports no
+    postcode at all, the hit stands: a self-hosted geocoder does not
+    necessarily return the same details.
 
-    Verglichen werden die ersten drei Stellen, nicht alle fuenf. Deutsche
-    Leitzahlen sind geografisch geordnet, die ersten drei Stellen umreissen
-    damit die Stadt. Das faengt den Fall ab, der zaehlt - eine erfundene
-    Adresse, auf die der Dienst mit irgendeinem Ort antwortet - laesst aber
-    die Strasse gelten, die laut OSM einen Block weiter in der
-    Nachbar-Leitzahl liegt. Sonst rutschte eine voellig richtige Anschrift
-    ohne Not auf den Stadtmittelpunkt zurueck.
+    The first three digits are compared, not all five. German postcodes are
+    geographically ordered, so the first three digits outline the city. This
+    catches the case that matters - an invented address to which the service
+    answers with some place - but still accepts the street that, according
+    to OSM, lies one block over in the neighbouring postcode. Otherwise a
+    perfectly correct address would needlessly fall back to the city
+    centre.
     """
     gefragt = re.search(r"\b\d{5}\b", adresse)
     if not gefragt:
@@ -162,7 +162,7 @@ def _plz_passt(adresse: str, treffer: dict) -> bool:
 
 
 def _nachschlagen(adresse: str) -> Optional[Tuple[float, float]]:
-    """Eine Adresse aufloesen - erst im Zwischenspeicher, dann beim Dienst."""
+    """Resolve an address - first in the cache, then at the service."""
     schluessel = _normalisieren(adresse)
     if not schluessel:
         return None
@@ -174,7 +174,7 @@ def _nachschlagen(adresse: str) -> Optional[Tuple[float, float]]:
         if eintrag["lat"] is not None and eintrag["lon"] is not None:
             return eintrag["lat"], eintrag["lon"]
 
-        # Fehlschlag: nur wiederholen, wenn er alt genug ist
+        # Failure: only retry if it is old enough
         if not _fehlschlag_abgelaufen(eintrag["resolved_at"]):
             return None
 
@@ -184,7 +184,7 @@ def _nachschlagen(adresse: str) -> Optional[Tuple[float, float]]:
 
 
 def _fehlschlag_abgelaufen(resolved_at: str) -> bool:
-    """True, wenn ein gespeicherter Fehlschlag neu versucht werden darf."""
+    """True if a stored failure may be retried."""
     try:
         gefragt_am = datetime.fromisoformat(resolved_at)
     except ValueError:
@@ -198,15 +198,14 @@ def _fehlschlag_abgelaufen(resolved_at: str) -> bool:
 
 def geocode(adresse: str, ort: Optional[str] = None) -> Optional[Dict]:
     """
-    Loest eine Adresse auf, notfalls nur bis zum Ort.
+    Resolves an address, if necessary only down to the town.
 
-    DFBnet-Adressen sind nicht immer vollstaendig - Spielstaetten stehen
-    haeufig ohne Hausnummer da ("Karl-Liebknecht-Str., 07806 Neustadt an der
-    Orla"). Findet der Geocoder die genaue Anschrift nicht, ist der
-    Ortsmittelpunkt immer noch eine brauchbare Naeherung; die Karte
-    kennzeichnet ihn als ungenau.
+    DFBnet addresses are not always complete - venues often come without a
+    house number ("Karl-Liebknecht-Str., 07806 Neustadt an der Orla"). If
+    the geocoder does not find the exact address, the town centre is still
+    a usable approximation; the map marks it as imprecise.
 
-    Rueckgabe: {"lat", "lon", "genauigkeit": "adresse" | "ort"} oder None.
+    Returns: {"lat", "lon", "genauigkeit": "adresse" | "ort"} or None.
     """
     kandidaten: List[Tuple[str, str]] = [(adresse, "adresse")]
 
@@ -226,13 +225,12 @@ def geocode(adresse: str, ort: Optional[str] = None) -> Optional[Dict]:
 
 def geocode_bekannt(adresse: str, ort: Optional[str] = None) -> Tuple[Optional[Dict], bool]:
     """
-    Wie geocode, aber nur aus dem Zwischenspeicher - ohne jede Anfrage.
+    Like geocode, but only from the cache - without any request.
 
-    Rueckgabe (Treffer oder None, offen). offen heisst: mindestens eine
-    Stufe wurde noch nie (oder vor zu langer Zeit erfolglos) gefragt, ein
-    Aufruf von geocode() koennte also noch etwas finden. Fuer Auswertungen
-    ueber viele Adressen, die den oeffentlichen Dienst nicht in einem Rutsch
-    befragen duerfen.
+    Returns (hit or None, offen). offen means: at least one level has never
+    been asked (or was unsuccessful too long ago), so a call to geocode()
+    might still find something. Meant for evaluations over many addresses
+    that must not query the public service in one go.
     """
     kandidaten: List[Tuple[str, str]] = [(adresse, "adresse")]
     grober_ort = ort or _ort_aus_adresse(adresse)
@@ -255,15 +253,15 @@ def geocode_bekannt(adresse: str, ort: Optional[str] = None) -> Tuple[Optional[D
 
 def _ort_aus_adresse(adresse: str) -> Optional[str]:
     """
-    Schneidet aus "Strasse, PLZ Ort" den hinteren Teil heraus.
+    Cuts the trailing part out of "Street, postcode Town".
 
-    Spielstaetten kommen als eine Zeile aus DFBnet, Unparteiische dagegen mit
-    getrenntem plz_ort - fuer die uebergibt der Aufrufer den Ort direkt.
+    Venues come from DFBnet as a single line, referees on the other hand with
+    a separate plz_ort - for those the caller passes the town directly.
     """
     if "," in adresse:
         return adresse.rsplit(",", 1)[-1].strip()
 
-    # Kein Komma: wenigstens ab der Postleitzahl abschneiden
+    # No comma: at least cut from the postcode onwards
     treffer = re.search(r"\b\d{5}\b.*$", adresse)
     return treffer.group(0).strip() if treffer else None
 

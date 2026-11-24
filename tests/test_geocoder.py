@@ -1,7 +1,7 @@
 """
-Geocoder ohne Netz: urlopen ist durch eine Attrappe ersetzt, die Uhr fuer
-den Mindestabstand ebenso. Der Zwischenspeicher laeuft gegen die echte
-(Wegwerf-)Datenbank aus der db-Fixture.
+Geocoder without network: urlopen is replaced by a stand-in, and so is the
+clock for the minimum interval. The cache runs against the real
+(throwaway) database from the db fixture.
 """
 import json
 from datetime import datetime, timedelta, UTC
@@ -23,7 +23,7 @@ from utils.geocoder import (
 
 
 class FalscherDienst:
-    """Ersatz fuer urlopen: liefert vorbereitete Antworten der Reihe nach."""
+    """Replacement for urlopen: returns prepared responses in order."""
 
     def __init__(self):
         self.antworten = {}
@@ -31,7 +31,7 @@ class FalscherDienst:
         self.anfragen = []
 
     def antwort(self, anfrage_text, ergebnis):
-        """Antwort fuer eine bestimmte q-Anfrage (Liste, Ausnahme oder bytes)."""
+        """Response for a specific q query (list, exception or bytes)."""
         self.antworten[anfrage_text] = ergebnis
 
     def __call__(self, request, timeout=None):
@@ -71,7 +71,7 @@ def _treffer(lat, lon, plz=None):
 
 @pytest.fixture
 def dienst(db, monkeypatch):
-    """Frische Datenbank, Attrappe statt Netz, kein Mindestabstand."""
+    """Fresh database, stand-in instead of network, no minimum interval."""
     falsch = FalscherDienst()
     monkeypatch.setattr(geocoder, "urlopen", falsch)
     monkeypatch.setattr(geocoder, "_letzte_anfrage", 0.0)
@@ -80,7 +80,7 @@ def dienst(db, monkeypatch):
     return falsch
 
 
-# ===== Einstellungen =====
+# ===== Settings =====
 
 class TestEinstellungen:
     def test_standard_url(self, monkeypatch):
@@ -113,7 +113,7 @@ class TestEinstellungen:
         assert geocoder._ort_aus_adresse(adresse) == ort
 
 
-# ===== Anfrage =====
+# ===== Request =====
 
 class TestAnfrage:
     def test_treffer(self, dienst):
@@ -177,7 +177,7 @@ class TestAnfrage:
         assert geocode("Gibtsnicht 1, 99999 Nirgendwo") is None
 
     def test_postleitzahl_widerspricht(self, dienst):
-        # Nominatim raet lieber, als nichts zu liefern
+        # Nominatim would rather guess than return nothing
         dienst.standard = _treffer(53.55, 9.99, "20095")
         assert geocode("Erfundene Str. 1, 99084 Erfurt") is None
 
@@ -198,7 +198,7 @@ class TestAnfrage:
         assert geocoder._abfragen("irgendwo") is None
 
 
-# ===== Nicht erreichbar =====
+# ===== Unreachable =====
 
 class TestNichtErreichbar:
     @pytest.mark.parametrize("fehler", [
@@ -223,12 +223,12 @@ class TestNichtErreichbar:
             geocode("Hauptstr. 1, 99084 Erfurt")
         assert get_cached("hauptstr. 1, 99084 erfurt", STANDARD_URL) is None
 
-        # Sobald der Dienst wieder da ist, wird gefragt
+        # As soon as the service is back, it is asked again
         dienst.standard = _treffer(50.97, 11.03)
         assert geocode("Hauptstr. 1, 99084 Erfurt") is not None
 
 
-# ===== Zwischenspeicher =====
+# ===== Cache =====
 
 class TestZwischenspeicher:
     def test_treffer_wird_gespeichert(self, dienst):
@@ -283,7 +283,7 @@ class TestZwischenspeicher:
         assert get_cached("hauptstr. 1", STANDARD_URL)["lat"] == 1.0
         assert get_cached("hauptstr. 1", "http://nominatim.lan")["lat"] == 2.0
 
-        # Zurueck zum Standard: wieder aus dem Speicher, ohne Anfrage
+        # Back to the default: from the cache again, without a request
         monkeypatch.delenv("NOMINATIM_URL")
         assert geocode("Hauptstr. 1")["lat"] == 1.0
         assert len(dienst.anfragen) == 2
@@ -298,7 +298,7 @@ class TestZwischenspeicher:
     @pytest.mark.parametrize("resolved_at, abgelaufen", [
         ((datetime.now(UTC) - timedelta(days=MISS_GUELTIG_TAGE + 1)).isoformat(), True),
         ((datetime.now(UTC) - timedelta(days=1)).isoformat(), False),
-        # Ohne Zeitzone gilt UTC
+        # Without a time zone, UTC applies
         ((datetime.now(UTC) - timedelta(days=MISS_GUELTIG_TAGE + 1)).replace(tzinfo=None).isoformat(), True),
         (datetime.now(UTC).replace(tzinfo=None).isoformat(), False),
         ("kein datum", True),
@@ -307,7 +307,7 @@ class TestZwischenspeicher:
         assert geocoder._fehlschlag_abgelaufen(resolved_at) is abgelaufen
 
 
-# ===== Mindestabstand =====
+# ===== Minimum interval =====
 
 class FalscheUhr:
     def __init__(self, start=1000.0):
@@ -380,7 +380,7 @@ class TestMindestabstand:
         assert uhr.geschlafen == []
 
 
-# ===== Nur aus dem Zwischenspeicher =====
+# ===== Cache only =====
 
 class TestGeocodeBekannt:
     def test_noch_nie_gefragt_ist_offen(self, dienst):

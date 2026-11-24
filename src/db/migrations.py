@@ -1,18 +1,17 @@
 """
-Schema-Migrationen fuer die SQLite-Datenbank.
+Schema migrations for the SQLite database.
 
-Die Datenbank fuehrt ihre Version in `PRAGMA user_version`. Jede Migration ist
-eine nummerierte Funktion; beim Start werden alle Schritte angewendet, deren
-Nummer groesser als die aktuelle Version ist. Vor dem ersten Schritt eines
-Laufs wird die Datenbankdatei gesichert - das Projekt hat keine Testsuite,
-also ist das Backup die Rueckfallebene.
+The database keeps its version in `PRAGMA user_version`. Each migration is a
+numbered function; on startup all steps whose number is greater than the
+current version are applied. Before the first step of a run the database file
+is backed up - the project has no test suite, so the backup is the fallback.
 
-Neue Migration hinzufuegen: Funktion schreiben und unten in MIGRATIONS mit der
-naechsten freien Nummer eintragen. Bestehende Schritte werden nie geaendert.
+Adding a new migration: write a function and register it in MIGRATIONS below
+under the next free number. Existing steps are never changed.
 
-Beim Deploy gilt: erst die neue Version starten, dann alte Daten wegraeumen.
-Der Backfill aus den Session-Ordnern laeuft genau einmal und bricht ab, wenn
-die Ordner fehlen, obwohl die Datenbank Sessions kennt.
+When deploying: first start the new version, then clear away old data.
+The backfill from the session folders runs exactly once and aborts if the
+folders are missing even though the database knows sessions.
 """
 import json
 import os
@@ -29,15 +28,15 @@ logger = setup_logger("migrations")
 
 def _run_script(conn: sqlite3.Connection, script: str) -> None:
     """
-    Fuehrt mehrere SQL-Anweisungen aus, ohne die laufende Transaktion zu beenden.
+    Executes several SQL statements without ending the running transaction.
 
-    conn.executescript() waere das Naheliegende, gibt aber vor jedem Lauf ein
-    COMMIT ab. Damit waere jede DDL sofort dauerhaft und das rollback() im
-    Runner wirkungslos: ein Schritt, der in der Mitte scheitert, liesse seine
-    halben Tabellen zurueck, waehrend user_version zurueckbleibt - der naechste
-    Start scheiterte dann an "table already exists" und die Anwendung kaeme nie
-    wieder hoch. SQLite kann DDL transaktional, also fuehren wir die
-    Anweisungen einzeln in der offenen Transaktion aus.
+    conn.executescript() would be the obvious choice, but it issues a COMMIT
+    before every run. That would make every DDL permanent immediately and the
+    rollback() in the runner ineffective: a step failing halfway would leave
+    its half-built tables behind while user_version stays behind - the next
+    start would then fail on "table already exists" and the application would
+    never come up again. SQLite supports transactional DDL, so we execute the
+    statements one by one inside the open transaction.
     """
     for anweisung in script.split(";"):
         if anweisung.strip():
@@ -46,9 +45,10 @@ def _run_script(conn: sqlite3.Connection, script: str) -> None:
 
 def _migration_001_baseline(conn: sqlite3.Connection) -> None:
     """
-    Ausgangsschema: die Tabellen, die vor Einfuehrung der Migrationen bereits
-    per CREATE TABLE IF NOT EXISTS angelegt wurden. Auf einer bestehenden
-    Datenbank ist dieser Schritt ein No-Op, auf einer leeren erzeugt er alles.
+    Baseline schema: the tables that were already created via
+    CREATE TABLE IF NOT EXISTS before migrations were introduced. On an
+    existing database this step is a no-op, on an empty one it creates
+    everything.
     """
     _run_script(conn, """
         CREATE TABLE IF NOT EXISTS users (
@@ -107,36 +107,37 @@ def _migration_001_baseline(conn: sqlite3.Connection) -> None:
 
 def _migration_002_wal(conn: sqlite3.Connection) -> None:
     """
-    WAL-Journal dauerhaft aktivieren. Gleichzeitiges Schreiben aus dem
-    Scraper-Kindprozess und Lesen durch die API blockiert sich damit nicht
-    mehr gegenseitig. Die Einstellung wird in der Datei gespeichert und gilt
-    danach fuer jede Verbindung.
+    Enable the WAL journal permanently. Concurrent writing from the scraper
+    child process and reading by the API then no longer block each other.
+    The setting is stored in the file and applies to every connection
+    afterwards.
     """
     conn.execute("PRAGMA journal_mode = WAL")
 
 
 def _migration_003_matches(conn: sqlite3.Connection) -> None:
     """
-    Die gescrapten Spiele selbst. Bisher lagen sie nur als spesen_data.json in
-    den Session-Ordnern; ab hier sind sie die Quelle der Wahrheit.
+    The scraped matches themselves. Until now they only existed as
+    spesen_data.json in the session folders; from here on they are the
+    source of truth.
 
-    Zwei Entwurfsentscheidungen, die nicht offensichtlich sind:
+    Two design decisions that are not obvious:
 
-    1. `match_key` statt eines natuerlichen Schluessels aus den Spalten.
-       DFBnet liefert (noch) keine Spielnummer, die Identitaet ist also
-       Heim + Gast + Datum. Sobald die Spielnummer verfuegbar ist, wird sie
-       einfach der neue match_key - Fremdschluessel auf `matches.id` bleiben
-       unberuehrt. Turnier-Ansetzungen ohne Teams bekommen einen Schluessel
-       aus Spielstaette und Anpfiff, sonst wuerden mehrere Turniere am selben
-       Tag kollidieren.
+    1. `match_key` instead of a natural key made of the columns.
+       DFBnet does not (yet) supply a match number, so the identity is
+       home + away + date. As soon as the match number is available, it
+       simply becomes the new match_key - foreign keys on `matches.id` stay
+       untouched. Tournament fixtures without teams get a key made of venue
+       and kick-off, otherwise several tournaments on the same day would
+       collide.
 
-    2. `match_officials` ist ein Schnappschuss pro Spiel, keine Personen-
-       Tabelle. Zwei Schiedsrichter koennen denselben Namen tragen, und eine
-       Adressaenderung mitten in der Saison darf die Anschrift in einer
-       bereits abgegebenen Abrechnung nicht rueckwirkend aendern.
+    2. `match_officials` is a snapshot per match, not a table of persons.
+       Two referees can have the same name, and an address change in the
+       middle of the season must not retroactively change the address in an
+       already submitted expense claim.
 
-    Aus demselben Grund werden auch die Spesensaetze und der km-Satz beim
-    Scrapen eingefroren statt bei jedem Rendern neu berechnet.
+    For the same reason the expense rates and the km rate are frozen at
+    scrape time instead of being recomputed on every render.
     """
     _run_script(conn, """
         CREATE TABLE matches (
@@ -208,13 +209,13 @@ def _migration_003_matches(conn: sqlite3.Connection) -> None:
 
 def _migration_004_scrape_runs(conn: sqlite3.Connection) -> None:
     """
-    Ersetzt die metadata.json im Session-Ordner. Der Scraper laeuft in einem
-    eigenen Prozess (Playwright vertraegt sich nicht mit dem asyncio-Loop),
-    schrieb seinen Fortschritt bisher in diese Datei und die API las sie fuer
-    den 2-Sekunden-Poll wieder aus. Diese Zeile ist jetzt der Kanal.
+    Replaces the metadata.json in the session folder. The scraper runs in its
+    own process (Playwright does not get along with the asyncio loop), used
+    to write its progress to that file, and the API read it back for the
+    2-second poll. This row is now the channel.
 
-    error_code traegt weiterhin die Werte, auf die das Frontend prueft
-    (DFB_CREDENTIALS_INVALID leitet den User in die Einstellungen).
+    error_code still carries the values the frontend checks for
+    (DFB_CREDENTIALS_INVALID sends the user to the settings).
     """
     _run_script(conn, """
         CREATE TABLE scrape_runs (
@@ -239,11 +240,11 @@ def _migration_004_scrape_runs(conn: sqlite3.Connection) -> None:
 
 def _migration_005_download_log_matches(conn: sqlite3.Connection) -> None:
     """
-    Downloads haengen kuenftig an einem Spiel, nicht mehr an einer Session.
+    Downloads are attached to a match from now on, no longer to a session.
 
-    SQLite kann einer Spalte das NOT NULL nicht nachtraeglich nehmen, also
-    wird die Tabelle neu gebaut und der Bestand uebernommen. Die alten Zeilen
-    behalten ihre session_id und bekommen kein match_id - sie sind Historie.
+    SQLite cannot remove NOT NULL from a column after the fact, so the table
+    is rebuilt and the existing rows are carried over. The old rows keep their
+    session_id and get no match_id - they are history.
     """
     _run_script(conn, """
         CREATE TABLE download_log_neu (
@@ -271,43 +272,42 @@ def _migration_005_download_log_matches(conn: sqlite3.Connection) -> None:
 
 def _migration_006_backfill_from_sessions(conn: sqlite3.Connection) -> None:
     """
-    Holt die Spiele aus den bestehenden Session-Ordnern in die Datenbank.
+    Pulls the matches from the existing session folders into the database.
 
-    Bis hierher lagen sie ausschliesslich als spesen_data.json unter
-    <DATA_DIR>/output/session_*/. Ohne diesen Schritt waere am Tag der
-    Umstellung bei jedem User die komplette Spielhistorie aus dem Dashboard
-    verschwunden, denn der alte Lesepfad hat die Ordner bei jedem Aufruf neu
-    eingelesen.
+    Until now they existed exclusively as spesen_data.json under
+    <DATA_DIR>/output/session_*/. Without this step, on the day of the
+    switchover every user's complete match history would have disappeared
+    from the dashboard, because the old read path re-read the folders on
+    every call.
 
-    Die Ordner werden nach Alter aufsteigend verarbeitet, damit bei mehrfach
-    gescrapten Spielen der zuletzt gesehene Stand gewinnt - dieselbe Regel,
-    die der alte Endpunkt zur Laufzeit angewandt hat (verlegte Anstosszeiten
-    kommen in den Daten tatsaechlich vor).
+    The folders are processed in ascending order of age so that for matches
+    scraped several times the most recently seen state wins - the same rule
+    the old endpoint applied at runtime (rescheduled kick-off times do occur
+    in the data).
 
-    Anschliessend werden die bereits erfassten Fahrtkosten aus der alten
-    Tabelle match_expenses auf die neuen Zeilen umgehaengt. Die alte Tabelle
-    bleibt vorerst stehen - sie ist die Rueckfallebene, falls hier etwas
-    schiefgeht.
+    Afterwards the already recorded travel costs are re-attached from the old
+    table match_expenses to the new rows. The old table stays for now - it is
+    the fallback in case something goes wrong here.
 
-    Die Helfer werden aus dem Anwendungscode importiert statt hier kopiert:
-    der match_key MUSS exakt so gebildet werden wie beim naechtlichen Scrapen,
-    sonst legt der erste Lauf nach der Umstellung alles doppelt an.
+    The helpers are imported from the application code instead of copied
+    here: the match_key MUST be built exactly as in the nightly scrape,
+    otherwise the first run after the switchover creates everything twice.
     """
-    # Lokale Importe: db.matches importiert db.database, das wiederum dieses
-    # Modul importiert - auf Modulebene waere das ein Zirkelbezug.
+    # Local imports: db.matches imports db.database, which in turn imports this
+    # module - at module level that would be a circular import.
     from core import config
     from db.matches import build_match_key, upsert_match
     from generator.spesen_calculator import calculate_spesen
     from utils.match_utils import extract_iso_date_from_anpfiff
 
-    # Kilometersatz, der zum Zeitpunkt dieser Migration galt. Bewusst als
-    # Literal: eine spaetere Aenderung der Pauschale darf die eingefrorenen
-    # Werte historischer Abrechnungen nicht nachtraeglich verschieben.
+    # Kilometre rate that applied at the time of this migration. Deliberately a
+    # literal: a later change of the flat rate must not retroactively shift the
+    # frozen values of historical claims.
     km_satz = 0.30
 
-    # get_output_dir() statt DATA_DIR/"output": eine Installation kann OUTPUT_DIR
-    # gesetzt haben oder noch auf dem alten Layout stehen, und dann lagen die
-    # Ordner woanders.
+    # get_output_dir() instead of DATA_DIR/"output": an installation may have
+    # OUTPUT_DIR set or still be on the old layout, and then the folders
+    # were located elsewhere.
     output_dir = config.get_output_dir()
 
     besitzer = {
@@ -320,15 +320,15 @@ def _migration_006_backfill_from_sessions(conn: sqlite3.Connection) -> None:
         key=lambda d: (besitzer[d.name]["created_at"] if d.name in besitzer else "", d.name),
     ) if output_dir.exists() else []
 
-    # Kennt die Datenbank Sessions, muessen auch deren Ordner da sein. Sind sie
-    # weg, zeigt der Pfad woandershin oder es wurde zu frueh aufgeraeumt. Ohne
-    # diese Pruefung liefe der Schritt durch, Migration 007 wuerfe gleich darauf
-    # `sessions` weg und die Historie aller Nutzer waere ohne eine einzige
-    # Fehlermeldung verloren.
+    # If the database knows sessions, their folders must be there too. If they
+    # are gone, the path points elsewhere or cleanup happened too early. Without
+    # this check the step would pass, migration 007 would drop `sessions`
+    # right after, and the history of all users would be lost without a single
+    # error message.
     #
-    # Geprueft wird die Zahl der WIEDERGEFUNDENEN Ordner, nicht bloss ob das
-    # Verzeichnis existiert: ein "rm -rf data/output/*" laesst das Verzeichnis
-    # stehen und waere sonst durchgerutscht.
+    # What is checked is the number of folders FOUND AGAIN, not merely whether
+    # the directory exists: an "rm -rf data/output/*" leaves the directory in
+    # place and would otherwise have slipped through.
     bekannt = sum(1 for d in ordner if d.name in besitzer)
 
     if besitzer and not bekannt and not os.getenv("SKIP_SESSION_BACKFILL"):
@@ -341,9 +341,9 @@ def _migration_006_backfill_from_sessions(conn: sqlite3.Connection) -> None:
 
     if besitzer and bekannt < len(besitzer):
         fehlend = len(besitzer) - bekannt
-        # Ein paar Sessions ohne Ordner sind normal: Laeufe, die schon beim
-        # DFB-Login scheiterten, haben nie etwas geschrieben. Erst wenn ein
-        # nennenswerter Teil fehlt, ist das ein Hinweis auf ein Problem.
+        # A few sessions without a folder are normal: runs that already failed at
+        # the DFB login never wrote anything. Only when a substantial part is
+        # missing is that a sign of a problem.
         melden = logger.warning if fehlend > len(besitzer) // 10 else logger.info
         melden(
             f"{fehlend} von {len(besitzer)} Sessions haben keinen Ordner "
@@ -355,7 +355,7 @@ def _migration_006_backfill_from_sessions(conn: sqlite3.Connection) -> None:
     for verzeichnis in ordner:
         session = besitzer.get(verzeichnis.name)
         if not session:
-            # Ordner ohne Datenbankzeile - niemand kann ihn besitzen
+            # Folder without a database row - nobody can own it
             ohne_besitzer += 1
             continue
 
@@ -395,9 +395,9 @@ def _migration_006_backfill_from_sessions(conn: sqlite3.Connection) -> None:
         f"({uebersprungen} uebersprungen, {ohne_besitzer} Ordner ohne Session-Zeile)"
     )
 
-    # Erfasste Fahrtkosten auf die neuen Zeilen umhaengen. Der alte Schluessel
-    # war (user_id, heim_team, gast_team, datum) - genau die Felder, aus denen
-    # bei Spielen mit Teams auch der match_key besteht.
+    # Re-attach recorded travel costs to the new rows. The old key was
+    # (user_id, heim_team, gast_team, datum) - exactly the fields that also
+    # make up the match_key for matches with teams.
     uebernommen = 0
     for alt in conn.execute("SELECT * FROM match_expenses").fetchall():
         treffer = conn.execute("""
@@ -430,20 +430,20 @@ def _migration_006_backfill_from_sessions(conn: sqlite3.Connection) -> None:
 
 def _migration_007_drop_legacy_tables(conn: sqlite3.Connection) -> None:
     """
-    Raeumt die Tabellen weg, die seit dem Umstieg auf die datenbankgestuetzten
-    Spiele niemand mehr anspricht.
+    Clears away the tables that nobody has touched since the switch to
+    database-backed matches.
 
-    `sessions` beschrieb einen Ordner unter data/output, den es nicht mehr gibt.
-    `match_expenses` war die flache Vorgaengerin von `official_expenses` mit
-    genau drei festen Rollen pro Spiel.
+    `sessions` described a folder under data/output that no longer exists.
+    `match_expenses` was the flat predecessor of `official_expenses` with
+    exactly three fixed roles per match.
 
-    Beide wurden in Migration 006 ein letztes Mal gelesen. Danach sind sie tot -
-    im Code steht kein einziger Zugriff mehr. Faellt der Backfill doch noch
-    einmal auf die Fuesse, ist die Rueckfallebene die Sicherungskopie, die der
-    Runner vor jedem Lauf neben app.db legt.
+    Both were read one last time in migration 006. After that they are dead -
+    there is not a single access left in the code. Should the backfill turn
+    out to have gone wrong after all, the fallback is the backup copy the
+    runner places next to app.db before every run.
 
-    `download_log.session_id` bleibt bestehen: die Spalte traegt die Historie
-    der Downloads aus der Zeit vor der Umstellung.
+    `download_log.session_id` stays: the column carries the download history
+    from the time before the switchover.
     """
     _run_script(conn, """
         DROP TABLE IF EXISTS sessions;
@@ -453,19 +453,19 @@ def _migration_007_drop_legacy_tables(conn: sqlite3.Connection) -> None:
 
 def _migration_008_rekey_matches(conn: sqlite3.Connection) -> None:
     """
-    Berechnet match_key fuer bestehende Zeilen nach der erweiterten Regel neu.
+    Recomputes match_key for existing rows according to the extended rule.
 
-    Der Schluessel enthaelt jetzt auch Mannschaftsart und Spielklasse. Ohne
-    diesen Schritt bildete der naechste Scrape neue Schluessel, fuende die
-    bestehenden Zeilen nicht wieder und legte jedes Spiel ein zweites Mal an -
-    samt Verlust der Verbindung zu den eingetragenen Kilometern.
+    The key now also contains team type and league. Without this step the
+    next scrape would form new keys, not find the existing rows again and
+    create every match a second time - including losing the link to the
+    entered kilometres.
 
-    Zusaetzliche Bestandteile koennen nur trennen, nie zusammenfuehren, also
-    kann dabei kein Konflikt mit UNIQUE(user_id, match_key) entstehen.
+    Additional components can only separate, never merge, so no conflict
+    with UNIQUE(user_id, match_key) can arise.
 
-    Was dieser Schritt NICHT kann: eine Ansetzung zurueckholen, die vorher von
-    einer anderen ueberschrieben wurde. Die taucht beim naechsten Scrape als
-    eigene Zeile auf.
+    What this step can NOT do: bring back a fixture that was previously
+    overwritten by another one. It shows up as its own row on the next
+    scrape.
     """
     from db.matches import build_match_key
 
@@ -498,23 +498,23 @@ def _migration_008_rekey_matches(conn: sqlite3.Connection) -> None:
 
 def _migration_009_stammdaten(conn: sqlite3.Connection) -> None:
     """
-    Eigene Stammdaten des Schiedsrichters aus DFBnet.
+    The referee's own master data from DFBnet.
 
-    DFBnet fuehrt diese Daten am SR-Account, und jeder App-User hinterlegt
-    genau einen solchen Account - also gehoert zu einem User genau eine Zeile.
-    Deshalb ist user_id hier Primaerschluessel: das ist Fremdschluessel und
-    UNIQUE in einem und macht eine zweite Zeile pro User unmoeglich.
+    DFBnet keeps this data on the referee account, and every app user stores
+    exactly one such account - so exactly one row belongs to a user.
+    That is why user_id is the primary key here: it is foreign key and
+    UNIQUE in one and makes a second row per user impossible.
 
-    Bewusst eine eigene Tabelle statt weiterer Spalten an users: get_user_by_id
-    macht ein SELECT *, und dessen Ergebnis haengt ueber get_current_user in
-    jedem geschuetzten Endpunkt. Anschrift und Geburtsdatum haetten dort nichts
-    zu suchen.
+    Deliberately a separate table instead of further columns on users:
+    get_user_by_id does a SELECT *, and its result hangs off get_current_user
+    in every protected endpoint. Address and date of birth have no business
+    being there.
 
-    Alle Scrape-Felder sind NOT NULL DEFAULT '', weil der Upsert leere Werte
-    per COALESCE(NULLIF(...)) wegmergt - '' heisst "der Scraper hat nichts
-    geliefert", nicht "das Feld ist jetzt leer". Die persoenlichen Felder
-    stehen verschluesselt drin (siehe db/stammdaten.py), das Schema sieht davon
-    nichts: es ist in beiden Faellen TEXT.
+    All scrape fields are NOT NULL DEFAULT '' because the upsert merges away
+    empty values via COALESCE(NULLIF(...)) - '' means "the scraper delivered
+    nothing", not "the field is now empty". The personal fields are stored
+    encrypted (see db/stammdaten.py), the schema does not see that: in both
+    cases it is TEXT.
     """
     _run_script(conn, """
         CREATE TABLE stammdaten (
@@ -555,24 +555,23 @@ def _migration_009_stammdaten(conn: sqlite3.Connection) -> None:
 
 def _migration_010_saison(conn: sqlite3.Connection) -> None:
     """
-    Geleitete Spiele und Saisonbilanz aus dem Reiter "Spiele & Statistiken".
+    Officiated matches and season summary from the "Matches & Statistics" tab.
 
-    Bewusst voellig getrennt von `matches`. Dort stehen die ANSETZUNGEN, an
-    denen die vom Nutzer eingetragenen Kilometer haengen; hier stehen die
-    GELEITETEN Spiele mit Ergebnis und Kartenstatistik. Teils dieselbe Partie,
-    aber aus zwei verschiedenen Tabellen von DFBnet. Ein Zusammenfuehren ueber
-    Heim/Gast/Datum ginge bei Turnieren und Verlegungen schief und haengte im
-    schlimmsten Fall erfasste Fahrtkosten an die falsche Zeile.
+    Deliberately completely separate from `matches`. That holds the
+    FIXTURES, to which the kilometres entered by the user are attached; this
+    holds the OFFICIATED matches with result and card statistics. Partly the
+    same fixture, but from two different tables of DFBnet. Merging them via
+    home/away/date would go wrong with tournaments and rescheduling and, in
+    the worst case, attach recorded travel costs to the wrong row.
 
-    Anders als bei `matches` darf hier pro Saison komplett neu geschrieben
-    werden: an diesen Zeilen haengt nichts, was der Nutzer selbst eingegeben
-    hat. Das ist auch noetig, denn DFBnet korrigiert Ergebnisse und
-    Kartenzahlen nachtraeglich, und die laufende Saison waechst mit jedem
-    Spieltag.
+    Unlike with `matches`, everything may be rewritten per season here: nothing
+    on these rows was entered by the user. That is also necessary, because
+    DFBnet corrects results and card counts after the fact, and the current
+    season grows with every matchday.
 
-    Die Kartenspalten sind INTEGER und duerfen NULL sein - DFBnet zeigt in der
-    Tabelle ein "-", wenn zu einem Spiel nichts erfasst ist. Als Text waeren
-    Summen ueber eine Saison nicht moeglich.
+    The card columns are INTEGER and may be NULL - DFBnet shows a "-" in the
+    table when nothing was recorded for a match. As text, sums over a season
+    would not be possible.
     """
     _run_script(conn, """
         CREATE TABLE season_matches (
@@ -638,20 +637,19 @@ def _migration_010_saison(conn: sqlite3.Connection) -> None:
 
 def _migration_011_saison_vollstaendig(conn: sqlite3.Connection) -> None:
     """
-    Merkt sich je Saison, ob sie vollstaendig gelesen wurde.
+    Remembers per season whether it was read completely.
 
-    Abgeschlossene Saisons aendern sich bei DFBnet nicht mehr. Sie jede Nacht
-    erneut zu lesen kostet bei neun Saisons ein Vielfaches der eigentlichen
-    Arbeit - der Abruf haengt an Umschaltvorgaengen, nicht an Rechenzeit.
-    Kuenftig wird eine Saison nur noch gelesen, wenn sie die laufende ist oder
-    ihr Bestand nicht vollstaendig ist.
+    Finished seasons no longer change at DFBnet. Re-reading them every night
+    costs, with nine seasons, a multiple of the actual work - the retrieval
+    is bound by switching steps, not by computing time. In future a season is
+    only read if it is the current one or its data is incomplete.
 
-    spiele_erwartet ist die von DFBnet gemeldete Trefferzahl. Sie wird beim
-    Pruefen gegen die tatsaechlich gespeicherten Zeilen gehalten: stimmen beide
-    nicht ueberein, fehlt etwas, und die Saison wird komplett neu gelesen.
+    spiele_erwartet is the hit count reported by DFBnet. When checking, it is
+    held against the rows actually stored: if the two do not match,
+    something is missing and the season is re-read completely.
 
-    Bestehende Zeilen bekommen vollstaendig = 0 und werden damit genau einmal
-    nachgelesen - deren Vollstaendigkeit ist nicht rueckwirkend feststellbar.
+    Existing rows get vollstaendig = 0 and are thereby re-read exactly once -
+    their completeness cannot be determined retroactively.
     """
     _run_script(conn, """
         ALTER TABLE season_education ADD COLUMN spiele_erwartet INTEGER NOT NULL DEFAULT 0;
@@ -660,24 +658,24 @@ def _migration_011_saison_vollstaendig(conn: sqlite3.Connection) -> None:
 
 def _migration_012_geocode_cache(conn: sqlite3.Connection) -> None:
     """
-    Zwischenspeicher fuer Adresse -> Koordinate.
+    Cache for address -> coordinate.
 
-    Die Karte im Reiter Fahrtkosten braucht Laengen- und Breitengrade, DFBnet
-    liefert aber nur Klartext-Adressen. Sie werden bei Bedarf einmal beim
-    Geocoder nachgeschlagen und danach hier behalten: dieselbe Spielstaette
-    und dieselben Kollegen tauchen ueber eine Saison hinweg immer wieder auf,
-    und der oeffentliche Nominatim-Dienst darf nicht in Serie befragt werden.
+    The map in the travel costs tab needs longitude and latitude, but DFBnet
+    only supplies plain-text addresses. When needed they are looked up once at
+    the geocoder and then kept here: the same venue and the same colleagues
+    keep showing up over a season, and the public Nominatim service must not
+    be queried in series.
 
-    Zwei Entwurfsentscheidungen:
+    Two design decisions:
 
-    1. Der Schluessel enthaelt den Provider. Wer spaeter einen eigenen
-       Geocoder eintraegt, bekommt dessen Ergebnisse - und nicht die des
-       vorherigen Dienstes, die vielleicht anders ausfallen.
+    1. The key contains the provider. Anyone who later configures their own
+       geocoder gets its results - and not those of the previous service,
+       which may differ.
 
-    2. Ein Fehlschlag wird als Zeile mit lat/lon NULL festgehalten. Ohne das
-       liefe jeder Aufruf der Karte erneut in dieselbe erfolglose Anfrage.
-       Gesucht wird trotzdem irgendwann wieder: der Geocoder kennt die
-       Adresse vielleicht spaeter (siehe MISS_GUELTIG_TAGE im Geocoder).
+    2. A failure is recorded as a row with lat/lon NULL. Without it, every
+       call of the map would run into the same unsuccessful request again.
+       It is still searched again at some point: the geocoder may know the
+       address later (see MISS_GUELTIG_TAGE in the geocoder).
     """
     _run_script(conn, """
         CREATE TABLE geocode_cache (
@@ -693,21 +691,20 @@ def _migration_012_geocode_cache(conn: sqlite3.Connection) -> None:
 
 def _migration_013_alte_herren_saetze(conn: sqlite3.Connection) -> None:
     """
-    Korrigiert die eingefrorenen Spesensaetze der Alt-Herren-Spiele.
+    Corrects the frozen expense rates of the Alte Herren matches.
 
-    Die Saetze werden beim Scrapen eingefroren, damit eine spaetere Aenderung
-    der Spesenordnung keine bereits abgegebene Abrechnung rueckwirkend
-    umschreibt. Dieser Schritt schreibt sie trotzdem neu - aber nicht wegen
-    einer geaenderten Ordnung, sondern weil der Rechner die Alten Herren
-    ueberhaupt nicht erkannt hat: gesucht wurde nach dem Wort "Alte Herren",
-    DFBnet liefert aber "Herren Ue32" bis "Herren Ue50".
+    The rates are frozen at scrape time so that a later change of the
+    expense regulations does not retroactively rewrite an already submitted
+    claim. This step rewrites them anyway - but not because of a changed
+    regulation, rather because the calculator did not recognise the Alte
+    Herren at all: it searched for the words "Alte Herren", but DFBnet
+    delivers "Herren Ue32" to "Herren Ue50".
 
-    Damit liefen alle Ue-Spiele durch die Maenner-Tabelle. Eine Kreisoberliga
-    Ue45 bekam deren 30/25 statt der 25/23 aus der Zeile "Kreis Alte Herren",
-    und die Landesmeisterschaften der Alten Herren (40/30) fanden gar keinen
-    Satz. Ein falscher eingefrorener Wert ist kein schuetzenswerter Stand,
-    deshalb werden genau diese Zeilen neu gerechnet - alle anderen bleiben
-    unberuehrt.
+    As a result all Ue matches went through the men's table. A Kreisoberliga
+    Ue45 received its 30/25 instead of the 25/23 from the "Kreis Alte Herren"
+    row, and the Alte Herren state championships (40/30) found no rate at
+    all. A wrong frozen value is not a state worth protecting, so exactly
+    these rows are recalculated - all others stay untouched.
     """
     from generator.spesen_calculator import calculate_spesen, is_alte_herren
 
@@ -740,25 +737,25 @@ def _migration_013_alte_herren_saetze(conn: sqlite3.Connection) -> None:
 
 def _migration_014_pokal_freundschaft_saetze(conn: sqlite3.Connection) -> None:
     """
-    Loescht die eingefrorenen Punktspielsaetze von Pokal- und Freundschaftsspielen.
+    Deletes the frozen league-match rates of cup and friendly matches.
 
-    Bis hierher hat der Rechner jedem Spiel einen Satz aus der Punktspieltabelle
-    gegeben, auch einem Kreispokalspiel oder einem Kreisfreundschaftsspiel. Dass
-    das nie auf dem Papier landete, lag allein daran, dass Anzeige und Generator
-    getrennt noch einmal geprueft haben, ob ein Punktspiel vorliegt - der falsche
-    Wert stand trotzdem in der Datenbank.
+    Until now the calculator gave every match a rate from the league-match
+    table, even a Kreispokal or Kreisfreundschaftsspiel. That this never
+    ended up on paper was solely because the display and the generator each
+    separately checked again whether a league match was involved - the wrong
+    value was in the database regardless.
 
-    Diese Pruefung faellt jetzt weg, weil der Rechner selbst entscheidet. Damit
-    wuerden die alten Werte auf einmal gedruckt, und zwar falsch: nach §2 Abs. 3
-    richtet sich der Pokalsatz nach der hoechstklassigen beteiligten Mannschaft,
-    nach Abs. 4 der Freundschaftssatz nach der Spielklasse des Gastgebers. Ein
-    Kreispokalspiel zweier Kreisoberligisten kostet 30/25, nicht die 25/23, die
-    hier eingefroren sind.
+    This check is dropped now because the calculator decides itself. The old
+    values would then suddenly be printed, and wrongly: under §2 para. 3 the
+    cup rate depends on the highest-ranked team involved, under para. 4 the
+    friendly rate depends on the league of the host. A Kreispokal match
+    between two Kreisoberliga teams costs 30/25, not the 25/23 frozen here.
 
-    Neu gerechnet wird nur, was der Rechner heute noch verantworten kann -
-    Juniorinnen und Alte Herren auf Kreisebene, deren Satz die Ordnung
-    klassenunabhaengig festlegt. Der Rest wird geleert. Punktspiele bleiben
-    unberuehrt: dort schuetzt das Einfrieren eine bereits abgegebene Abrechnung.
+    Only what the calculator can still vouch for today is recalculated -
+    women's youth and Alte Herren at district level, whose rate the
+    regulations set independently of the league. The rest is emptied. League
+    matches stay untouched: there the freezing protects an already submitted
+    claim.
     """
     from generator.spesen_calculator import PUNKTSPIEL, calculate_spesen, wettbewerbsart
 
@@ -792,19 +789,19 @@ def _migration_014_pokal_freundschaft_saetze(conn: sqlite3.Connection) -> None:
 
 def _migration_015_fremde_verbaende(conn: sqlite3.Connection) -> None:
     """
-    Nimmt den Spielen anderer Landesverbaende die TFV-Saetze wieder ab.
+    Takes the TFV rates away again from matches of other regional associations.
 
-    Bis hierher hat der Rechner nur Spielklasse und Mannschaftsart gesehen.
-    DFBnet normalisiert die Spielklasse aber ueber die Verbandsgrenze hinweg:
-    ein Kreisoberligaspiel in der Altmark steht dort als "Kreisoberliga" wie
-    jedes Thueringer auch, ein NOFV-Spiel der C-Junioren als "Landesliga". So
-    bekamen Spiele der Nachbarverbaende die Saetze des TFV, obwohl nach §2
-    Abs. 6 der ausrichtende Verband nach eigenen Pauschalen zahlt.
+    Until now the calculator only saw league and team type. But DFBnet
+    normalises the league across association borders: a Kreisoberliga match
+    in the Altmark appears there as "Kreisoberliga" just like any Thuringian
+    one, an NOFV match of the C-juniors as "Landesliga". Matches of the
+    neighbouring associations thus got the TFV's rates, although under §2
+    para. 6 the hosting association pays by its own flat rates.
 
-    Erkennbar ist das erst an der Staffel ("1. Altmark West Liga",
-    "U14-Talente-Spielrunde-Nordost"), die der Rechner jetzt mitbekommt. Hier
-    werden die betroffenen Zeilen nachgezogen - wie in Migration 013 ist ein
-    falscher eingefrorener Wert kein schuetzenswerter Stand.
+    This is only recognisable from the group ("1. Altmark West Liga",
+    "U14-Talente-Spielrunde-Nordost"), which the calculator now receives.
+    Here the affected rows are brought up to date - as in migration 013, a
+    wrong frozen value is not a state worth protecting.
     """
     from generator.spesen_calculator import calculate_spesen, _ist_fremder_verband
 
@@ -813,8 +810,8 @@ def _migration_015_fremde_verbaende(conn: sqlite3.Connection) -> None:
     for row in conn.execute(
         "SELECT id, spielklasse, mannschaftsart, staffel, sr_spesen, sra_spesen FROM matches"
     ).fetchall():
-        # Nur Spiele anderer Verbaende. Ein TFV-Spiel behaelt seinen einmal
-        # eingefrorenen Satz, auch wenn die Ordnung inzwischen anders zahlt.
+        # Only matches of other associations. A TFV match keeps its once-frozen
+        # rate, even if the regulations now pay differently.
         if not _ist_fremder_verband(row["staffel"] or ""):
             continue
 
@@ -839,24 +836,23 @@ def _migration_015_fremde_verbaende(conn: sqlite3.Connection) -> None:
 
 def _migration_016_ligen(conn: sqlite3.Connection) -> None:
     """
-    Die Thueringer Herren-Ligen und ihre Tabellen.
+    The Thuringian men's leagues and their tables.
 
-    Bei Pokal- und Freundschaftsspielen richtet sich der Spesensatz nach der
-    Spielklasse der beteiligten Vereine (§2 Abs. 3 und 4), nicht nach der des
-    Spiels - in der Ansetzung steht aber nur "Kreispokal". Diese Tabellen
-    schliessen die Luecke; sie werden naechtlich aus fussball.de gefuellt und
-    zeigen nebenbei den Reiter *Ligen*.
+    For cup and friendly matches the expense rate depends on the league of the
+    clubs involved (§2 para. 3 and 4), not on that of the match - but the
+    fixture only says "Kreispokal". These tables close the gap; they are
+    filled nightly from fussball.de and incidentally feed the *Leagues* tab.
 
-    Zwei Entwurfsentscheidungen:
+    Two design decisions:
 
-    1. kern und nummer liegen als eigene Spalten daneben, nicht als Ausdruck
-       im SELECT. Nur so laesst sich ueber sie ein Index legen, und nur so ist
-       die Zuordnungsregel an genau einer Stelle festgeschrieben (siehe
+    1. kern and nummer are separate columns alongside, not an expression in
+       the SELECT. Only that way can an index be put on them, and only that
+       way is the matching rule fixed in exactly one place (see
        db.ligen.finde_mannschaft).
 
-    2. Der Schluessel ist die team_id von fussball.de, nicht der Name. Eine
-       Mannschaft kann im Laufe der Saison umbenannt werden - dann soll ihre
-       Zeile ersetzt und nicht verdoppelt werden.
+    2. The key is the team_id from fussball.de, not the name. A team can be
+       renamed during the season - then its row should be replaced and not
+       duplicated.
     """
     _run_script(conn, """
         CREATE TABLE liga_staffeln (
@@ -893,20 +889,20 @@ def _migration_016_ligen(conn: sqlite3.Connection) -> None:
 
 def _migration_017_beobachtungen(conn: sqlite3.Connection) -> None:
     """
-    Die eigenen Beobachtungen aus Schiri-Beobachtung und Schiri-Portal.
+    The own observations from Schiri-Beobachtung and Schiri-Portal.
 
-    quelle trennt die beiden Module: "herren" (Landesverband) und "portal"
-    (DFB-Nachwuchs). Beide haben je Saison einen eigenen Schnitt und duerfen
-    nie zusammengerechnet werden.
+    quelle separates the two modules: "herren" (regional association) and
+    "portal" (DFB youth). Each has its own average per season and they must
+    never be added together.
 
-    Je Spiel wird nur die EIGENE Note gespeichert, zusammen mit der Rolle, in
-    der sie vergeben wurde. Die Noten der Kollegen gehen niemanden etwas an,
-    der nicht selbst Nutzer ist.
+    Per match only the OWN grade is stored, together with the role in which
+    it was given. The colleagues' grades are none of the business of anyone
+    who is not a user themselves.
 
-    beobachtung_saisons merkt sich, welche Saisons vollstaendig gelesen
-    wurden - auch die leeren. Sonst liesse sich "ohne Beobachtung" nicht von
-    "noch nie gelesen" unterscheiden, und jede leere Saison wuerde jede Nacht
-    erneut abgefragt.
+    beobachtung_saisons remembers which seasons were read completely - the
+    empty ones too. Otherwise "without observation" could not be told apart
+    from "never read", and every empty season would be queried again every
+    night.
     """
     _run_script(conn, """
         CREATE TABLE beobachtungen (
@@ -947,16 +943,15 @@ def _migration_017_beobachtungen(conn: sqlite3.Connection) -> None:
 
 def _migration_018_nofv_saetze(conn: sqlite3.Connection) -> None:
     """
-    Traegt den Pflichtspielen der NOFV-Spielklassen ihren Satz nach.
+    Fills in the rate for competitive matches of the NOFV leagues.
 
-    Bis hierher hat der Rechner jedes Spiel oberhalb des TFV leer gelassen, und
-    so ist es auch eingefroren worden. Jetzt kennt er die Saetze der
-    Finanzordnung des NOFV (§9 Nr. 7) fuer Regionalliga und Oberliga.
+    Until now the calculator left every match above the TFV empty, and that
+    is how it was frozen. Now it knows the rates of the NOFV finance
+    regulations (§9 no. 7) for Regionalliga and Oberliga.
 
-    Angefasst werden nur Zeilen OHNE Satz, die der Rechner als NOFV-Pflichtspiel
-    erkennt. Ein leeres Feld war nie ein abgerechneter Stand, den es zu
-    schuetzen gaelte - wer bisher abgerechnet hat, hat den Betrag von Hand
-    eingetragen.
+    Only rows WITHOUT a rate that the calculator recognises as an NOFV
+    competitive match are touched. An empty field was never a settled state
+    to be protected - whoever has claimed so far entered the amount by hand.
     """
     from generator.spesen_calculator import SPESEN_NOFV, nofv_spielklasse
 
@@ -983,28 +978,27 @@ def _migration_018_nofv_saetze(conn: sqlite3.Connection) -> None:
 
 def _migration_019_spielberichte(conn: sqlite3.Connection) -> None:
     """
-    Die Spielberichte der eigenen Spiele aus "Spielberichte -> Einsatzplan".
+    The match reports of the own matches from "Spielberichte -> Einsatzplan".
 
-    Schluessel ist die Spiel-ID, die DFBnet im Link auf den Bericht fuehrt -
-    sie ist ueber Saisons und Verlegungen hinweg stabil. Mit den geleiteten
-    Spielen (season_matches) und den Ansetzungen (matches) wird beim Lesen
-    ueber Datum und Mannschaften verknuepft, nicht per Fremdschluessel: beide
-    Tabellen werden unabhaengig davon ersetzt bzw. neu verschluesselt.
+    The key is the match ID that DFBnet carries in the link to the report -
+    it is stable across seasons and rescheduling. With the officiated matches
+    (season_matches) and the fixtures (matches) the link is made when reading
+    via date and teams, not via foreign key: both tables are replaced or
+    re-keyed independently of this.
 
-    daten haelt den aufbereiteten Spielverlauf als JSON (Ereignisse,
-    Aufstellungen, Kontrollen, Bestaetigungen). Er wird nur angezeigt, nie
-    ausgewertet; eine Tabelle je Ereignisart waere hier nur Ballast.
+    daten holds the processed course of the match as JSON (events, line-ups,
+    checks, confirmations). It is only displayed, never evaluated; a table
+    per event type would be mere ballast here.
 
-    fahrtkosten und spesen sind die Summen des ganzen Gespanns, wie DFBnet
-    sie im Bericht fuehrt. Sie stehen als eigene Spalten da, weil die
-    Spesenseite sie je Spiel anzeigt, ohne den ganzen Bericht zu laden.
+    fahrtkosten and spesen are the totals for the whole crew, as DFBnet lists
+    them in the report. They are separate columns because the expenses page
+    shows them per match without loading the whole report.
 
-    Die Dokumente liegen als Dateien unter DATA_DIR/spielberichte/<user>/;
-    pfad ist relativ zu DATA_DIR, damit ein umgezogener Datenordner gueltig
-    bleibt.
+    The documents are files under DATA_DIR/spielberichte/<user>/; pfad is
+    relative to DATA_DIR so that a relocated data folder stays valid.
 
-    spielbericht_saisons merkt sich, welche Saisons fertig gelesen sind -
-    abgeschlossen und ohne Bericht, der noch auf seine Freigabe wartet.
+    spielbericht_saisons remembers which seasons have been read completely -
+    finished and without a report still waiting for its release.
     """
     _run_script(conn, """
         CREATE TABLE spielberichte (
@@ -1060,16 +1054,16 @@ def _migration_019_spielberichte(conn: sqlite3.Connection) -> None:
 
 def _migration_020_spielbericht_log(conn: sqlite3.Connection) -> None:
     """
-    Protokolliert, wie die Spielberichte genutzt werden - wie login_log und
-    download_log fuer die Nutzungsstatistik.
+    Logs how the match reports are used - like login_log and download_log
+    for the usage statistics.
 
-    aktion: "ansehen" (Bericht geoeffnet), "dokument_oeffnen" oder
-    "dokument_laden". quelle sagt, von wo der Bericht geoeffnet wurde
-    ("saison", "spesen" oder "direkt" fuer einen Aufruf ohne Herkunft, etwa
-    ein Link von aussen; bei Dokumenten "bericht").
+    aktion: "ansehen" (report opened), "dokument_oeffnen" or
+    "dokument_laden". quelle says where the report was opened from
+    ("saison", "spesen" or "direkt" for a call without origin, such as an
+    external link; for documents "bericht").
 
-    Kein Fremdschluessel auf spielberichte: das Log ist Historie und soll
-    einen geloeschten Bericht (Kontowechsel) ueberdauern.
+    No foreign key on spielberichte: the log is history and should outlive a
+    deleted report (account change).
     """
     _run_script(conn, """
         CREATE TABLE spielbericht_log (
@@ -1089,14 +1083,14 @@ def _migration_020_spielbericht_log(conn: sqlite3.Connection) -> None:
 
 def _migration_021_login_sperren(conn: sqlite3.Connection) -> None:
     """
-    Zaehlt fehlgeschlagene Logins je E-Mail-Adresse, damit nach fuenf
-    Fehlversuchen eine Sperre greift.
+    Counts failed logins per e-mail address so that a lockout takes effect
+    after five failed attempts.
 
-    Bewusst nach Adresse und nicht nach IP: die Instanz steht hinter einem
-    Cloudflare Tunnel, alle Anfragen kommen dort von derselben Adresse - eine
-    IP-Sperre wuerde jeden aussperren. Auch Adressen ohne Konto werden
-    gezaehlt, sonst verriete die Sperre, welche Adressen registriert sind.
-    Kein Fremdschluessel auf users aus demselben Grund.
+    Deliberately by address and not by IP: the instance sits behind a
+    Cloudflare Tunnel, all requests come from the same address there - an IP
+    lockout would lock everyone out. Addresses without an account are
+    counted too, otherwise the lockout would reveal which addresses are
+    registered. No foreign key on users for the same reason.
     """
     _run_script(conn, """
         CREATE TABLE login_sperren (
@@ -1110,12 +1104,12 @@ def _migration_021_login_sperren(conn: sqlite3.Connection) -> None:
 
 def _migration_022_dfb_login_abgelehnt(conn: sqlite3.Connection) -> None:
     """
-    Merkt sich, seit wann DFBnet die gespeicherten Zugangsdaten ablehnt.
+    Remembers since when DFBnet has been rejecting the stored credentials.
 
-    Bisher stand das nur im letzten Abruf. Der naechste Lauf - oder ein
-    abgebrochener - ueberschrieb es, und der Hinweis verschwand, obwohl die
-    Zugangsdaten weiter falsch waren. NULL heisst: zuletzt angenommen oder
-    noch nicht geprueft.
+    Until now this was only in the last retrieval. The next run - or an
+    aborted one - overwrote it, and the notice disappeared although the
+    credentials were still wrong. NULL means: last accepted or not yet
+    checked.
     """
     _run_script(conn, """
         ALTER TABLE users ADD COLUMN dfb_login_abgelehnt_seit TEXT;
@@ -1124,30 +1118,30 @@ def _migration_022_dfb_login_abgelehnt(conn: sqlite3.Connection) -> None:
 
 def _migration_023_dfb_spiel_id(conn: sqlite3.Connection) -> None:
     """
-    Die DFBnet-ID wird zur Identitaet eines Spiels.
+    The DFBnet ID becomes the identity of a match.
 
-    Seit die Ansetzungen ueber die JSON-Schnittstelle gelesen werden, kommt
-    zu jedem Spiel dessen ID mit - dieselbe, unter der auch der Spielbericht
-    steht (spielberichte.dfb_spiel_id). Mit ihr bleibt ein verlegtes Spiel in
-    seiner Zeile, statt als neues aufzutauchen.
+    Since the fixtures are read via the JSON interface, each match comes with
+    its ID - the same one under which the match report is filed
+    (spielberichte.dfb_spiel_id). With it a rescheduled match stays in its
+    row instead of appearing as a new one.
 
-    Bestehende Spiele bekommen ihre ID hier aus den gespeicherten
-    Spielberichten (gleicher Nutzer, gleicher Tag, beide Teams oder ein Team
-    plus Anstosszeit - wie beim Verknuepfen der Berichte in der Liste), dazu die
-    Spielkennung fuer die Spesenquittungen. Was keinen Bericht hat - vor allem
-    kuenftige Spiele -, ordnet der naechste Abruf ueber den match_key zu
+    Existing matches get their ID here from the stored match reports (same
+    user, same day, both teams or one team plus kick-off time - as when
+    linking the reports in the list), plus the match identifier for the
+    expense receipts. What has no report - above all future matches - is
+    assigned by the next retrieval via the match_key
     (db.matches._schreibe_mit_id).
 
-    Mehrdeutige Faelle bleiben ohne ID: lieber spaeter zuordnen als falsch.
+    Ambiguous cases stay without an ID: better to assign later than wrongly.
     """
     _run_script(conn, """
         ALTER TABLE matches ADD COLUMN dfb_spiel_id TEXT;
     """)
 
-    # Eigene Kopie der Zuordnung aus db.spielberichte (team_kern, Zuordnung):
-    # eine Migration darf sich nicht mit spaeteren Aenderungen am Code
-    # mitveraendern. Die Namen sind in den DFBnet-Modulen verschieden
-    # geschrieben ("Hertha BSC II" / "Hertha BSC U23", "... 1911" / "... 1911 e.V.").
+    # Own copy of the mapping from db.spielberichte (team_kern, Zuordnung):
+    # a migration must not change along with later changes to the code.
+    # The names are spelled differently in the DFBnet modules
+    # ("Hertha BSC II" / "Hertha BSC U23", "... 1911" / "... 1911 e.V.").
     zusatz = re.compile(r"^(u\d{1,2}|i{1,3}|iv|\d{1,2}|e|v|ev)$")
 
     def kern(name):
@@ -1202,20 +1196,20 @@ def _migration_023_dfb_spiel_id(conn: sqlite3.Connection) -> None:
     logger.info(f"DFBnet-ID aus Spielberichten zugeordnet: {zugeordnet} Spiele")
 
 
-# (Version, Beschreibung, Funktion) - aufsteigend, Luecken sind nicht erlaubt.
+# (version, description, function) - ascending, gaps are not allowed.
 def _migration_024_platz_und_eigene_rolle(conn: sqlite3.Connection) -> None:
     """
-    Koordinaten der Spielstaette und die eigene Rolle je Spiel.
+    Coordinates of the venue and the own role per match.
 
-    Die Ansetzungs-Schnittstelle liefert zu jeder Spielstaette Breite und
-    Laenge - genauer als die Adresssuche, die bei "Auenweg, 07318 Saalfeld"
-    ohne Hausnummer nur raten kann. Kilometer-Vorschlaege, Statistik und die
-    Karte der besuchten Plaetze rechnen damit.
+    The fixtures interface supplies latitude and longitude for every venue -
+    more precise than the address search, which can only guess at
+    "Auenweg, 07318 Saalfeld" without a house number. Kilometre suggestions,
+    statistics and the map of visited venues calculate with it.
 
-    ist_selbst markiert die Zeile des Nutzers im Gespann (seine
-    Schiedsrichter-ID steht in der Ansetzung). Ohne sie liesse sich nicht
-    sagen, ob die SR- oder die SRA-Spesen die eigenen sind. Bestehende Spiele
-    bekommen beides beim naechsten Abruf, der die ganze Saison liest.
+    ist_selbst marks the user's row in the crew (their referee ID appears in
+    the fixture). Without it one could not tell whether the SR or the SRA
+    expenses are the user's own. Existing matches get both on the next
+    retrieval, which reads the whole season.
     """
     _run_script(conn, """
         ALTER TABLE matches ADD COLUMN staette_lat REAL;
@@ -1226,18 +1220,18 @@ def _migration_024_platz_und_eigene_rolle(conn: sqlite3.Connection) -> None:
 
 def _migration_025_strecken_cache(conn: sqlite3.Connection) -> None:
     """
-    Zwischenspeicher fuer Strassenentfernungen zwischen zwei Koordinaten.
+    Cache for road distances between two coordinates.
 
-    Kilometer-Vorschlaege und die geschaetzten Fahrtkosten der Statistik
-    fragen einen Routenplaner. Der oeffentliche Dienst von OpenStreetMap
-    Deutschland erlaubt eine Anfrage je Sekunde; dieselben Wege (Wohnort ->
-    Heimplatz des Nachbarvereins) wiederholen sich aber staendig. Jede
-    Strecke wird deshalb einmal gefragt und dann hier behalten.
+    Kilometre suggestions and the estimated travel costs of the statistics
+    query a routing service. The public service of OpenStreetMap Germany
+    allows one request per second; but the same routes (home -> home ground
+    of the neighbouring club) keep repeating. Each route is therefore asked
+    for once and then kept here.
 
-    Die Koordinaten stehen auf vier Nachkommastellen gerundet im Schluessel
-    (gut zehn Meter): genauer unterscheidet keine Strassenentfernung. Die
-    Richtung zaehlt - Einbahnstrassen machen Hin- und Rueckweg verschieden.
-    meter NULL heisst "der Dienst kennt keinen Weg", wie beim Geocoder.
+    The coordinates are rounded to four decimals in the key (a little over
+    ten metres): no road distance distinguishes more finely. The direction
+    counts - one-way streets make the outward and return journey different.
+    meter NULL means "the service knows no route", as with the geocoder.
     """
     _run_script(conn, """
         CREATE TABLE strecken_cache (
@@ -1308,22 +1302,21 @@ MIGRATIONS: List[Tuple[int, str, Callable[[sqlite3.Connection], None]]] = [
 
 def _backup_database(conn: sqlite3.Connection, db_path: Path, from_version: int) -> Path | None:
     """
-    Legt eine Kopie der Datenbank neben der Originaldatei ab, bevor migriert
-    wird. Gibt den Pfad des Backups zurueck, oder None wenn es noch keine
-    Datenbankdatei gibt (frische Installation - da ist nichts zu sichern).
+    Places a copy of the database next to the original file before migrating.
+    Returns the path of the backup, or None if there is no database file yet
+    (fresh installation - nothing to back up).
 
-    Bewusst ueber die Backup-API von SQLite und nicht per Dateikopie: sobald
-    die Datenbank im WAL-Modus laeuft (ab Migration 002), stehen frisch
-    committete Daten noch in app.db-wal. Ein shutil.copy2 nimmt nur app.db mit
-    und liefert damit eine stille Teilsicherung - genau dann wertlos, wenn sie
-    gebraucht wird. backup() zieht einen konsistenten Schnappschuss inklusive
-    WAL-Inhalt.
+    Deliberately via SQLite's backup API and not via file copy: once the
+    database runs in WAL mode (from migration 002), freshly committed data
+    still sits in app.db-wal. A shutil.copy2 only takes app.db along and thus
+    yields a silent partial backup - worthless exactly when it is needed.
+    backup() takes a consistent snapshot including the WAL content.
     """
     if not db_path.exists():
         return None
 
-    # sqlite3.connect legt die Datei schon beim Oeffnen an. Eine Datei ohne
-    # ein einziges Schema-Objekt ist deshalb ebenfalls eine frische Installation.
+    # sqlite3.connect creates the file as soon as it opens it. A file without
+    # a single schema object is therefore also a fresh installation.
     if conn.execute("SELECT COUNT(*) FROM sqlite_master").fetchone()[0] == 0:
         return None
 
@@ -1343,16 +1336,16 @@ def _backup_database(conn: sqlite3.Connection, db_path: Path, from_version: int)
 
 def apply_migrations(conn: sqlite3.Connection, db_path: Path) -> int:
     """
-    Bringt die Datenbank auf den neuesten Stand.
+    Brings the database up to date.
 
-    Jeder Schritt laeuft in einer eigenen Transaktion und setzt danach
-    user_version. Bricht ein Schritt ab, wird er vollstaendig zurueckgerollt,
-    die Datenbank bleibt auf der letzten erfolgreich angewendeten Version und
-    die Exception wird weitergereicht - halb migriert startet die App nicht.
-    Ein erneuter Start nimmt den gescheiterten Schritt sauber noch einmal.
+    Each step runs in its own transaction and sets user_version afterwards.
+    If a step fails, it is rolled back completely, the database stays at the
+    last successfully applied version and the exception is passed on - the
+    app does not start half-migrated. A restart cleanly retries the failed
+    step.
 
     Returns:
-        Die Version, auf der die Datenbank nach dem Lauf steht.
+        The version the database is at after the run.
     """
     current = conn.execute("PRAGMA user_version").fetchone()[0]
     target = MIGRATIONS[-1][0] if MIGRATIONS else 0
@@ -1370,18 +1363,18 @@ def apply_migrations(conn: sqlite3.Connection, db_path: Path) -> int:
 
         logger.info(f"Migration {version}: {description}")
         try:
-            # Ausdrueckliches BEGIN: Pythons sqlite3 oeffnet von sich aus keine
-            # Transaktion fuer DDL, und ohne eine ist rollback() folgenlos.
-            # journal_mode vertraegt keine offene Transaktion, deshalb die
-            # Ausnahme fuer Schritt 2.
+            # Explicit BEGIN: Python's sqlite3 does not open a transaction for DDL
+            # on its own, and without one rollback() has no effect.
+            # journal_mode does not tolerate an open transaction, hence the
+            # exception for step 2.
             transaktional = migrate is not _migration_002_wal
             if transaktional:
                 conn.execute("BEGIN")
 
             migrate(conn)
 
-            # user_version nimmt keine Parameter-Bindung entgegen; die Version
-            # stammt aus MIGRATIONS und ist damit keine fremde Eingabe.
+            # user_version does not accept parameter binding; the version
+            # comes from MIGRATIONS and is therefore not foreign input.
             conn.execute(f"PRAGMA user_version = {version}")
             conn.commit()
         except Exception:

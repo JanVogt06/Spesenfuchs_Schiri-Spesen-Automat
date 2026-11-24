@@ -1,17 +1,17 @@
 """
-Strassenentfernungen ueber einen OSRM-Routenplaner.
+Road distances via an OSRM routing service.
 
-Voreinstellung ist der Dienst von OpenStreetMap Deutschland (FOSSGIS e.V.),
-den auch openstreetmap.org zur Routenplanung nutzt. ROUTING_URL zeigt auf
-einen eigenen OSRM, wenn gewuenscht - etwa, damit keine Koordinate das Haus
-verlaesst. Gefragt wird ueber die Matrix-Schnittstelle (table): eine Anfrage
-liefert alle Wege zwischen mehreren Punkten, fuer ein ganzes Gespann also
-eine einzige.
+The default is the service of OpenStreetMap Germany (FOSSGIS e.V.), which
+openstreetmap.org also uses for route planning. ROUTING_URL can point to
+a self-hosted OSRM if desired - for instance, so that no coordinate leaves
+the house. Queries go through the matrix interface (table): one request
+returns all routes between several points, so a whole crew needs just
+one.
 
-Wie beim Geocoder gilt: hoechstens eine Anfrage je Sekunde
-(ROUTING_MIN_INTERVAL), und jede Strecke wird nur einmal gefragt
-(db.strecken). Uebertragen werden nur Koordinaten, keine Namen oder
-Anschriften.
+As with the geocoder: at most one request per second
+(ROUTING_MIN_INTERVAL), and each route is only ever asked for once
+(db.strecken). Only coordinates are transmitted, no names or
+addresses.
 """
 import json
 import math
@@ -32,15 +32,15 @@ logger = setup_logger("routing")
 STANDARD_URL = "https://routing.openstreetmap.de/routed-car"
 TIMEOUT_SEKUNDEN = 15
 
-# Wie beim Geocoder: ein Weg, den heute niemand kennt, ist in vier Wochen vielleicht eingetragen
+# As with the geocoder: a route nobody knows today may have been added in four weeks
 MISS_GUELTIG_TAGE = 30
 
-# OSRM nimmt je Matrix-Anfrage hoechstens 100 Punkte an (max-table-size)
+# OSRM accepts at most 100 points per matrix request (max-table-size)
 MAX_PUNKTE_JE_ANFRAGE = 100
 
-# Luftlinie -> Strasse: auf Landstrassen in Thueringen faehrt man im Mittel
-# ein gutes Drittel mehr als die Luftlinie. Nur Notbehelf, wenn der
-# Routenplaner nicht antwortet.
+# Straight line -> road: on country roads in Thuringia you drive on average
+# a good third more than the straight-line distance. Only a stopgap when the
+# routing service does not respond.
 UMWEGFAKTOR = 1.3
 
 _schloss = threading.Lock()
@@ -48,7 +48,7 @@ _letzte_anfrage = 0.0
 
 
 class RoutingNichtErreichbar(Exception):
-    """Der Routenplaner hat nicht (brauchbar) geantwortet."""
+    """The routing service did not respond (or not usefully)."""
 
 
 def basis_url() -> str:
@@ -63,12 +63,12 @@ def _min_intervall() -> float:
 
 
 def runden(punkt: Punkt) -> Punkt:
-    """Schluessel im Zwischenspeicher: gut zehn Meter genau."""
+    """Cache key: accurate to a little over ten metres."""
     return round(punkt[0], 4), round(punkt[1], 4)
 
 
 def luftlinie_m(a: Punkt, b: Punkt) -> float:
-    """Entfernung auf der Kugel in Metern (Haversine)."""
+    """Distance on the sphere in metres (haversine)."""
     lat1, lon1, lat2, lon2 = map(math.radians, (*a, *b))
     h = math.sin((lat2 - lat1) / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin((lon2 - lon1) / 2) ** 2
     return 2 * 6_371_000 * math.asin(math.sqrt(h))
@@ -85,7 +85,7 @@ def _abgelaufen(resolved_at: str) -> bool:
 
 
 def _matrix_abfragen(quellen: List[Punkt], ziele: List[Punkt]) -> List[List[Optional[float]]]:
-    """Eine table-Anfrage: Meter von jeder Quelle zu jedem Ziel, None ohne Weg."""
+    """One table request: metres from each source to each destination, None if there is no route."""
     global _letzte_anfrage
 
     punkte = quellen + ziele
@@ -125,11 +125,11 @@ def _matrix_abfragen(quellen: List[Punkt], ziele: List[Punkt]) -> List[List[Opti
 
 class Entfernungen:
     """
-    Ergebnis von entfernungen(): meter[i][j] von Quelle i zu Ziel j.
+    Result of entfernungen(): meter[i][j] from source i to destination j.
 
-    None heisst: unbekannt - der Dienst kennt keinen Weg, oder die Strecke
-    wurde nicht gefragt, weil das Zeitbudget aufgebraucht war (dann zaehlt
-    sie in offen und kommt beim naechsten Aufruf dran).
+    None means unknown - the service knows no route, or the route was not
+    requested because the time budget was used up (it then counts towards
+    offen and is picked up on the next call).
     """
 
     def __init__(self, meter: List[List[Optional[float]]], offen: int):
@@ -140,14 +140,14 @@ class Entfernungen:
 def entfernungen(quellen: Sequence[Punkt], ziele: Sequence[Punkt],
                  frist: Optional[float] = None) -> Entfernungen:
     """
-    Strassenentfernungen von jeder Quelle zu jedem Ziel, in Metern.
+    Road distances from each source to each destination, in metres.
 
-    Was im Zwischenspeicher steht, kommt von dort; der Rest geht in so wenigen
-    Anfragen wie moeglich an den Routenplaner. frist ist ein Zeitpunkt
-    (time.monotonic), nach dem keine neue Anfrage mehr beginnt.
+    Whatever is in the cache comes from there; the rest goes to the routing
+    service in as few requests as possible. frist is a point in time
+    (time.monotonic) after which no new request is started.
 
-    Antwortet der Dienst nicht, fliegt RoutingNichtErreichbar - der Aufrufer
-    entscheidet, ob er auf die Luftlinie ausweicht.
+    If the service does not respond, RoutingNichtErreichbar is raised - the
+    caller decides whether to fall back to the straight-line distance.
     """
     quellen = [runden(p) for p in quellen]
     ziele = [runden(p) for p in ziele]
@@ -180,7 +180,7 @@ def entfernungen(quellen: Sequence[Punkt], ziele: Sequence[Punkt],
                     continue
                 if (q, z) in paare:
                     meter[(q, z)] = antwort[i][j]
-                # Mitgelieferte Strecken behalten - sie kommen beim naechsten Spiel dran
+                # Keep the routes that came along - they will be needed for the next match
                 neu.append((q, z, antwort[i][j]))
         store_strecken(neu, provider)
 
@@ -189,11 +189,11 @@ def entfernungen(quellen: Sequence[Punkt], ziele: Sequence[Punkt],
 
 def _anfragen_buendeln(fehlend: List[Tuple[Punkt, Punkt]]):
     """
-    Fasst fehlende Strecken zu moeglichst wenigen Matrix-Anfragen zusammen:
-    alle betroffenen Quellen gegen alle betroffenen Ziele. Das liefert auch
-    ein paar Strecken, die niemand gefragt hat - fuer ein Gespann aber eine
-    Anfrage statt einer je Person, und jede kostet beim oeffentlichen Dienst
-    einige Sekunden. Keine Anfrage ueberschreitet MAX_PUNKTE_JE_ANFRAGE.
+    Combines missing routes into as few matrix requests as possible:
+    all affected sources against all affected destinations. This also yields
+    a few routes nobody asked for - but for a crew it is one request instead
+    of one per person, and each one takes a few seconds on the public
+    service. No request exceeds MAX_PUNKTE_JE_ANFRAGE.
     """
     quellen = list(dict.fromkeys(q for q, _ in fehlend))
     ziele = list(dict.fromkeys(z for _, z in fehlend))

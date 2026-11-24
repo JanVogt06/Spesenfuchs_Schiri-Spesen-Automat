@@ -1,7 +1,7 @@
 """
-Routenplaner ohne Netz: urlopen ist eine Attrappe, die eine Matrix aus einer
-Funktion der Koordinaten berechnet. Der Zwischenspeicher laeuft gegen die
-Wegwerf-Datenbank der db-Fixture.
+Routing service without network: urlopen is a stand-in that computes a matrix
+from a function of the coordinates. The cache runs against the throwaway
+database of the db fixture.
 """
 import json
 from datetime import datetime, timedelta, UTC
@@ -39,7 +39,7 @@ class _Antwort:
 
 
 class FalscherPlaner:
-    """Antwortet mit 1000 x (Index der Quelle + 1) + Index des Ziels Metern."""
+    """Answers with 1000 x (source index + 1) + destination index metres."""
 
     def __init__(self):
         self.anfragen = []
@@ -109,7 +109,7 @@ class TestAnfrage:
         planer.fehler = URLError("weg")
         with pytest.raises(RoutingNichtErreichbar):
             entfernungen([JENA], [WEIMAR])
-        # Ein Ausfall landet nicht im Speicher
+        # An outage does not end up in the cache
         assert get_strecken([(JENA, WEIMAR)], STANDARD_URL) == {}
 
 
@@ -187,7 +187,7 @@ class TestBuendeln:
 
 
 def test_luftlinie():
-    # Jena - Weimar: gut 19 km
+    # Jena - Weimar: a good 19 km
     assert 18_500 < luftlinie_m(JENA, WEIMAR) < 19_500
     assert luftlinie_m(JENA, JENA) == 0
 
