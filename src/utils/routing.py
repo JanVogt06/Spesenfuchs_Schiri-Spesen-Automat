@@ -176,9 +176,12 @@ def entfernungen(quellen: Sequence[Punkt], ziele: Sequence[Punkt],
         neu = []
         for i, q in enumerate(gruppe_q):
             for j, z in enumerate(gruppe_z):
+                if q == z:
+                    continue
                 if (q, z) in paare:
                     meter[(q, z)] = antwort[i][j]
-                    neu.append((q, z, antwort[i][j]))
+                # Mitgelieferte Strecken behalten - sie kommen beim naechsten Spiel dran
+                neu.append((q, z, antwort[i][j]))
         store_strecken(neu, provider)
 
     return Entfernungen([[meter.get((q, z)) for z in ziele] for q in quellen], offen)
@@ -186,23 +189,20 @@ def entfernungen(quellen: Sequence[Punkt], ziele: Sequence[Punkt],
 
 def _anfragen_buendeln(fehlend: List[Tuple[Punkt, Punkt]]):
     """
-    Fasst fehlende Strecken zu Matrix-Anfragen zusammen: je Quelle alle ihre
-    fehlenden Ziele, und Quellen mit denselben Zielen gemeinsam. Keine Anfrage
-    ueberschreitet MAX_PUNKTE_JE_ANFRAGE.
+    Fasst fehlende Strecken zu moeglichst wenigen Matrix-Anfragen zusammen:
+    alle betroffenen Quellen gegen alle betroffenen Ziele. Das liefert auch
+    ein paar Strecken, die niemand gefragt hat - fuer ein Gespann aber eine
+    Anfrage statt einer je Person, und jede kostet beim oeffentlichen Dienst
+    einige Sekunden. Keine Anfrage ueberschreitet MAX_PUNKTE_JE_ANFRAGE.
     """
-    ziele_je_quelle: Dict[Punkt, List[Punkt]] = {}
-    for q, z in fehlend:
-        ziele_je_quelle.setdefault(q, []).append(z)
+    quellen = list(dict.fromkeys(q for q, _ in fehlend))
+    ziele = list(dict.fromkeys(z for _, z in fehlend))
+    gesucht = set(fehlend)
 
-    nach_zielen: Dict[Tuple[Punkt, ...], List[Punkt]] = {}
-    for q, zs in ziele_je_quelle.items():
-        nach_zielen.setdefault(tuple(zs), []).append(q)
-
-    for zs, qs in nach_zielen.items():
-        # Viele Quellen zu einem Ziel (Spielorte -> Wohnort) oder umgekehrt:
-        # in Bloecke teilen, die zusammen unter die Grenze passen
-        platz = MAX_PUNKTE_JE_ANFRAGE // 2
-        for i in range(0, len(qs), platz):
-            for j in range(0, len(zs), platz):
-                block_q, block_z = qs[i:i + platz], list(zs[j:j + platz])
-                yield block_q, block_z, {(q, z) for q in block_q for z in block_z}
+    platz = MAX_PUNKTE_JE_ANFRAGE // 2
+    for i in range(0, len(quellen), platz):
+        for j in range(0, len(ziele), platz):
+            block_q, block_z = quellen[i:i + platz], ziele[j:j + platz]
+            paare = {(q, z) for q in block_q for z in block_z if (q, z) in gesucht}
+            if paare:
+                yield block_q, block_z, paare

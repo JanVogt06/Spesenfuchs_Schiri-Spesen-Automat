@@ -196,3 +196,13 @@ def test_abgelaufen():
     assert routing._abgelaufen((datetime.now(UTC) - timedelta(days=31)).isoformat())
     assert not routing._abgelaufen(datetime.now(UTC).isoformat())
     assert routing._abgelaufen("kaputt")
+
+
+def test_ein_gespann_ist_eine_anfrage(planer):
+    punkte = [JENA, WEIMAR, ERFURT, (50.6483, 11.3659)]
+
+    ergebnis = entfernungen(punkte, punkte)
+
+    assert len(planer.anfragen) == 1
+    assert all(m is not None for zeile in ergebnis.meter for m in zeile)
+    assert [ergebnis.meter[i][i] for i in range(4)] == [0.0] * 4
