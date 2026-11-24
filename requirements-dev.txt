@@ -3,4 +3,4 @@
 # Tests
 pytest
 pytest-cov
-httpx  # fuer FastAPIs TestClient
+httpx  # for FastAPI's TestClient

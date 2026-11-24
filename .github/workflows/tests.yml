@@ -4,7 +4,7 @@ on:
   push:
     branches: ['**']
   pull_request:
-  # Der Release-Workflow ruft diesen auf, bevor er ein Image baut
+  # The release workflow calls this one before it builds an image
   workflow_call:
 
 permissions:
@@ -18,7 +18,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      # Dieselbe Version wie im Dockerfile
+      # Same version as in the Dockerfile
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
@@ -28,8 +28,8 @@ jobs:
             requirements.txt
             requirements-dev.txt
 
-      # Ohne "playwright install": die Tests starten keinen Browser,
-      # LibreOffice und SMTP werden ebenso nachgestellt.
+      # No "playwright install": the tests do not start a browser;
+      # LibreOffice and SMTP are mocked as well.
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
 
@@ -46,7 +46,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      # Dieselbe Version wie im Dockerfile
+      # Same version as in the Dockerfile
       - name: Set up Node
         uses: actions/setup-node@v6
         with:

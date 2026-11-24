@@ -1,23 +1,23 @@
-# Multi-stage Build: Frontend bauen, dann Backend
-# Das Frontend-Build ist plattformunabhaengig und laeuft daher auf der
-# Architektur des Builders - sonst wuerde npm beim arm64-Image emuliert.
+# Multi-stage build: build the frontend, then the backend
+# The frontend build is platform-independent and therefore runs on the
+# builder's architecture - otherwise npm would be emulated for the arm64 image.
 FROM --platform=$BUILDPLATFORM node:26-slim AS frontend-builder
 
 WORKDIR /frontend
 
-# Frontend Dependencies installieren
+# Install frontend dependencies
 COPY frontend/package*.json ./
 RUN npm ci
 
-# Frontend Code kopieren und bauen
+# Copy the frontend code and build it
 COPY frontend/ ./
 RUN npm run build
 
 # ===== Backend Stage =====
 FROM python:3.14-slim
 
-# Die Version kommt beim Release aus dem Git-Tag. Ohne Angabe bleibt es beim
-# Rueckfallwert in core/config.py - ein Bau von Hand ist kein Release.
+# At release time the version comes from the Git tag. Without it, the fallback
+# value in core/config.py applies - a manual build is not a release.
 ARG APP_VERSION=""
 ENV APP_VERSION=${APP_VERSION}
 
@@ -28,8 +28,8 @@ LABEL org.opencontainers.image.title="Spesenfuchs" \
 
 WORKDIR /app
 
-# System-Dependencies für Playwright + LibreOffice (DOCX/XLSX->PDF Konvertierung).
-# Carlito ist metrisch gleich zu Calibri, der Schrift der NOFV-Vorlage.
+# System dependencies for Playwright + LibreOffice (DOCX/XLSX->PDF conversion).
+# Carlito is metrically identical to Calibri, the font of the NOFV template.
 RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
@@ -58,25 +58,25 @@ RUN apt-get update && apt-get install -y \
     fonts-crosextra-carlito \
     && rm -rf /var/lib/apt/lists/*
 
-# Python Dependencies installieren
+# Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Playwright Browser installieren - fester Pfad im Image, damit er nicht
-# von HOME abhängt und nicht im Daten-Volume landet
+# Install the Playwright browser - fixed path in the image, so it does not
+# depend on HOME and does not end up in the data volume
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN playwright install chromium
 
-# Backend Code kopieren
+# Copy the backend code
 COPY src/ ./src/
 
-# Frontend Build kopieren
+# Copy the frontend build
 COPY --from=frontend-builder /frontend/dist ./frontend/dist
 
-# Alles Veränderliche liegt unter /data, damit ein einziges Volume genügt:
-#   /data/.env     Secrets (JWT_SECRET_KEY, ENCRYPTION_KEY)
-#   /data/app.db   SQLite-Datenbank (User, Spiele, Unparteiische, Fahrtkosten)
-# Dokumente werden nicht abgelegt - sie entstehen beim Download.
+# Everything mutable lives under /data, so a single volume is enough:
+#   /data/.env     secrets (JWT_SECRET_KEY, ENCRYPTION_KEY)
+#   /data/app.db   SQLite database (users, matches, officials, travel costs)
+# Documents are not stored - they are generated on download.
 ENV DATA_DIR=/data \
     FRONTEND_DIR=/app/frontend/dist \
     API_HOST=0.0.0.0 \
@@ -88,11 +88,11 @@ RUN mkdir -p /data
 
 VOLUME /data
 
-# Port exposieren
+# Expose the port
 EXPOSE 8001
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD ["python", "-c", "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.getenv('API_PORT', '8001') + '/api/health').read()"]
 
-# Start Command
+# Start command
 CMD ["python", "src/main.py"]

@@ -1,7 +1,7 @@
-# Einzige Quelle fuer die Compose-Konfiguration: unveraendert auf einem Server
-# verwendbar, weil keine Build-Anweisung darin steht - es wird nur das fertige
-# Image von GHCR gezogen. Im Checkout ergaenzt docker-compose.override.yml
-# automatisch "build: ." fuer die lokale Entwicklung.
+# Single source for the Compose configuration: usable unchanged on a server,
+# because it contains no build instruction - it only pulls the finished image
+# from GHCR. In a checkout, docker-compose.override.yml automatically adds
+# "build: ." for local development.
 services:
   spesenfuchs:
     image: ghcr.io/janvogt06/spesenfuchs:latest
@@ -12,7 +12,7 @@ services:
     environment:
       - TZ=${TZ:-Europe/Berlin}
     volumes:
-      # Secrets (.env) und Datenbank (app.db)
+      # Secrets (.env) and database (app.db)
       - ./data:/data
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/api/health').read()"]

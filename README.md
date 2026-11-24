@@ -1,50 +1,51 @@
 # Spesenfuchs
 
-**Schiri-Spesen-Automat.** Erstellt Schiedsrichter-Spesenabrechnungen automatisch aus den eigenen
-DFB.net-Ansetzungen. Einmal die DFB.net-Zugangsdaten hinterlegen, danach holt
-die Anwendung jede Nacht die aktuellen Ansetzungen in die Datenbank. Die
-Abrechnung als DOCX oder PDF entsteht beim Download — inklusive Fahrtkosten,
-wenn die Kilometer im Rechner eingetragen sind. Beim selben Abruf liest die
-Anwendung auch die eigenen Stammdaten aus DFB.net und zeigt sie im Reiter
-*Stammdaten*; die persönlichen Angaben darunter liegen verschlüsselt in der
-Datenbank. Der Reiter *Saison* zeigt alle geleiteten Spiele je Saison mit
-Ergebnis, Kartenstatistik und Gespann, dazu Einsatzbilanz und Lehrabende,
-die eigenen Spesen und Fahrtkosten der Saison (fehlende Fahrtkosten
-geschätzt und als geschätzt gekennzeichnet) und eine Karte aller
-Spielstätten, an denen man schon im Einsatz war.
-Der Reiter *Beobachtungen* zeigt die eigenen Noten aus Schiri-Beobachtung
-(Herren, ab der Saison von „Schiedsrichter seit“) und – wer es hat – aus dem
-Schiri-Portal (DFB-Nachwuchs): je Saison ein Schnitt als Schiedsrichter, als
-Assistent und als 4. Offizieller, bei den Herren zusätzlich je Spielklasse.
-Abgeschlossene Saisons werden nur einmal gelesen — erneut geholt werden die
-laufende Saison und jede, deren Bestand unvollständig ist. Bei den Fahrtkosten
-eines Spiels liegt eine Karte, die die Anschriften der angesetzten
-Unparteiischen und die Spielstätte zeigt — so ist beim Eintragen der Kilometer
-sichtbar, wer wie weit fährt.
+**Referee expense automat.** Automatically creates referee expense claims from
+your own DFB.net assignments. Store your DFB.net credentials once, and from then
+on the application fetches your current assignments into the database every
+night. The claim as DOCX or PDF is generated on download — including travel
+costs, if the kilometres have been entered in the calculator. On the same
+fetch, the application also reads your own master data from DFB.net and shows
+it in the *Stammdaten* (master data) tab; the personal details below it are
+stored encrypted in the database. The *Saison* (season) tab shows all matches
+you officiated per season with result, card statistics and crew, plus
+assignment balance and training evenings, your own expenses and travel costs
+for the season (missing travel costs are estimated and marked as estimated),
+and a map of all venues where you have already officiated.
+The *Beobachtungen* (observations) tab shows your own grades from referee
+observations (men's football, from the season of "Schiedsrichter seit", i.e.
+referee since) and — for those who have it — from the Schiri-Portal (DFB
+youth talent programme): per season an average as referee, as assistant and as
+fourth official, and for men's football additionally per league level.
+Completed seasons are read only once — the current season and any season whose
+data is incomplete are fetched again. Next to the travel costs of a match
+there is a map showing the addresses of the assigned officials and the venue —
+so when entering the kilometres you can see who travels how far.
 
-Bei Pokal- und Freundschaftsspielen richtet sich der Satz nicht nach der
-Spielklasse des Spiels, sondern nach der der beteiligten Vereine — in der
-Ansetzung steht die nicht. Für den Herrenbereich holt die Anwendung deshalb
-nachts die Tabellen der Thüringenliga und der drei Landesklasse-Staffeln von
-FUSSBALL.DE; der Reiter *Ligen* zeigt sie. Lässt sich eine Mannschaft nicht
-zweifelsfrei zuordnen oder ist eine überregional spielende beteiligt, bleibt
-das Spesenfeld leer statt geraten.
+For cup and friendly matches, the rate does not depend on the league level of
+the match itself but on that of the clubs involved — which the assignment does
+not state. For men's football, the application therefore fetches the tables of
+the Thüringenliga and the three Landesklasse groups from FUSSBALL.DE every
+night; the *Ligen* (leagues) tab shows them. If a team cannot be matched
+unambiguously, or a team playing at supra-regional level is involved, the
+expense field stays empty rather than guessed.
 
-Die Oberfläche hat vier Hauptreiter: *Übersicht*, *Spiele* mit allen
-Ansetzungen – kommend und vergangen, durchsuchbar, je Spiel mit Abrechnung zum
-Herunterladen –, *Saison* und *Beobachtungen*. Hinter *Mehr* liegen *Ligen*,
-*Stammdaten*, *Einstellungen* und *Fehler melden*. Neben dem Knopf
-*Aktualisieren* oben rechts steht, wann zuletzt aus DFB.net gelesen wurde.
+The interface has four main tabs: *Übersicht* (overview), *Spiele* (matches)
+with all assignments – upcoming and past, searchable, each match with a claim
+to download –, *Saison* and *Beobachtungen*. Behind *Mehr* (more) are *Ligen*,
+*Stammdaten*, *Einstellungen* (settings) and *Fehler melden* (report a bug).
+Next to the *Aktualisieren* (refresh) button at the top right it shows when
+DFB.net was last read.
 
-Self-hosted: ein Container, eine `docker-compose.yml`, ein `data`-Ordner.
+Self-hosted: one container, one `docker-compose.yml`, one `data` folder.
 
-## Schnellstart
+## Quick start
 
-### Auf einem Server, ohne Checkout
+### On a server, without a checkout
 
-Der Quellcode wird nicht gebraucht — eine Datei und ein Ordner genügen. Die
-`docker-compose.yml` dieses Repositories ist unverändert server-tauglich, sie
-enthält absichtlich keine Build-Anweisung:
+The source code is not needed — one file and one folder are enough. The
+`docker-compose.yml` of this repository is server-ready as it is; it
+intentionally contains no build instruction:
 
 ```bash
 mkdir -p spesenfuchs/data && cd spesenfuchs
@@ -52,65 +53,65 @@ curl -fO https://raw.githubusercontent.com/JanVogt06/dfb-spesen-generator/main/d
 docker compose pull && docker compose up -d
 ```
 
-Danach ist die Oberfläche unter http://localhost:8001 erreichbar, von anderen
-Geräten im Netzwerk über die Adresse des Hosts, zum Beispiel
+Afterwards the interface is reachable at http://localhost:8001, and from other
+devices on the network via the host's address, for example
 `http://192.168.1.20:8001`.
 
-Die Datei zieht `latest`. Wer selbst entscheiden möchte, wann aktualisiert wird,
-nagelt die Version fest — entweder von Hand oder gleich beim Einrichten:
+The file pulls `latest`. If you want to decide yourself when to update, pin the
+version — either by hand or right when setting up:
 
 ```bash
 sed -i 's/:latest/:1.2.1/' docker-compose.yml
 ```
 
-### Aus einem Checkout
+### From a checkout
 
 ```bash
 docker compose up -d --build
 ```
 
-Im Checkout liegt neben der Compose-Datei eine
-[`docker-compose.override.yml`](docker-compose.override.yml), die Docker Compose
-automatisch dazulädt und die `build: .` ergänzt. Deshalb baut derselbe Befehl
-hier aus dem Quellcode, während auf dem Server ohne diese Datei das fertige
-Image benutzt wird — eine Konfiguration, zwei Verwendungen.
+In a checkout, next to the Compose file there is a
+[`docker-compose.override.yml`](docker-compose.override.yml) that Docker Compose
+loads automatically and that adds `build: .`. That is why the same command
+builds from source here, while on the server, without this file, the finished
+image is used — one configuration, two uses.
 
-### Port ändern
+### Changing the port
 
-Ohne die Compose-Datei anzufassen:
+Without touching the Compose file:
 
 ```bash
 SPESEN_PORT=9000 docker compose up -d
 ```
 
-Soll die Oberfläche nur vom Host selbst erreichbar sein (etwa weil ein
-Reverse-Proxy davor liegt), das Port-Mapping auf
-`"127.0.0.1:${SPESEN_PORT:-8001}:8001"` ändern.
+If the interface should only be reachable from the host itself (for example
+because a reverse proxy sits in front of it), change the port mapping to
+`"127.0.0.1:${SPESEN_PORT:-8001}:8001"`.
 
-## Daten und Secrets
+## Data and secrets
 
-Alles Veränderliche liegt im Container unter `/data` und damit im Ordner `data`
-neben der Compose-Datei — es übersteht Neustarts und Updates:
+Everything mutable lives in the container under `/data` and thus in the `data`
+folder next to the Compose file — it survives restarts and updates:
 
-| Pfad | Inhalt |
+| Path | Contents |
 | --- | --- |
-| `data/.env` | `JWT_SECRET_KEY` und `ENCRYPTION_KEY` |
-| `data/app.db` | Nutzer, eigene Stammdaten, Spiele, Unparteiische, Fahrtkosten, geleitete Spiele je Saison, eigene Beobachtungsnoten, aufgelöste Adressen der Karte, Ligatabellen, Abruf-Protokoll, Login- und Download-Log |
-| `data/logs/spesenfuchs.log` | Protokoll der Anwendung und der nächtlichen Abrufe, rotiert bei 5 MB (vier ältere Dateien bleiben liegen) |
+| `data/.env` | `JWT_SECRET_KEY` and `ENCRYPTION_KEY` |
+| `data/app.db` | Users, own master data, matches, officials, travel costs, matches officiated per season, own observation grades, resolved map addresses, league tables, fetch log, login and download log |
+| `data/logs/spesenfuchs.log` | Log of the application and the nightly fetches, rotated at 5 MB (four older files are kept) |
 
-Erzeugte Dokumente werden nicht gespeichert: sie entstehen bei jedem Download
-neu aus den Daten in `app.db`. Ein Backup der Datenbank ist damit ein
-vollständiges Backup.
+Generated documents are not stored: they are created anew on every download
+from the data in `app.db`. A backup of the database is therefore a complete
+backup.
 
-Fehlt `data/.env` beim Start, erzeugt die Anwendung beide Schlüssel selbst und
-schreibt sie dorthin. Eine vorhandene Datei wird nie verändert.
+If `data/.env` is missing at startup, the application generates both keys itself
+and writes them there. An existing file is never modified.
 
-> **Diese beiden Schlüssel sichern.** Der `ENCRYPTION_KEY` entschlüsselt die in
-> `app.db` gespeicherten DFB-Zugangsdaten, der `JWT_SECRET_KEY` hält bestehende
-> Logins gültig. Gehen sie verloren, muss jeder Nutzer seine DFB-Zugangsdaten
-> neu eintragen — die restlichen Daten bleiben erhalten.
+> **Back up these two keys.** The `ENCRYPTION_KEY` decrypts the DFB credentials
+> stored in `app.db`, and the `JWT_SECRET_KEY` keeps existing logins valid. If
+> they are lost, every user has to re-enter their DFB credentials — the rest of
+> the data is kept.
 
-Ein Backup ist damit ein Kopieren des Ordners:
+A backup is thus just a copy of the folder:
 
 ```bash
 docker compose stop
@@ -118,294 +119,292 @@ tar -czf spesenfuchs-backup-$(date +%F).tar.gz data
 docker compose start
 ```
 
-Einzelne Pfade lassen sich per Umgebungsvariable verlegen (`DATA_DIR`,
-`ENV_FILE`, `DATABASE_PATH`, `OUTPUT_DIR`, `LOG_FILE`); nötig ist das im Normalfall nicht.
-`OUTPUT_DIR` zeigt nur noch auf die alten Session-Ordner und wird ausschließlich
-für die einmalige Übernahme beim Versionssprung gebraucht.
+Individual paths can be relocated via environment variable (`DATA_DIR`,
+`ENV_FILE`, `DATABASE_PATH`, `OUTPUT_DIR`, `LOG_FILE`); normally this is not
+necessary. `OUTPUT_DIR` only points to the old session folders and is used
+exclusively for the one-time migration on the version jump.
 
-`ALLOW_SCHEDULER_TRIGGER=1` gibt den manuellen Sammel-Abruf über
-`POST /api/scheduler/trigger` frei. Er ist standardmäßig gesperrt, weil er den
-nächtlichen Lauf für **alle** Konten startet und das Projekt keine Rollen kennt.
+`ALLOW_SCHEDULER_TRIGGER=1` enables the manual bulk fetch via
+`POST /api/scheduler/trigger`. It is blocked by default because it starts the
+nightly run for **all** accounts and the project has no roles.
 
-Zwei Stellschrauben für den Download-Pfad: `PDF_MAX_CONCURRENCY` (Standard 2)
-begrenzt, wie viele LibreOffice-Prozesse gleichzeitig laufen dürfen — jeder
-belegt 150–300 MB. `MAX_BULK_DOWNLOAD` (Standard 50) begrenzt, wie viele Spiele
-in einem ZIP stecken dürfen.
+Two tuning knobs for the download path: `PDF_MAX_CONCURRENCY` (default 2)
+limits how many LibreOffice processes may run at the same time — each takes
+150–300 MB. `MAX_BULK_DOWNLOAD` (default 50) limits how many matches may go
+into one ZIP.
 
-## Als App installieren
+## Installing as an app
 
-Die Oberfläche lässt sich als App auf den Homescreen legen (PWA). Auf Android
-und in Chrome oder Edge am Rechner steht dafür auf der Übersicht und in den
-*Einstellungen* ein Knopf „App installieren“. Auf dem iPhone lässt Apple keinen
-Installationsdialog zu; derselbe Knopf klappt dort die Handgriffe in Safari auf
-(*Teilen* → *Zum Home-Bildschirm*).
+The interface can be put on the home screen as an app (PWA). On Android and in
+Chrome or Edge on desktop, there is an "App installieren" (install app) button
+for this on the overview and in the *Einstellungen*. On the iPhone, Apple does
+not allow an install dialog; there the same button unfolds the steps in Safari
+(*Teilen* (share) → *Zum Home-Bildschirm* (add to home screen)).
 
-Voraussetzung ist **HTTPS**: über `http://192.168.x.x:8001` bietet kein Browser
-die Installation an, über einen Reverse-Proxy oder Cloudflare Tunnel mit
-Zertifikat schon. Nur `localhost` ist davon ausgenommen.
+**HTTPS** is required: over `http://192.168.x.x:8001` no browser offers
+installation, but it does over a reverse proxy or Cloudflare Tunnel with a
+certificate. Only `localhost` is exempt.
 
-Der Service Worker (`frontend/public/sw.js`) hält nur die Hülle der Oberfläche
-vor, damit die App auch ohne Netz startet. Antworten der API landen nie in
-seinem Cache — sie enthalten Anschriften und Telefonnummern. Seitenaufrufe gehen
-immer zuerst ans Netz, ein Update erreicht die installierte App also beim
-nächsten Öffnen von selbst. `sw.js` und das Manifest liefert das Backend mit
-`Cache-Control: no-cache` aus, damit auch ein CDN davor keinen alten Worker
-festhält.
+The service worker (`frontend/public/sw.js`) caches only the shell of the
+interface, so the app also starts without a network. API responses never end up
+in its cache — they contain addresses and phone numbers. Page requests always go
+to the network first, so an update reaches the installed app on its next open
+by itself. The backend serves `sw.js` and the manifest with
+`Cache-Control: no-cache`, so that even a CDN in front does not hold on to an
+old worker.
 
-## Karte
+## Map
 
-Die Karten brauchen Koordinaten, DFBnet liefert aber nur
-Anschriften im Klartext. Sie werden beim ersten Öffnen einer Karte einmalig
-aufgelöst und danach dauerhaft in `app.db` behalten — dieselbe Spielstätte und
-dieselben Kollegen tauchen über eine Saison hinweg immer wieder auf, sodass es
-insgesamt bei einer Handvoll Abfragen bleibt. Wird nie eine Karte geöffnet,
-wird auch nie eine Adresse verschickt.
+The maps need coordinates, but DFBnet only delivers addresses as plain text.
+They are resolved once when a map is first opened and then kept permanently in
+`app.db` — the same venue and the same colleagues show up again and again over
+a season, so it stays at a handful of queries overall. If no map is ever
+opened, no address is ever sent.
 
-Bei den Fahrtkosten schlägt die Anwendung Kilometer vor: für jede Person
-Hin- und Rückfahrt allein und, wo es Kilometer spart, Fahrgemeinschaften – wer
-fährt, wen er unterwegs abholt, Mitfahrer mit 0 km. Ein Klick übernimmt die
-Werte in die Felder, gespeichert wird wie gewohnt. Dafür fragt sie einen
-Routenplaner nach den Straßenkilometern zwischen den Wohnorten und dem Platz;
-übertragen werden nur Koordinaten. Die Koordinate des Platzes liefert DFBnet
-selbst, sie ist genauer als die Adresssuche. Dieselben Strecken nutzt die
-Statistik im Reiter *Saison*, um Fahrtkosten zu schätzen, wo keine eingetragen
-sind (allein vom eigenen Wohnort, hin und zurück). Auch jede Strecke wird nur
-einmal gefragt und dann in `app.db` behalten; Auswertungen über viele Spiele
-fragen je Aufruf nur einige Sekunden lang nach und holen den Rest beim
-nächsten.
+For travel costs, the application suggests kilometres: for each person the
+round trip alone and, where it saves kilometres, carpools – who drives, whom
+they pick up on the way, passengers with 0 km. One click transfers the values
+into the fields; saving works as usual. To do this, it asks a route planner for
+the road kilometres between the places of residence and the venue; only
+coordinates are transmitted. The venue's coordinate is supplied by DFBnet
+itself, which is more accurate than an address search. The statistics in the
+*Saison* tab use the same routes to estimate travel costs where none have been
+entered (alone from your own place of residence, round trip). Each route, too,
+is only asked for once and then kept in `app.db`; evaluations over many matches
+only query for a few seconds per call and fetch the rest on the next one.
 
-Voreingestellt sind die öffentlichen Dienste von OpenStreetMap. Alle lassen
-sich auf eine eigene Instanz umstellen:
+The public OpenStreetMap services are preconfigured. All of them can be
+switched to your own instance:
 
-| Variable | Standard | Zweck |
+| Variable | Default | Purpose |
 | --- | --- | --- |
-| `NOMINATIM_URL` | `https://nominatim.openstreetmap.org` | Adresse → Koordinate |
-| `GEOCODER_MIN_INTERVAL` | `1.0` | Mindestabstand zwischen zwei Abfragen in Sekunden |
-| `ROUTING_URL` | `https://routing.openstreetmap.de/routed-car` | Straßenkilometer (OSRM, Matrix-Abfrage) |
-| `ROUTING_MIN_INTERVAL` | `1.0` | Mindestabstand zwischen zwei Routenabfragen in Sekunden |
-| `MAP_TILE_URL` | `https://tile.openstreetmap.org/{z}/{x}/{y}.png` | Kartenbilder, vom Browser geladen |
-| `MAP_TILE_ATTRIBUTION` | OpenStreetMap-Mitwirkende | Quellenangabe in der Karte |
+| `NOMINATIM_URL` | `https://nominatim.openstreetmap.org` | Address → coordinate |
+| `GEOCODER_MIN_INTERVAL` | `1.0` | Minimum interval between two queries in seconds |
+| `ROUTING_URL` | `https://routing.openstreetmap.de/routed-car` | Road kilometres (OSRM, matrix query) |
+| `ROUTING_MIN_INTERVAL` | `1.0` | Minimum interval between two route queries in seconds |
+| `MAP_TILE_URL` | `https://tile.openstreetmap.org/{z}/{x}/{y}.png` | Map tiles, loaded by the browser |
+| `MAP_TILE_ATTRIBUTION` | OpenStreetMap contributors | Attribution shown in the map |
 
-Der Mindestabstand hält die Nutzungsbedingungen des öffentlichen Nominatim ein
-(eine Abfrage pro Sekunde aus einem einzelnen Strang). Wer selbst hostet, darf
-ihn herunterdrehen.
+The minimum interval complies with the terms of use of the public Nominatim
+(one query per second from a single thread). If you self-host, you may turn it
+down.
 
-Ein eigener Geocoder lohnt sich für diese Datenmenge kaum: ein Nominatim mit
-ganz Deutschland belegt 50–108 GB und importiert stundenlang, ein
-Photon-Index für Deutschland sind 9 GB Download. Dem stehen geschätzt hundert
-Abfragen über die Lebensdauer eines Kontos gegenüber. Wer es dennoch will,
-setzt `NOMINATIM_URL` auf den eigenen Dienst — im Code ändert sich nichts, und
-zu einem anderen Dienst aufgelöste Adressen werden getrennt gespeichert.
+Your own geocoder is hardly worthwhile for this amount of data: a Nominatim
+with all of Germany takes up 50–108 GB and imports for hours, and a Photon
+index for Germany is a 9 GB download. Against that stand an estimated hundred
+queries over the lifetime of an account. If you still want it, set
+`NOMINATIM_URL` to your own service — nothing changes in the code, and
+addresses resolved by a different service are stored separately.
 
-## Ligen und die Spesen der Pokal- und Freundschaftsspiele
+## Leagues and the expenses of cup and friendly matches
 
-Die Spesenordnung des TFV knüpft den Satz bei Pokalspielen an die
-höchstklassige beteiligte Mannschaft (§2 Abs. 3) und bei Freundschaftsspielen
-an die Spielklasse des Gastgebers (§2 Abs. 4). DFBnet nennt in der Ansetzung
-aber nur „Kreispokal" oder „Kreisfreundschaftsspiele" — die Liga der Vereine
-steht dort nicht.
+The TFV expense regulations tie the rate for cup matches to the highest-ranked
+team involved (§2 para. 3) and for friendly matches to the league level of the
+host (§2 para. 4). But in the assignment, DFBnet only states "Kreispokal"
+(district cup) or "Kreisfreundschaftsspiele" (district friendlies) — the clubs'
+league is not there.
 
-Deshalb holt die Anwendung nachts vor dem DFBnet-Abruf die Tabellen von
-FUSSBALL.DE: Thüringenliga und Landesklasse als Grundlage der Sätze, dazu
-Regionalliga Nordost und NOFV-Oberliga, um eine überregionale Beteiligung zu
-**erkennen**. Aus überregionalen Ligen wird nicht abgerechnet — ist eine
-solche Mannschaft beteiligt, bleibt das Feld leer.
+That is why the application fetches the FUSSBALL.DE tables every night before
+the DFBnet fetch: Thüringenliga and Landesklasse as the basis for the rates,
+plus Regionalliga Nordost and NOFV-Oberliga, to **detect** supra-regional
+involvement. Nothing is billed from supra-regional leagues — if such a team is
+involved, the field stays empty.
 
-Die Staffel-Kennungen von FUSSBALL.DE wechseln mit jeder Saison und stehen
-deshalb nirgends im Code. Gesucht werden sie ausgehend von einem Verein, von
-dem die eigenen Ansetzungen bereits wissen, dass er in der gesuchten Liga
-spielt. Wer nie ein Spiel in Verbandsliga oder Landesklasse hatte, bekommt
-keine Tabellen — und für Pokal- und Freundschaftsspiele keine Sätze.
+FUSSBALL.DE's group identifiers change with every season and are therefore
+nowhere in the code. They are looked up starting from a club that your own
+assignments already know to play in the league in question. Anyone who has never
+had a match in the Verbandsliga or Landesklasse gets no tables — and no rates
+for cup and friendly matches.
 
-Zugeordnet wird über Vereinsnamen und **Mannschaftsnummer**. Die Nummer ist
-nicht verhandelbar: die dritte Mannschaft des FC Saalfeld spielt Kreisliga,
-die erste Verbandsliga. Bleibt eine Zuordnung mehrdeutig oder ergebnislos,
-bleibt das Spesenfeld leer. Ein leeres Feld trägt der Schiedsrichter in der
-Kabine nach, ein plausibel aussehender falscher Betrag fällt niemandem auf.
+Matching is done via club names and **team number**. The number is not
+negotiable: the third team of FC Saalfeld plays Kreisliga, the first the
+Verbandsliga. If a match remains ambiguous or yields nothing, the expense field
+stays empty. An empty field is filled in by the referee in the dressing room; a
+plausible-looking wrong amount goes unnoticed.
 
-Abgedeckt ist damit der **Herrenbereich**. Bei Juniorinnen gibt es nichts
-nachzuschlagen (20 € in allen Spiel- und Altersklassen), bei Alten Herren auf
-Kreisebene ebenso wenig (ein Satz für alle Kreisstaffeln). Für Junioren und
-Frauen bleiben Pokal- und Freundschaftsspiele ohne Satz: dort müssten die
-Ligatabellen derselben Mannschaftsart vorliegen, und ein Verein ohne
-Herrenmannschaft stünde in keiner davon.
+This covers **men's football**. For girls' youth football there is nothing to
+look up (€20 in all match and age classes), nor for veterans (Alte Herren) at
+district level (one rate for all district groups). For boys' youth football and
+women, cup and friendly matches remain without a rate: that would require the
+league tables of the same team type, and a club without a men's team would not
+appear in any of them.
 
-## Anmeldung und Zugangsdaten
+## Login and credentials
 
-Nach **fünf falschen Passwörtern** hintereinander ist der Login für dieses
-Konto 15 Minuten gesperrt, auch mit dem richtigen Passwort. Ab dem dritten
-Fehlversuch sagt die Anmeldung, wie viele Versuche noch bleiben. Gezählt wird je
-E-Mail-Adresse, nicht je IP: hinter einem Cloudflare Tunnel kommen alle
-Anfragen von derselben Adresse. Adressen ohne Konto werden genauso gezählt,
-damit die Sperre nicht verrät, wer registriert ist. Die Zähler liegen in
-`app.db` und überstehen einen Neustart.
+After **five wrong passwords** in a row, login for that account is locked for
+15 minutes, even with the correct password. From the third failed attempt on,
+the login says how many attempts remain. Counting is per email address, not per
+IP: behind a Cloudflare Tunnel all requests come from the same address.
+Addresses without an account are counted the same way, so that the lock does not
+reveal who is registered. The counters live in `app.db` and survive a restart.
 
-Lehnt DFBnet die gespeicherten Zugangsdaten ab, meist weil DFBnet ein neues
-Passwort verlangt hat, merkt sich die Anwendung das mit Datum. Bis neue
-Zugangsdaten gespeichert sind oder ein Abruf wieder durchkommt, steht auf jeder
-Seite ein roter Hinweis, und *Mehr* sowie darin *Einstellungen* tragen einen roten Punkt.
+If DFBnet rejects the stored credentials, usually because DFBnet has demanded a
+new password, the application records this with the date. Until new credentials
+are saved or a fetch succeeds again, a red notice appears on every page, and
+*Mehr* as well as *Einstellungen* within it carry a red dot.
 
-## Fehler melden
+## Reporting bugs
 
-Der gleichnamige Eintrag unter *Mehr* schickt einen Bericht per Mail. Ohne Postausgang ist
-das Formular sichtbar, sagt aber, dass nichts versendet werden kann — still
-verworfen wird kein Bericht.
+The entry of the same name under *Mehr* (*Fehler melden*) sends a report by
+email. Without an outgoing mail server the form is visible but says that nothing
+can be sent — no report is silently discarded.
 
-| Variable | Standard | Zweck |
+| Variable | Default | Purpose |
 | --- | --- | --- |
-| `SMTP_HOST` | – | Postausgangsserver, ohne ihn ist der Versand aus |
-| `SMTP_PORT` | `587` | `465` spricht sofort TLS, sonst STARTTLS |
-| `SMTP_USER` / `SMTP_PASSWORD` | – | Zugangsdaten des Postfachs |
-| `SMTP_FROM` | `SMTP_USER` | Absenderadresse |
-| `BUGREPORT_EMPFAENGER` | `spesen-generator@jan-vogt.dev` | Empfänger der Berichte |
+| `SMTP_HOST` | – | Outgoing mail server; without it sending is off |
+| `SMTP_PORT` | `587` | `465` speaks TLS immediately, otherwise STARTTLS |
+| `SMTP_USER` / `SMTP_PASSWORD` | – | Mailbox credentials |
+| `SMTP_FROM` | `SMTP_USER` | Sender address |
+| `BUGREPORT_EMPFAENGER` | `spesen-generator@jan-vogt.dev` | Recipient of the reports |
 
-Als Absender steht die Adresse des Postausgangs in der Mail, die des Melders
-im `Reply-To` — andersherum würde jeder Empfänger mit SPF- oder
-DMARC-Prüfung die Nachricht abweisen.
+The mail's sender is the outgoing mail server's address, and the reporter's
+address goes in `Reply-To` — the other way round, every recipient with SPF or
+DMARC checks would reject the message.
 
-## Aktualisieren
+## Updating
 
 ```bash
 docker compose pull && docker compose up -d
 ```
 
-Schemaänderungen laufen beim Start automatisch. Vor dem ersten Schritt legt die
-Anwendung eine Kopie von `app.db` daneben (`app.db.v<version>.<zeit>.bak`).
-Beim Sprung auf die datenbankgestützte Version werden die Spiele aus den alten
-`data/output/`-Ordnern einmalig übernommen; danach wird das Verzeichnis nicht
-mehr gebraucht und kann nach einer Sicherung gelöscht werden.
+Schema changes run automatically at startup. Before the first step, the
+application places a copy of `app.db` next to it (`app.db.v<version>.<time>.bak`).
+On the jump to the database-backed version, the matches from the old
+`data/output/` folders are taken over once; after that the directory is no
+longer needed and can be deleted after a backup.
 
-Der `data`-Ordner wird dabei nicht angefasst.
+The `data` folder is not touched in the process.
 
-## Umstieg vom alten Setup
+## Migrating from the old setup
 
-Das Projekt hieß früher *DFB Spesen Generator*; Image, Service und Container
-heißen jetzt `spesenfuchs`. Eine laufende Installation zieht weiter das alte
-Image, bis ihre `docker-compose.yml` auf
-`ghcr.io/janvogt06/spesenfuchs` umgestellt ist. Der alte Container muss dabei
-einmal weichen, weil sich der `container_name` geändert hat:
+The project used to be called *DFB Spesen Generator*; image, service and
+container are now called `spesenfuchs`. A running installation keeps pulling the
+old image until its `docker-compose.yml` is switched to
+`ghcr.io/janvogt06/spesenfuchs`. The old container has to make way once,
+because the `container_name` has changed:
 
 ```bash
-docker compose down          # entfernt den Container "dfb-spesen-generator"
+docker compose down          # removes the container "dfb-spesen-generator"
 curl -fO https://raw.githubusercontent.com/JanVogt06/dfb-spesen-generator/main/docker-compose.yml
 docker compose pull && docker compose up -d
 ```
 
-Der `data`-Ordner bleibt davon unberührt — Datenbank, Secrets und erzeugte
-Dokumente überleben die Umbenennung.
+The `data` folder remains untouched by this — database, secrets and generated
+documents survive the renaming.
 
-Früher lief die Anwendung aus einem Checkout mit `docker compose up -d --build`
-und drei einzelnen Bind-Mounts (`./app.db`, `./.env`, `./output`). Die
-vorhandenen Daten wandern einmalig in den `data`-Ordner:
+Previously the application ran from a checkout with `docker compose up -d --build`
+and three individual bind mounts (`./app.db`, `./.env`, `./output`). The
+existing data moves into the `data` folder once:
 
 ```bash
-cd /pfad/zum/alten/verzeichnis
+cd /path/to/old/directory
 
-# 1. Sicherung, bevor irgendetwas bewegt wird
+# 1. Backup before anything is moved
 tar -czf ~/spesenfuchs-backup-$(date +%F).tar.gz app.db .env output
 
-# 2. Alten Container stoppen (das Image bleibt vorerst liegen)
+# 2. Stop the old container (the image stays around for now)
 docker compose down
 
-# 3. Daten in den neuen Ordner verschieben
+# 3. Move the data into the new folder
 mkdir -p data
 mv app.db .env output data/
 
-# 4. Neue docker-compose.yml einsetzen (siehe oben), dann
+# 4. Put the new docker-compose.yml in place (see above), then
 docker compose pull && docker compose up -d
 ```
 
-Sollte `data/app.db` einmal fehlen, während `app.db` noch daneben liegt, benutzt
-die Anwendung weiterhin die alte Datei und schreibt eine Warnung ins Log — ein
-halb migriertes Verzeichnis startet also nicht mit leerer Datenbank.
+If `data/app.db` should ever be missing while `app.db` still sits next to it,
+the application keeps using the old file and writes a warning to the log — so a
+half-migrated directory does not start with an empty database.
 
 ## Releases
 
-Ein Tag, der mit `v` beginnt, baut ein Multi-Architektur-Image (`linux/amd64`
-und `linux/arm64`), veröffentlicht es unter
-`ghcr.io/janvogt06/spesenfuchs` als `<version>`, `<major>.<minor>` und
-`latest` und legt daraus ein GitHub-Release an:
+A tag beginning with `v` builds a multi-architecture image (`linux/amd64` and
+`linux/arm64`), publishes it at `ghcr.io/janvogt06/spesenfuchs` as `<version>`,
+`<major>.<minor>` and `latest`, and creates a GitHub release from it:
 
 ```bash
 git tag v1.2.0 && git push origin v1.2.0
 ```
 
-Die Versionsnummer im Code muss dabei **nicht** mitgezogen werden: der Workflow
-reicht den Tag als Bauargument `APP_VERSION` ins Image, und der Health-Endpunkt,
-der Betreff der Fehlerberichte und der User-Agent gegenüber FUSSBALL.DE und
-Nominatim melden genau diesen Wert. Ein Lauf aus dem Quellcode fällt auf die
-Konstante in [`src/core/config.py`](src/core/config.py) zurück — ein Bau von Hand
-ist kein Release.
+The version number in the code does **not** have to be bumped along: the
+workflow passes the tag into the image as the build argument `APP_VERSION`, and
+the health endpoint, the subject of the bug reports and the User-Agent towards
+FUSSBALL.DE and Nominatim report exactly this value. A run from source falls
+back to the constant in [`src/core/config.py`](src/core/config.py) — a manual
+build is not a release.
 
-Der Workflow lässt sich unter *Actions* auch ohne Tag starten (`workflow_dispatch`),
-etwa um nur den Image-Bau zu prüfen; das Ergebnis landet dann als `edge` und ohne
-Release. Der arm64-Teil wird auf dem Runner emuliert und dauert deutlich länger
-als amd64 — bei einem Testlauf lohnt es, in der Eingabe `linux/amd64` zu setzen.
+The workflow can also be started without a tag under *Actions*
+(`workflow_dispatch`), for example to only check the image build; the result
+then lands as `edge` and without a release. The arm64 part is emulated on the
+runner and takes considerably longer than amd64 — for a test run it is worth
+setting `linux/amd64` in the input.
 
-## Entwicklung
+## Development
 
-Backend und Frontend getrennt, ohne Docker:
+Backend and frontend separately, without Docker:
 
 ```bash
 pip install -r requirements.txt
 playwright install chromium
-python src/main.py                    # API auf :8001
+python src/main.py                    # API on :8001
 
-cd frontend && npm install && npm run dev   # Oberfläche auf :5173
+cd frontend && npm install && npm run dev   # interface on :5173
 ```
 
-Ohne gesetzte Umgebungsvariablen liegt `DATA_DIR` auf `./data` im Projekt — die
-lokale Entwicklung benutzt also dieselbe Struktur wie der Server. `data/` ist in
-`.gitignore`, für die Vorlage der Secrets siehe [.env.example](.env.example).
+Without any environment variables set, `DATA_DIR` points to `./data` in the
+project — local development thus uses the same structure as the server. `data/`
+is in `.gitignore`; for the template of the secrets see
+[.env.example](.env.example).
 
 ### Tests
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest                      # Backend
+python -m pytest                      # backend
 
-cd frontend && npm test               # Frontend (Vitest)
+cd frontend && npm test               # frontend (Vitest)
 npm run lint && npx tsc -b
 ```
 
-Die Backend-Tests laufen gegen eine Wegwerf-Datenbank in einem temporären
-Ordner (siehe [`tests/conftest.py`](tests/conftest.py)) und fassen `data/` nie
-an. DFBnet, FUSSBALL.DE, Nominatim, SMTP und LibreOffice werden nachgestellt,
-es geht also nichts ins Netz und kein Browser startet. Vermutete, noch nicht
-behobene Fehler stehen als `xfail(strict=True)` in den Tests. Sobald einer
-behoben ist, schlägt der Test fehl, bis die Markierung entfernt wird.
+The backend tests run against a throwaway database in a temporary folder (see
+[`tests/conftest.py`](tests/conftest.py)) and never touch `data/`. DFBnet,
+FUSSBALL.DE, Nominatim, SMTP and LibreOffice are mocked, so nothing goes out to
+the network and no browser starts. Suspected, not yet fixed bugs are marked as
+`xfail(strict=True)` in the tests. As soon as one is fixed, the test fails until
+the marker is removed.
 
-Der Workflow [`tests.yml`](.github/workflows/tests.yml) führt beides bei jedem
-Push und Pull Request aus. Der Release-Workflow ruft ihn vorher auf und baut
-kein Image, solange ein Test rot ist.
+The workflow [`tests.yml`](.github/workflows/tests.yml) runs both on every push
+and pull request. The release workflow calls it beforehand and builds no image
+as long as a test is red.
 
-Die DOCX→PDF-Konvertierung braucht LibreOffice; im Container ist
-`libreoffice-writer` enthalten, lokal muss es installiert sein — ohne
-LibreOffice funktioniert nur der DOCX-Download.
+The DOCX→PDF conversion needs LibreOffice; the container includes
+`libreoffice-writer`, locally it has to be installed — without LibreOffice only
+the DOCX download works.
 
-Das DOCX entsteht in rund 25 ms, die PDF-Konvertierung kostet 2–6 Sekunden.
-Der Kaltstart von LibreOffice dominiert dabei, deshalb ist ein Sammel-Download
-mehrerer Spiele kaum teurer als ein einzelner.
+The DOCX is created in about 25 ms, the PDF conversion costs 2–6 seconds.
+LibreOffice's cold start dominates, which is why a bulk download of several
+matches costs hardly more than a single one.
 
 ## Layout
 
-| Pfad | Zweck |
+| Path | Purpose |
 | --- | --- |
-| `src/main.py` | Einstiegspunkt und Scraping-Ablauf |
-| `src/api/` | FastAPI-Endpunkte und Authentifizierung |
-| `src/core/config.py` | Pfade und Secrets (`DATA_DIR` und Ableitungen) |
-| `src/scraper/` | DFB.net-Scraper (Playwright) |
-| `src/generator/` | DOCX-Erzeugung (im Speicher) und Spesenberechnung |
-| `src/scheduler/` | Nächtlicher Abruf um 3:00 (Europe/Berlin) |
-| `src/db/` | SQLite-Zugriff; `migrations.py` führt das Schema über `PRAGMA user_version` nach |
-| `frontend/` | React-Oberfläche (Vite), wird ins Image gebaut |
-| `Dockerfile` | Image mit Frontend-Build, Playwright und LibreOffice |
-| `docker-compose.yml` | Service, Port, Volume und Health Check — ohne Build, direkt server-tauglich |
-| `docker-compose.override.yml` | Ergänzt lokal `build: .`, wird von Compose automatisch geladen |
-| `.github/workflows/release.yml` | Image-Bau und Release beim Tag-Push |
-| `.github/workflows/tests.yml` | pytest, ESLint, TypeScript und Vitest bei jedem Push |
-| `tests/` | Backend-Tests (pytest) |
+| `src/main.py` | Entry point and scraping flow |
+| `src/api/` | FastAPI endpoints and authentication |
+| `src/core/config.py` | Paths and secrets (`DATA_DIR` and derivatives) |
+| `src/scraper/` | DFB.net scraper (Playwright) |
+| `src/generator/` | DOCX generation (in memory) and expense calculation |
+| `src/scheduler/` | Nightly fetch at 3:00 (Europe/Berlin) |
+| `src/db/` | SQLite access; `migrations.py` migrates the schema via `PRAGMA user_version` |
+| `frontend/` | React interface (Vite), built into the image |
+| `Dockerfile` | Image with frontend build, Playwright and LibreOffice |
+| `docker-compose.yml` | Service, port, volume and health check — without build, directly server-ready |
+| `docker-compose.override.yml` | Adds `build: .` locally, loaded automatically by Compose |
+| `.github/workflows/release.yml` | Image build and release on tag push |
+| `.github/workflows/tests.yml` | pytest, ESLint, TypeScript and Vitest on every push |
+| `tests/` | Backend tests (pytest) |
 
-## Lizenz
+## License
 
-MIT — siehe [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE).

@@ -1,31 +1,34 @@
-# Instagram-Beitrag: Vorstellung von Spesenfuchs
+# Instagram post: introducing Spesenfuchs
 
-Fünf Slides im Format 3:4 (1080 × 1440), in dieser Reihenfolge hochladen:
+Five slides in 3:4 format (1080 × 1440), to be uploaded in this order:
 
-1. `01-ankuendigung.png` – Abpfiff für den Papierkram
-2. `02-problem.png` – Nach dem Spiel ist vor der Abrechnung
-3. `03-ablauf.png` – Vier Schritte bis zum Abpfiff
-4. `04-funktionen.png` – Mehr als nur Spesen
-5. `05-aufruf.png` – Adresse und Link in Bio
+1. `01-ankuendigung.png` – Final whistle for the paperwork (announcement)
+2. `02-problem.png` – After the match is before the expense claim (the problem)
+3. `03-ablauf.png` – Four steps to the final whistle (how it works)
+4. `04-funktionen.png` – More than just expenses (features)
+5. `05-aufruf.png` – Address and link in bio (call to action)
 
-Dieselben fünf Slides gibt es als Story in 9:16 (1080 × 1920) unter `story/`.
-Oben und unten bleibt dort Platz für die Leisten von Instagram. Auf der letzten
-Story ist unter der Adresse eine Lücke frei: Dort den **Link-Sticker** mit
-`https://spesenfuchs.jan-vogt.dev` platzieren (Sticker-Symbol → Link).
+The same five slides exist as a story in 9:16 (1080 × 1920) under `story/`.
+Space is left at the top and bottom for Instagram's bars. On the last story,
+a gap is left free below the address: place the **link sticker** with
+`https://spesenfuchs.jan-vogt.dev` there (sticker icon → Link).
 
-Die Slides sind keine Grafiken, sondern gebaut aus den Bausteinen der
-Landingpage mit deren Beispieldaten: `frontend/src/instagram/Slides.tsx`,
-aufrufbar im Dev-Server unter `http://localhost:5173/instagram.html`
-(`?s=1` bis `?s=5` für eine einzelne Slide, `&f=story` für die Story). Sie
-gehören nicht zum Build.
+The slides are not graphics but are built from the building blocks of the
+landing page with its sample data: `frontend/src/instagram/Slides.tsx`,
+available in the dev server at `http://localhost:5173/instagram.html`
+(`?s=1` to `?s=5` for a single slide, `&f=story` for the story). They are
+not part of the build.
 
-Neu exportieren, während `npm run dev` in `frontend` läuft:
+To export again while `npm run dev` is running in `frontend`:
 
 ```bash
 marketing/instagram/export.sh
 ```
 
-## Beschreibung zum Beitrag (Vorschlag)
+## Post caption (suggestion)
+
+The caption is deliberately kept in German: it is the public text for German
+referees in the Thuringian football association (TFV).
 
 > Abpfiff für den Papierkram. 🟢
 >

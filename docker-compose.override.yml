@@ -1,7 +1,7 @@
-# Nur fuer die lokale Entwicklung. Docker Compose laedt diese Datei automatisch,
-# sobald sie neben docker-compose.yml liegt: "docker compose up -d --build" baut
-# dann aus dem Checkout, statt das Image von GHCR zu ziehen. Auf einem Server
-# existiert die Datei nicht, dort bleibt docker-compose.yml unveraendert gueltig.
+# For local development only. Docker Compose loads this file automatically as
+# soon as it sits next to docker-compose.yml: "docker compose up -d --build"
+# then builds from the checkout instead of pulling the image from GHCR. On a
+# server the file does not exist, so docker-compose.yml stays valid unchanged.
 services:
   spesenfuchs:
     build: .

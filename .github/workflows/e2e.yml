@@ -1,14 +1,14 @@
 name: End-to-end (DFBnet)
 
-# Ein echter Abruf mit dem Konto aus den Repository-Secrets DFB_USERNAME und
-# DFB_PASSWORD: Login, Ansetzungen, Stammdaten, Saisons, Beobachtungen,
-# Spielberichte, Quittungen (tests/e2e). Nicht bei jedem Push auf jeden
-# Branch - jeder Lauf ist ein Login bei DFBnet.
+# A real fetch with the account from the repository secrets DFB_USERNAME and
+# DFB_PASSWORD: login, assignments, master data, seasons, observations,
+# match reports, receipts (tests/e2e). Not on every push to every branch -
+# each run is a login at DFBnet.
 on:
   push:
     branches: [main]
   workflow_dispatch:
-  # Der Release-Workflow ruft diesen auf, bevor er ein Image baut
+  # The release workflow calls this one before it builds an image
   workflow_call:
     secrets:
       DFB_USERNAME:
@@ -19,7 +19,7 @@ on:
 permissions:
   contents: read
 
-# Nie zwei Logins mit demselben Konto gleichzeitig
+# Never two logins with the same account at the same time
 concurrency:
   group: e2e-dfbnet
   cancel-in-progress: false
@@ -33,14 +33,14 @@ jobs:
       DFB_USERNAME: ${{ secrets.DFB_USERNAME }}
       DFB_PASSWORD: ${{ secrets.DFB_PASSWORD }}
     steps:
-      # Forks und Repos ohne Secrets: ueberspringen statt rot werden
+      # Forks and repos without secrets: skip instead of turning red
       - name: Check credentials
         id: zugang
         run: |
           if [ -n "$DFB_USERNAME" ] && [ -n "$DFB_PASSWORD" ]; then
             echo "vorhanden=true" >> "$GITHUB_OUTPUT"
           else
-            echo "::notice::DFB_USERNAME/DFB_PASSWORD sind nicht als Secrets hinterlegt - Gesamtlauf uebersprungen"
+            echo "::notice::DFB_USERNAME/DFB_PASSWORD are not set as secrets - full run skipped"
             echo "vorhanden=false" >> "$GITHUB_OUTPUT"
           fi
 
@@ -48,7 +48,7 @@ jobs:
         if: steps.zugang.outputs.vorhanden == 'true'
         uses: actions/checkout@v7
 
-      # Dieselbe Version wie im Dockerfile
+      # Same version as in the Dockerfile
       - name: Set up Python
         if: steps.zugang.outputs.vorhanden == 'true'
         uses: actions/setup-python@v6
@@ -65,13 +65,13 @@ jobs:
           pip install -r requirements-dev.txt
           python -m playwright install --with-deps chromium
 
-      # Das Repository ist oeffentlich und damit auch dieses Log. Hier darf
-      # NICHTS erscheinen, was bei DFBnet gelesen wurde - auch keine Anzahlen.
-      # --show-capture=no: die Logger des Scrapers schreiben Teams und
-      # Termine; --tb=no und -p no:warnings: keine Werte aus Tracebacks oder
-      # Warnungen. Der Test meldet nur bestanden oder die Namen der
-      # fehlgeschlagenen Pruefungen. Keine Artefakte, keine Zusammenfassung -
-      # die Wegwerf-Datenbank enthaelt echte Daten und bleibt im Runner.
+      # The repository is public, and so is this log. NOTHING that was read
+      # from DFBnet may appear here - not even counts.
+      # --show-capture=no: the scraper's loggers write teams and dates;
+      # --tb=no and -p no:warnings: no values from tracebacks or warnings.
+      # The test only reports a pass or the names of the failed checks. No
+      # artifacts, no summary - the throwaway database contains real data and
+      # stays on the runner.
       - name: Run end-to-end test
         if: steps.zugang.outputs.vorhanden == 'true'
         env:

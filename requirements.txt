@@ -11,7 +11,7 @@ pyjwt
 cryptography
 
 # Database
-# (sqlite3 ist in Python included)
+# (sqlite3 is included in Python)
 
 # Web Scraping
 playwright
@@ -19,4 +19,4 @@ playwright
 # Document Generation
 python-docx
 openpyxl
-pillow  # damit openpyxl das NOFV-Logo der Excel-Vorlage mitnimmt
+pillow  # so openpyxl carries over the NOFV logo of the Excel template

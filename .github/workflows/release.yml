@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       platforms:
-        description: 'Zielplattformen (arm64 wird emuliert und dauert deutlich laenger)'
+        description: 'Target platforms (arm64 is emulated and takes considerably longer)'
         default: 'linux/amd64,linux/arm64'
 
 permissions:
@@ -15,11 +15,11 @@ permissions:
   packages: write
 
 jobs:
-  # Kein Image aus einem Stand, dessen Tests rot sind
+  # No image from a state whose tests are red
   tests:
     uses: ./.github/workflows/tests.yml
 
-  # Und keins, mit dem der Abruf bei DFBnet nicht mehr durchlaeuft
+  # And none with which the fetch from DFBnet no longer works
   e2e:
     uses: ./.github/workflows/e2e.yml
     secrets: inherit
@@ -89,13 +89,13 @@ jobs:
             docker pull ${{ steps.image.outputs.name }}:${{ steps.meta.outputs.version }}
             ```
 
-            Gebaut für `linux/amd64` und `linux/arm64`.
+            Built for `linux/amd64` and `linux/arm64`.
 
-            ## Starten
+            ## Getting started
 
-            Auf dem Server werden nur zwei Dinge gebraucht: die
-            `docker-compose.yml` dieses Tags und ein Ordner `data` daneben.
-            Kein Checkout, kein Build.
+            On the server you only need two things: the
+            `docker-compose.yml` of this tag and a `data` folder next to it.
+            No checkout, no build.
 
             ```bash
             mkdir -p spesenfuchs/data && cd spesenfuchs
@@ -104,15 +104,15 @@ jobs:
             docker compose up -d
             ```
 
-            Ohne das `sed` bleibt es bei `latest`, dann aktualisiert jedes
-            `docker compose pull` auf die jeweils neueste Version.
+            Without the `sed`, it stays on `latest`, and every
+            `docker compose pull` then updates to the newest version.
 
-            Danach ist die Oberfläche unter http://localhost:8001 erreichbar.
-            Fehlt `data/.env`, werden `JWT_SECRET_KEY` und `ENCRYPTION_KEY` beim
-            ersten Start erzeugt. **Diese Datei sichern** — ohne sie sind die
-            gespeicherten DFB-Zugangsdaten nicht mehr entschlüsselbar.
+            Afterwards the interface is reachable at http://localhost:8001.
+            If `data/.env` is missing, `JWT_SECRET_KEY` and `ENCRYPTION_KEY` are
+            generated on first start. **Back up this file** — without it the
+            stored DFB credentials can no longer be decrypted.
 
-            ## Aktualisieren
+            ## Updating
 
             ```bash
             docker compose pull && docker compose up -d
