@@ -14,6 +14,7 @@ from db.matches import (
     get_matches_for_user,
     mark_missing_matches,
     set_official_expenses,
+    setze_spielnummern,
     upsert_match,
 )
 from db_helpers import feste_uhr, nutzer_anlegen, spiel
@@ -318,6 +319,42 @@ class TestIdentitaetUeberId:
 
     def test_nutzer_sind_getrennt(self, user, zweiter):
         assert _upsert(user["id"], mit_id("SPIEL1")) != _upsert(zweiter, mit_id("SPIEL1"))
+
+
+class TestSpielnummern:
+    def test_ueber_id_und_ueber_teams(self, user):
+        mit = _upsert(user["id"], mit_id("SPIEL1", heim="Hertha BSC U23", gast="FSV Zwickau"))
+        ohne = _upsert(user["id"], spiel(heim="SG Dynamo Dresden U19", gast="RB Leipzig U19",
+                                         tag="2026-12-06", zeit="11:00"))
+
+        n = setze_spielnummern(user["id"], [
+            {"spielkennung": "690047011", "dfb_spiel_id": "SPIEL1"},
+            # Kuenftig, ohne Link: Namen wie im Einsatzplan
+            {"spielkennung": "890201022", "dfb_spiel_id": None, "datum": "2026-12-06",
+             "uhrzeit": "11:00", "heim": "SG Dynamo Dresden", "gast": "RB Leipzig"},
+            {"spielkennung": "", "dfb_spiel_id": "SPIEL1"},
+        ])
+
+        assert n == 2
+        assert _zeile(mit)["spielnummer"] == "690047011"
+        assert get_match(ohne)["spielnummer"] == "890201022"
+        # Unveraendert zaehlt nicht
+        assert setze_spielnummern(user["id"], [{"spielkennung": "690047011", "dfb_spiel_id": "SPIEL1"}]) == 0
+
+    def test_kein_treffer_und_fremde_id(self, user, zweiter):
+        mid = _upsert(user["id"], mit_id("SPIEL1"))
+        _upsert(zweiter, mit_id("SPIEL9"))
+
+        assert setze_spielnummern(user["id"], [
+            # Anderer Tag
+            {"spielkennung": "1", "datum": "2026-12-06", "heim": "FC Heim", "gast": "SV Gast"},
+            # Gleiche Teams, aber eine andere DFBnet-ID
+            {"spielkennung": "2", "dfb_spiel_id": "SPIEL2", "datum": "2026-12-05",
+             "heim": "FC Heim", "gast": "SV Gast"},
+            # ID eines anderen Nutzers
+            {"spielkennung": "3", "dfb_spiel_id": "SPIEL9"},
+        ]) == 0
+        assert _zeile(mid)["spielnummer"] is None
 
 
 # -------------------------------------------------------- Fehlende Spiele

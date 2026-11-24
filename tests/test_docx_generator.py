@@ -165,6 +165,10 @@ class TestStammdaten:
         assert felder["DATUM"] == "08.11.2025"
         assert felder["ANSTOSS"] == "13:00"
 
+    def test_spielnummer_aus_der_datenbank(self, generator):
+        felder = _felder(generator.render_document({**_spiel(), "spielnummer": "659000082"}))
+        assert felder["SPIELNUMMER"] == "659000082"
+
     def test_datum_auch_neben_der_unterschrift(self, generator):
         doc = Document(BytesIO(generator.render_document(_spiel())))
         assert any("08.11.2025" in p.text and "Unterschrift" in p.text for p in doc.paragraphs)

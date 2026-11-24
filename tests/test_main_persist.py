@@ -270,6 +270,31 @@ def _fertig_vermerkt(uid, saison):
         conn.close()
 
 
+class TestPersistSpielnummern:
+    def test_aus_einsatzplan_und_bericht(self, user):
+        mit_id = spiel(tag="2026-11-14")
+        mit_id["spiel_info"]["dfb_spiel_id"] = "SPIEL1"
+        main.persist_matches(user["id"], [mit_id, spiel(heim="Kuenftig", tag="2026-12-05")])
+        gruppe = "Herren, Kreisoberliga, Kreis Mittelthüringen 659000 - Meisterschaft, KOL"
+
+        n = main.persist_spielnummern(user["id"], {
+            "saisons": {"26/27": {"zeilen": [
+                {**_bzeile(None, "2026-12-05"), "heim": "Kuenftig", "gruppe": gruppe, "nummer": "091"},
+            ]}},
+            "berichte": {"SPIEL1": {"zeile": {}, "daten": {"spielkennung": "659000082"}}},
+        })
+
+        assert n == 2
+        nummern = {s["heim_team"]: s["spielnummer"] for s in get_matches_for_user(user["id"])}
+        assert nummern == {"FC Heim": "659000082", "Kuenftig": "659000091"}
+
+    def test_fehler_wird_nur_geloggt(self, user, monkeypatch):
+        def kaputt(*a):
+            raise RuntimeError("DB weg")
+        monkeypatch.setattr(main, "setze_spielnummern", kaputt)
+        assert main.persist_spielnummern(user["id"], {"saisons": {}, "berichte": {}}) == 0
+
+
 class TestPersistSpielberichte:
     def test_alles_gelesen_saison_fertig(self, user, datenordner):
         z = _bzeile("A", "2025-05-01")

@@ -15,7 +15,7 @@ from scraper.dfb_scraper import DFBScraper
 from generator.docx_generator import KM_SATZ_EURO
 from generator.spesen_calculator import calculate_spesen
 from db.database import dfb_login_angenommen
-from db.matches import upsert_match, mark_missing_matches
+from db.matches import upsert_match, mark_missing_matches, setze_spielnummern
 from db.stammdaten import upsert_stammdaten, get_stammdaten
 from db.beobachtungen import (
     replace_beobachtungs_saison, count_beobachtungen, get_fertige_beobachtungs_saisons,
@@ -25,7 +25,7 @@ from db.spielberichte import (
     speichere_bericht, setze_saison, get_fertige_saisons as get_fertige_bericht_saisons,
     get_gespeicherte as get_gespeicherte_berichte, get_dokument_ids,
 )
-from scraper.spielberichte import ist_lesbar, wartet_auf_freigabe
+from scraper.spielberichte import ist_lesbar, spielkennung, wartet_auf_freigabe
 from utils.logger import setup_logger
 from utils.match_utils import extract_iso_date_from_anpfiff, parse_saison_datum
 from utils.saison_utils import saison_start_jahr, saison_fuer_datum, parse_deutsches_datum, saison_zeitraum
@@ -325,6 +325,42 @@ def persist_spielberichte(user_id: int, ergebnis: dict, heute: Optional[date] = 
     return gespeichert
 
 
+def persist_spielnummern(user_id: int, ergebnis: dict) -> int:
+    """
+    Traegt die Spielkennungen aus dem Einsatzplan bei den Ansetzungen ein -
+    sie stehen auf den Spesenquittungen (TFV und NOFV).
+
+    Laeuft nach persist_matches, damit auch gerade erst angelegte Spiele ihre
+    Kennung bekommen. Fehler werden nur geloggt, wie bei allem Beiwerk.
+    """
+    eintraege = []
+    for daten in (ergebnis.get("saisons") or {}).values():
+        for zeile in daten.get("zeilen") or []:
+            eintraege.append({
+                "spielkennung": spielkennung(zeile),
+                "dfb_spiel_id": zeile.get("dfb_spiel_id"),
+                "datum": zeile.get("datum"),
+                "uhrzeit": zeile.get("uhrzeit"),
+                "heim": zeile.get("heim"),
+                "gast": zeile.get("gast"),
+            })
+    # Der gelesene Bericht ist die genaueste Quelle
+    for spiel_id, bericht in (ergebnis.get("berichte") or {}).items():
+        eintraege.append({
+            "spielkennung": (bericht.get("daten") or {}).get("spielkennung"),
+            "dfb_spiel_id": spiel_id,
+        })
+
+    try:
+        gesetzt = setze_spielnummern(user_id, eintraege)
+        if gesetzt:
+            logger.info(f"Spielkennung bei {gesetzt} Spielen eingetragen")
+        return gesetzt
+    except Exception as e:
+        logger.error(f"Spielkennungen konnten nicht eingetragen werden: {e}")
+        return 0
+
+
 def scrape_matches(
     username: Optional[str] = None,
     password: Optional[str] = None,
@@ -503,6 +539,7 @@ def scrape_matches(
         persist_beobachtungen(user_id, beobachtungen)
         if spielberichte:
             persist_spielberichte(user_id, spielberichte)
+            persist_spielnummern(user_id, spielberichte)
 
     logger.info(f"Erfolgreich {len(all_matches)} Spiele gescrapt")
     return all_matches

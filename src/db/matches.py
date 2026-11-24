@@ -569,3 +569,60 @@ def ergaenze_offene_saetze() -> int:
         logger.info(f"Spesensätze nachgetragen: {ergaenzt} Pokal-/Freundschaftsspiele")
 
     return ergaenzt
+
+
+def setze_spielnummern(user_id: int, eintraege: Iterable[Dict]) -> int:
+    """
+    Traegt die Spielkennung (z.B. "659000082") bei den Spielen eines Nutzers ein.
+
+    Die Ansetzungs-Schnittstelle kennt sie nicht; sie kommt aus dem
+    Einsatzplan der Spielberichte. Dort tragen nur vergangene Spiele mit
+    Bericht einen Link und damit die DFBnet-ID - kuenftige werden ueber Tag,
+    Mannschaften und Anstoss zugeordnet, nach derselben Regel wie die
+    Berichte in der Spieleliste (db.spielberichte.Zuordnung).
+
+    Args:
+        eintraege: je {"spielkennung", "dfb_spiel_id" (oder None), "datum",
+            "uhrzeit", "heim", "gast"}
+
+    Returns:
+        Anzahl Spiele, deren Spielkennung neu gesetzt oder geaendert wurde.
+    """
+    from db.spielberichte import Zuordnung
+
+    conn = get_connection()
+    geaendert = 0
+    try:
+        zeilen = [dict(z) for z in conn.execute(
+            "SELECT id, dfb_spiel_id, datum, anpfiff, heim_team, gast_team, spielnummer "
+            "FROM matches WHERE user_id = ?", (user_id,),
+        )]
+        nach_id = {z["dfb_spiel_id"]: z for z in zeilen if z["dfb_spiel_id"]}
+        zuordnung = Zuordnung(
+            {**z, "heim": z["heim_team"], "gast": z["gast_team"], "uhrzeit": z["anpfiff"]}
+            for z in zeilen if z["heim_team"] and z["gast_team"]
+        )
+
+        for eintrag in eintraege:
+            kennung = (eintrag.get("spielkennung") or "").strip()
+            if not kennung:
+                continue
+
+            zeile = nach_id.get(eintrag.get("dfb_spiel_id") or "")
+            if zeile is None and eintrag.get("datum") and eintrag.get("heim"):
+                zeile = zuordnung.finde(eintrag["datum"], eintrag["heim"],
+                                        eintrag.get("gast") or "", eintrag.get("uhrzeit") or "")
+                # Eine Zeile mit anderer ID ist ein anderes Spiel
+                if zeile and zeile["dfb_spiel_id"] and eintrag.get("dfb_spiel_id") \
+                        and zeile["dfb_spiel_id"] != eintrag["dfb_spiel_id"]:
+                    zeile = None
+
+            if zeile is not None and zeile["spielnummer"] != kennung:
+                conn.execute("UPDATE matches SET spielnummer = ? WHERE id = ?", (kennung, zeile["id"]))
+                zeile["spielnummer"] = kennung
+                geaendert += 1
+
+        conn.commit()
+        return geaendert
+    finally:
+        conn.close()

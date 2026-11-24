@@ -456,7 +456,7 @@ class SpesenGenerator:
             'HEIM_TEAM': spiel_info.get('heim_team', ''),
             'GAST_TEAM': spiel_info.get('gast_team', ''),
             'SPIELKLASSE': spiel_info.get('spielklasse', ''),
-            'SPIELNUMMER': '',
+            'SPIELNUMMER': match_data.get('spielnummer') or '',
             'DATUM': datum,
             'ANSTOSS': anstoss,
             'SPIELORT': spielort_komplett,

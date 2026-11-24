@@ -240,6 +240,21 @@ def wartet_auf_freigabe(zeile: Dict, heute: Optional[date] = None) -> bool:
     return "spiel_historisch" not in status
 
 
+def spielkennung(zeile: Dict) -> str:
+    """
+    Die neunstellige Spielkennung einer Einsatzplan-Zeile: Staffelkennung aus
+    der Gruppenueberschrift ("Herren, Kreisoberliga, Kreis Mittelthueringen
+    659000 - Meisterschaft, ...") plus die Nr. der Zeile ("082") ->
+    "659000082". So steht sie in jedem gespeicherten Bericht (identifier),
+    auch fuer Spiele, deren Bericht es noch nicht gibt.
+    """
+    nummer = (zeile.get("nummer") or "").strip()
+    staffel = re.findall(r"\b(\d{6}) - ", zeile.get("gruppe") or "")
+    if not nummer.isdigit() or not staffel:
+        return ""
+    return staffel[-1] + nummer
+
+
 # ----------------------------------------------------------- Bericht-App (JSON)
 
 def _pruefe_pfad(pfad: str) -> str:

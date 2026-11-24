@@ -765,3 +765,17 @@ class TestLiesBerichte:
         ergebnis = lies_berichte(object(), ZEILEN, lambda d: True)
 
         assert list(ergebnis) == [ZEILEN[0]["dfb_spiel_id"]]
+
+
+class TestSpielkennung:
+    @pytest.mark.parametrize("gruppe, nummer, kennung", [
+        ("Herren, Kreisoberliga, Kreis Mittelthüringen 659000 - Meisterschaft, coffeecom-Kreisoberliga",
+         "082", "659000082"),
+        ("Herren, Kreisfreundschaftsspiele, Kreis Mittelthüringen 850010 - Freundschaftsspiel, FS / H / 1",
+         "082", "850010082"),
+        ("Herren, Oberliga, Meisterschaft", "082", ""),
+        ("Herren, Kreisoberliga, Kreis 659000 - Meisterschaft", "", ""),
+        ("Herren, Kreisoberliga, Kreis 659000 - Meisterschaft", "abc", ""),
+    ])
+    def test_staffelkennung_plus_nummer(self, gruppe, nummer, kennung):
+        assert sb.spielkennung({"gruppe": gruppe, "nummer": nummer}) == kennung
