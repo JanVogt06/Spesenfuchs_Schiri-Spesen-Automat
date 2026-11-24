@@ -1105,10 +1105,18 @@ def _wurzel_datei(full_path: str) -> Optional[FileResponse]:
     """
     Eine Datei direkt in FRONTEND_DIR, sonst None. Unterverzeichnisse und
     Pfade, die aus dem Verzeichnis herausfuehren, zaehlen nicht.
+
+    Die Anfrage waehlt nur einen Namen aus der Liste der vorhandenen Dateien;
+    der ausgelieferte Pfad stammt immer aus dem Verzeichnis selbst. Damit
+    kann kein '..' oder kodierter Schraegstrich den Pfad bauen.
     """
-    wurzel = FRONTEND_DIR.resolve()
-    kandidat = (wurzel / full_path).resolve()
-    if kandidat.parent != wurzel or not kandidat.is_file() or kandidat.name == "index.html":
+    wurzeldateien = {
+        eintrag.name: eintrag
+        for eintrag in FRONTEND_DIR.iterdir()
+        if eintrag.is_file() and not eintrag.is_symlink() and eintrag.name != "index.html"
+    }
+    kandidat = wurzeldateien.get(full_path)
+    if kandidat is None:
         return None
 
     media_type = "application/manifest+json" if kandidat.suffix == ".webmanifest" else None
