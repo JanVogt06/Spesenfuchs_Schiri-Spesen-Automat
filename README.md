@@ -12,7 +12,10 @@ you officiated per season with result, card statistics and crew, plus
 assignment balance and training evenings. The *Statistik* (statistics) tab
 shows your own expenses and travel costs per season (missing travel costs are
 estimated and marked as estimated) and a map of all venues where you have
-already officiated.
+already officiated. It counts the matches DFBnet lists as officiated – the
+same as the *Saison* tab – and takes rates, entered kilometres and venues from
+the stored appointments; for matches before your first fetch the rate follows
+from the league.
 The *Beobachtungen* (observations) tab shows your own grades from referee
 observations (men's football, from the season of "Schiedsrichter seit", i.e.
 referee since) and — for those who have it — from the Schiri-Portal (DFB
