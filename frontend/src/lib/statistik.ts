@@ -13,9 +13,13 @@ export interface Statistik {
     saisons: string[];
     /** The evaluated season - without data for the requested one, the newest */
     saison: string | null;
+    /** dfbnet: DFBnet's list of officiated matches; ansetzungen: fallback without that list */
+    quelle: 'dfbnet' | 'ansetzungen';
     spiele: number;
     ohne_rolle: number;
     ohne_satz: number;
+    /** Officiated, but no appointment stored (before the first fetch): rate computed from the league */
+    ohne_ansetzung: number;
     spesen: number;
     fahrtkosten: {
         erfasst: number;

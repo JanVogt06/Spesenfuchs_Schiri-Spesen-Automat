@@ -216,8 +216,24 @@ export function SpesenStatistik({saison, onGeladen}: SpesenStatistikProps) {
                             denen die eigene Rolle nicht erkennbar ist – der nächste Abruf trägt sie nach.
                         </p>
                     )}
+                    <p>
+                        {daten.quelle === 'dfbnet'
+                            ? 'Gezählt sind die Spiele, die DFBnet als geleitet führt – dieselben wie im Reiter Saison.'
+                            : 'Für diese Saison liegt die Liste der geleiteten Spiele aus DFBnet noch nicht vor – gezählt sind die Ansetzungen, die nicht zurückgezogen wurden.'}
+                    </p>
+                    {daten.ohne_ansetzung > 0 && (
+                        <p>
+                            Für {daten.ohne_ansetzung} {daten.ohne_ansetzung === 1 ? 'Spiel' : 'Spiele'} gibt es keine
+                            gespeicherte Ansetzung (vor deinem ersten Abruf): Spesen nach der Spielklasse berechnet,
+                            Fahrtkosten geschätzt.
+                        </p>
+                    )}
                     {daten.ohne_satz > 0 && (
-                        <p>Ohne Spesensatz: {daten.ohne_satz} {daten.ohne_satz === 1 ? 'Spiel' : 'Spiele'}.</p>
+                        <p>
+                            Ohne Spesensatz: {daten.ohne_satz} {daten.ohne_satz === 1 ? 'Spiel' : 'Spiele'} – etwa
+                            Junioren-Bundesliga (zahlt der DFB), Beobachtungen oder Pokal- und Freundschaftsspiele,
+                            deren Klasse sich nicht bestimmen lässt.
+                        </p>
                     )}
                     {daten.offen > 0 && (
                         <p className="flex items-center gap-1.5">

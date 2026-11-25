@@ -9,9 +9,11 @@ vi.mock('@/lib/api', async () => (await import('@/test/apiMock')).apiModul);
 const STATISTIK: Statistik = {
     saisons: ['26/27'],
     saison: '26/27',
+    quelle: 'dfbnet',
     spiele: 3,
     ohne_rolle: 1,
     ohne_satz: 0,
+    ohne_ansetzung: 0,
     spesen: 80,
     fahrtkosten: {
         erfasst: 12, erfasst_spiele: 1, geschaetzt: 26.4, geschaetzt_spiele: 2, geschaetzt_km: 88,
@@ -45,6 +47,21 @@ describe('SpesenStatistik', () => {
         expect(screen.getByRole('table')).toBeInTheDocument();
         expect(screen.getAllByText(/Sept\. 2026/).length).toBeGreaterThan(0);
         expect(apiGet).toHaveBeenCalledWith('/api/statistik', {params: {saison: '26/27'}});
+    });
+
+    it('nennt die Quelle, Spiele ohne Ansetzung und ohne Satz', async () => {
+        getRouten({'/api/statistik': {...STATISTIK, ohne_ansetzung: 19, ohne_satz: 4}});
+        render(<SpesenStatistik saison="26/27"/>);
+
+        expect(await screen.findByText(/die DFBnet als geleitet führt/)).toBeInTheDocument();
+        expect(screen.getByText(/Für 19 Spiele gibt es keine/)).toBeInTheDocument();
+        expect(screen.getByText(/Ohne Spesensatz: 4 Spiele/)).toBeInTheDocument();
+    });
+
+    it('sagt, wenn nur Ansetzungen gezaehlt sind', async () => {
+        getRouten({'/api/statistik': {...STATISTIK, quelle: 'ansetzungen'}});
+        render(<SpesenStatistik saison="26/27"/>);
+        expect(await screen.findByText(/gezählt sind die Ansetzungen/)).toBeInTheDocument();
     });
 
     it('sagt "alle eingetragen", wenn nichts geschaetzt ist', async () => {
