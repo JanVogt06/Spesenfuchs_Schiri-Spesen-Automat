@@ -350,7 +350,7 @@ def team_kern(name: str) -> str:
     return "".join(woerter)
 
 
-def _gleiches_team(a: str, b: str) -> bool:
+def gleiches_team(a: str, b: str) -> bool:
     """
     Same core, or one is contained in the other ("Arminia Bielefeld" in
     "DSC Arminia Bielefeld"). Cores that are too short do not count - otherwise "SV"
@@ -397,12 +397,12 @@ class Zuordnung:
         zeit = uhrzeit_aus(uhrzeit)
         zur_zeit = [k for k in kandidaten if zeit and uhrzeit_aus(k.get("uhrzeit") or "") == zeit]
 
-        beide = [k for k in kandidaten if _gleiches_team(k["heim"], heim) and _gleiches_team(k["gast"], gast)]
+        beide = [k for k in kandidaten if gleiches_team(k["heim"], heim) and gleiches_team(k["gast"], gast)]
         if beide:
             # With two hits (first and second leg of a tournament day) the time decides
             return next((k for k in beide if k in zur_zeit), beide[0])
 
-        eine = [k for k in zur_zeit if _gleiches_team(k["heim"], heim) or _gleiches_team(k["gast"], gast)]
+        eine = [k for k in zur_zeit if gleiches_team(k["heim"], heim) or gleiches_team(k["gast"], gast)]
         return eine[0] if len(eine) == 1 else None
 
 

@@ -8,7 +8,7 @@ import db.database as database
 from db import spielberichte as sb
 from db.spielberichte import (
     Zuordnung,
-    _gleiches_team,
+    gleiches_team,
     delete_spielberichte,
     get_bericht,
     get_dokument,
@@ -85,14 +85,14 @@ class TestNamen:
         assert team_kern(a) == team_kern(b)
 
     def test_enthalten_ab_acht_zeichen(self):
-        assert _gleiches_team("Arminia Bielefeld", "DSC Arminia Bielefeld")
+        assert gleiches_team("Arminia Bielefeld", "DSC Arminia Bielefeld")
 
     def test_kurzer_kern_passt_nicht_ueberall(self):
-        assert not _gleiches_team("SV", "SV Musterstadt")
+        assert not gleiches_team("SV", "SV Musterstadt")
 
     def test_leer_passt_nie(self):
-        assert not _gleiches_team("", "")
-        assert not _gleiches_team("U19", "FC Heim")
+        assert not gleiches_team("", "")
+        assert not gleiches_team("U19", "FC Heim")
 
     @pytest.mark.parametrize("text, erwartet", [
         ("So., 22.11.2026 13:30", "13:30"),

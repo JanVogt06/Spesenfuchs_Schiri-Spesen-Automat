@@ -367,11 +367,15 @@ def get_saison(user_id: int, saison: str) -> Optional[Dict]:
 
 
 def get_eigene_rollen(user_id: int) -> List[Dict]:
-    """Date, teams and own role of all refereed matches - for matching other sources."""
+    """
+    Season, date, teams, league and own role of all refereed matches - for
+    matching other sources and for the statistics, which count exactly these.
+    """
     conn = get_connection()
     try:
         rows = conn.execute(
-            "SELECT datum, heim, gast, eigene_rolle FROM season_matches WHERE user_id = ?", (user_id,)
+            "SELECT saison, datum, uhrzeit, heim, gast, liga, eigene_rolle FROM season_matches WHERE user_id = ?",
+            (user_id,),
         ).fetchall()
         return [dict(row) for row in rows]
     finally:

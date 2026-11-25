@@ -223,3 +223,95 @@ class TestEigenePerson:
         match = {"schiedsrichter": [{"rolle": "SR", "name": "A Eins"}, {"rolle": "SR", "name": "B Zwei"}],
                  "selbst": {"rolle": "SR", "seq": 1}}
         assert eigene_spiele.eigene_person(match)["name"] == "B Zwei"
+
+
+# ===== Counting DFBnet's officiated matches =====
+
+from db.season import replace_saison  # noqa: E402
+from db.spielberichte import speichere_bericht  # noqa: E402
+from utils.statistik import klasse_und_art  # noqa: E402
+
+
+def geleitet(datum, heim="FC Heim", gast="SV Gast", liga="Kreisoberliga", rolle="SR"):
+    return {"datum": datum, "uhrzeit": "15:00", "liga": liga, "heim": heim, "gast": gast, "ergebnis": "1:0",
+            "karten": {}, "gespann": [], "eigene_rolle": rolle}
+
+
+class TestGeleiteteSpiele:
+    def test_zaehlt_was_dfbnet_als_geleitet_fuehrt(self, user, dienste):
+        anlegen(user["id"], "2026-09-05", selbst=0)
+        # Given back before the match: an appointment, but not officiated
+        anlegen(user["id"], "2026-09-12", selbst=0, heim="FC Zurueckgegeben")
+        replace_saison(user["id"], "26/27", [geleitet("2026-09-05")], [], {})
+
+        ergebnis = auswerten(user["id"])
+
+        assert ergebnis["quelle"] == "dfbnet"
+        assert (ergebnis["spiele"], ergebnis["spesen"], ergebnis["ohne_ansetzung"]) == (1, 30.0, 0)
+
+    def test_rolle_kommt_aus_dfbnet(self, user, dienste):
+        anlegen(user["id"], "2026-09-05")
+        replace_saison(user["id"], "26/27", [geleitet("2026-09-05", rolle="SRA 1")], [], {})
+
+        assert auswerten(user["id"])["rollen"] == [{"rolle": "SRA 1", "spiele": 1, "spesen": 20.0}]
+
+    def test_erfasste_kilometer_der_eigenen_rolle(self, user, dienste):
+        mid = anlegen(user["id"], "2026-09-05")
+        set_official_expenses(mid, {"sra2_km": 50, "sr_km": 10})
+        replace_saison(user["id"], "26/27", [geleitet("2026-09-05", rolle="SRA 2")], [], {})
+
+        fahrt = auswerten(user["id"])["fahrtkosten"]
+        assert (fahrt["erfasst"], fahrt["erfasst_spiele"]) == (15.0, 1)
+
+    def test_ohne_ansetzung_satz_nach_spielklasse_und_platz_aus_dem_bericht(self, user, dienste):
+        upsert_stammdaten(user["id"], {"name_vorname": "Pfeife, Erika", "strasse": "Weg 1",
+                                       "plz_ort": "99999 Irgendwo"})
+        replace_saison(user["id"], "25/26", [geleitet("2025-09-06", heim="FC Alt", liga="Verbandsliga")], [], {})
+        speichere_bericht(user["id"], "25/26", {"dfb_spiel_id": "B1", "datum": "2025-09-06", "uhrzeit": "15:00",
+                                                "gruppe": "", "nummer": "", "heim": "FC Alt", "gast": "SV Gast",
+                                                "ergebnis": "1:0"},
+                          {"kosten": {}, "spielstaette": {"name": "Platz", "strasse": "Waldweg 1",
+                                                          "ort": "99999 Irgendwo"},
+                           "ergebnis": {"endstand": "1:0", "wertung": ""}}, {})
+
+        ergebnis = auswerten(user["id"], "25/26")
+
+        assert (ergebnis["spiele"], ergebnis["ohne_ansetzung"], ergebnis["spesen"]) == (1, 1, 50.0)
+        # Home from the master data (Weg 1), venue from the report (Waldweg 1): 11.1 km each way
+        assert ergebnis["fahrtkosten"]["geschaetzt_km"] == 22
+
+    def test_turnier_findet_die_ansetzung_des_tages(self, user, dienste):
+        anlegen(user["id"], "2026-10-05", selbst=0, heim="", gast="", staette="Halle")
+        replace_saison(user["id"], "26/27", [geleitet("2026-10-05", heim="Turnierblock A", gast="",
+                                                       liga="B-Junioren Turnier")], [], {})
+
+        ergebnis = auswerten(user["id"])
+        assert (ergebnis["ohne_ansetzung"], ergebnis["spesen"]) == (0, 30.0)
+
+    def test_beobachter_zaehlt_ohne_satz(self, user, dienste):
+        replace_saison(user["id"], "26/27", [geleitet("2026-09-05", rolle="Beo.")], [], {})
+        ergebnis = auswerten(user["id"])
+        assert (ergebnis["spiele"], ergebnis["ohne_satz"]) == (1, 1)
+
+    def test_saisons_aus_beiden_quellen(self, user, dienste):
+        anlegen(user["id"], "2026-09-05", selbst=0)
+        replace_saison(user["id"], "24/25", [geleitet("2024-09-07")], [], {})
+
+        ergebnis = auswerten(user["id"])
+        assert ergebnis["saisons"] == ["26/27", "24/25"]
+        # 26/27 has no list from DFBnet yet: the appointments count
+        assert ergebnis["quelle"] == "ansetzungen"
+
+
+@pytest.mark.parametrize("liga, erwartet", [
+    ("Kreis-FS", ("Kreisfreundschaftsspiele", "Herren")),
+    ("Landes-FS", ("Landesfreundschaftsspiele", "Herren")),
+    ("B-Junioren Bundesliga", ("Bundesliga", "B-Junioren")),
+    ("B-Junioren Regional-FS", ("Regionalfreundschaftsspiele", "B-Junioren")),
+    ("C-Junioren TFV-Pokal", ("Thüringen-Pokal", "C-Junioren")),
+    ("Herren Ü40 Landespokal", ("Landespokal", "Herren Ü40")),
+    ("Verbandsliga", ("Verbandsliga", "Herren")),
+    ("", ("", "Herren")),
+])
+def test_klasse_und_art(liga, erwartet):
+    assert klasse_und_art(liga) == erwartet
