@@ -293,9 +293,16 @@ def upsert_match(
 
 
 def mark_missing_matches(user_id: int, seen_keys: List[str], now: Optional[str] = None,
-                         seen_ids: Iterable[int] = ()) -> int:
+                         seen_ids: Iterable[int] = (), ab: Optional[str] = None) -> int:
     """
-    Marks future assignments that no longer appeared in the last scrape.
+    Marks assignments that no longer appeared in the last scrape.
+
+    By default only future ones (see below). Since the scraper reads the
+    whole current season through the referee API, every stored match from
+    the start of that period on must be in the result - ab is that first
+    day. A match before today that is missing there was withdrawn or
+    re-staffed before it was played (a returned match, a swap on the same
+    day) and must not count as officiated.
 
     The restriction to future matches is important: the fetch covers only
     the current season (scraper/ansetzungen.zeitraum). A played
@@ -329,7 +336,8 @@ def mark_missing_matches(user_id: int, seen_keys: List[str], now: Optional[str] 
         return 0
 
     now = now or datetime.now(UTC).isoformat()
-    today = now[:10]
+    # Lower date bound: today, or the start of the fully read period
+    untergrenze = min(ab, now[:10]) if ab else now[:10]
     conn = get_connection()
 
     try:
@@ -341,7 +349,7 @@ def mark_missing_matches(user_id: int, seen_keys: List[str], now: Optional[str] 
               AND datum >= ?
               AND match_key NOT IN ({keys})
               AND id NOT IN ({ids})
-        """, [now, user_id, today, *seen_keys, *seen_ids])
+        """, [now, user_id, untergrenze, *seen_keys, *seen_ids])
 
         conn.commit()
         return cursor.rowcount

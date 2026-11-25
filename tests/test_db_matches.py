@@ -404,6 +404,22 @@ class TestMarkMissing:
         assert _zeile(heute)["missing_since"] == self.JETZT
         assert _zeile(kuenftig)["missing_since"] == self.JETZT
 
+    def test_im_gelesenen_zeitraum_auch_vergangene(self, user):
+        # The whole season was read: a past match missing from it was given back
+        alt = _upsert(user["id"], spiel(heim="Vorsaison", tag="2026-06-20"))
+        vergangen, heute, kuenftig = self._drei(user["id"])
+
+        assert mark_missing_matches(user["id"], ["x"], now=self.JETZT, ab="2026-07-01") == 3
+        assert _zeile(vergangen)["missing_since"] == self.JETZT
+        assert _zeile(kuenftig)["missing_since"] == self.JETZT
+        # Before the read period nothing can be judged
+        assert _zeile(alt)["missing_since"] is None
+
+    def test_spaeterer_beginn_als_heute_aendert_nichts(self, user):
+        vergangen, _, _ = self._drei(user["id"])
+        assert mark_missing_matches(user["id"], ["x"], now=self.JETZT, ab="2026-12-01") == 2
+        assert _zeile(vergangen)["missing_since"] is None
+
     def test_gesehene_bleiben_unmarkiert(self, user):
         _, _, kuenftig = self._drei(user["id"])
         gesehen = _zeile(kuenftig)["match_key"]

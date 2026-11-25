@@ -33,7 +33,8 @@ from utils.saison_utils import saison_start_jahr, saison_fuer_datum, parse_deuts
 logger = setup_logger("main")
 
 
-def persist_matches(user_id: int, matches_data: List[dict], vollstaendig: bool = True) -> int:
+def persist_matches(user_id: int, matches_data: List[dict], vollstaendig: bool = True,
+                    gelesen_ab: Optional[str] = None) -> int:
     """
     Writes a scrape result to the database.
 
@@ -51,6 +52,10 @@ def persist_matches(user_id: int, matches_data: List[dict], vollstaendig: bool =
             scraper skips individual matches whose data cannot be processed;
             without this distinction the user would see perfectly valid
             assignments displayed as withdrawn.
+        gelesen_ab: First day (ISO date) the fetch covered completely. Stored
+            matches from that day on that are missing from the result count as
+            withdrawn, past ones included. Without it only future matches are
+            checked.
 
     Returns:
         Number of saved matches.
@@ -81,7 +86,7 @@ def persist_matches(user_id: int, matches_data: List[dict], vollstaendig: bool =
             continue
 
     if seen_ids and vollstaendig:
-        markiert = mark_missing_matches(user_id, [], seen_ids=seen_ids)
+        markiert = mark_missing_matches(user_id, [], seen_ids=seen_ids, ab=gelesen_ab)
         if markiert:
             logger.info(f"{markiert} Spiele nicht mehr in der Ansetzung - markiert")
     elif seen_ids:
@@ -535,7 +540,8 @@ def scrape_matches(
             logger.warning(f"Spielberichte konnten nicht gelesen werden: {e}")
 
     if user_id is not None:
-        persist_matches(user_id, all_matches, vollstaendig=vollstaendig)
+        persist_matches(user_id, all_matches, vollstaendig=vollstaendig,
+                        gelesen_ab=getattr(scraper, "gelesen_ab", None))
         persist_stammdaten(user_id, stammdaten)
         persist_saisons(user_id, saisons)
         persist_beobachtungen(user_id, beobachtungen)

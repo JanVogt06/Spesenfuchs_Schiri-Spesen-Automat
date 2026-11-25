@@ -76,6 +76,17 @@ class TestPersistMatches:
         assert spiele["Weg"]["missing_since"] == "2026-11-23T12:00:00+00:00"
         assert spiele["Gespielt"]["missing_since"] is None
 
+    def test_zurueckgegebenes_vergangenes_spiel_im_gelesenen_zeitraum(self, user, uhr):
+        # The whole season was read: a played-date match missing from it was given back
+        main.persist_matches(user["id"], [spiel(heim="Bleibt"), spiel(heim="Zurueck", tag="2026-11-01"),
+                                          spiel(heim="Vorsaison", tag="2026-06-20")])
+        main.persist_matches(user["id"], [spiel(heim="Bleibt")], gelesen_ab="2026-07-01")
+
+        spiele = _nach_heim(user["id"])
+        assert spiele["Zurueck"]["missing_since"] == "2026-11-23T12:00:00+00:00"
+        assert spiele["Vorsaison"]["missing_since"] is None
+        assert spiele["Bleibt"]["missing_since"] is None
+
     def test_unvollstaendiger_scrape_markiert_nichts(self, user, uhr):
         main.persist_matches(user["id"], [spiel(heim="Bleibt"), spiel(heim="Weg")])
         main.persist_matches(user["id"], [spiel(heim="Bleibt")], vollstaendig=False)

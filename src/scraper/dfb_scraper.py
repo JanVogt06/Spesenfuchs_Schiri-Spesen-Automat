@@ -1,4 +1,5 @@
 import sys
+from datetime import timedelta
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright, Page, Browser
@@ -423,6 +424,10 @@ class DFBScraper:
         # to detect an incomplete fetch: individual matches can be skipped
         # below.
         self.erwartete_spiele = anzahl_spiele
+        # First day the fetch fully covers (zeitraum() starts a day early as a
+        # buffer for the UTC boundaries). Anything stored from this day on that
+        # is missing from the result was withdrawn - played matches included.
+        self.gelesen_ab = (von + timedelta(days=1)).isoformat()
 
         all_matches = []
         for ansetzung in rohdaten["ansetzungen"]:

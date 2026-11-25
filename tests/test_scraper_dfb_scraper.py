@@ -327,6 +327,8 @@ class TestScrapeAllMatches:
         assert aufrufe == [("SCHIRI", date(2026, 6, 30), date(2027, 11, 24))]
         # The caller recognizes the incomplete scrape by the target count
         assert scraper.erwartete_spiele == 3
+        # The buffer day before the season is not fully covered
+        assert scraper.gelesen_ab == "2026-07-01"
         assert fortschritt == [(0, 0, "Lese Ansetzungen..."), (2, 3, "2 Ansetzungen gelesen")]
 
     def test_schnittstelle_faellt_aus(self, monkeypatch):
