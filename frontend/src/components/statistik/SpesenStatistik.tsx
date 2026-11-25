@@ -202,8 +202,12 @@ export function SpesenStatistik({saison, onGeladen}: SpesenStatistikProps) {
                     {fahrt.geschaetzt_spiele > 0 && (
                         <p>
                             Geschätzt für {fahrt.geschaetzt_spiele} {fahrt.geschaetzt_spiele === 1 ? 'Spiel' : 'Spiele'} ohne
-                            eingetragene Fahrtkosten: allein vom eigenen Wohnort zum Platz und zurück,
-                            zusammen {fahrt.geschaetzt_km.toLocaleString('de-DE')} km
+                            eingetragene Fahrtkosten, wie der kürzeste Kilometer-Vorschlag mit dem ganzen Gespann
+                            {fahrt.fahrgemeinschaft_spiele > 0
+                                ? `: ${fahrt.fahrgemeinschaft_spiele}× als Fahrgemeinschaft${fahrt.mitfahrer_spiele > 0
+                                    ? ` (davon ${fahrt.mitfahrer_spiele}× fährst du mit, 0 km)` : ''}, sonst allein`
+                                : ': jeweils allein'}
+                            {' '}– zusammen {fahrt.geschaetzt_km.toLocaleString('de-DE')} km
                             {fahrt.luftlinie_spiele > 0 && ' (teils nur über die Luftlinie)'}.
                         </p>
                     )}

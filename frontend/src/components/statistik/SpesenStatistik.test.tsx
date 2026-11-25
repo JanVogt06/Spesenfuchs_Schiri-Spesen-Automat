@@ -17,7 +17,7 @@ const STATISTIK: Statistik = {
     spesen: 80,
     fahrtkosten: {
         erfasst: 12, erfasst_spiele: 1, geschaetzt: 26.4, geschaetzt_spiele: 2, geschaetzt_km: 88,
-        ohne_schaetzung: 0, luftlinie_spiele: 0,
+        ohne_schaetzung: 0, luftlinie_spiele: 0, fahrgemeinschaft_spiele: 0, mitfahrer_spiele: 0,
     },
     gesamt: 118.4,
     monate: [
@@ -42,7 +42,7 @@ describe('SpesenStatistik', () => {
         expect(screen.getByText(euro('≈ 38,40 €'))).toBeInTheDocument();
         expect(screen.getByText(euro('davon 26,40 € geschätzt'))).toBeInTheDocument();
         expect(screen.getByText(euro('≈ 118,40 €'))).toBeInTheDocument();
-        expect(screen.getByText(/zusammen 88 km/)).toBeInTheDocument();
+        expect(screen.getByText(/zusammen 88 km/)).toHaveTextContent('jeweils allein');
         expect(screen.getByText(/Nicht gezählt: 1 Spiel/)).toBeInTheDocument();
         expect(screen.getByRole('table')).toBeInTheDocument();
         expect(screen.getAllByText(/Sept\. 2026/).length).toBeGreaterThan(0);
@@ -62,6 +62,15 @@ describe('SpesenStatistik', () => {
         getRouten({'/api/statistik': {...STATISTIK, quelle: 'ansetzungen'}});
         render(<SpesenStatistik saison="26/27"/>);
         expect(await screen.findByText(/gezählt sind die Ansetzungen/)).toBeInTheDocument();
+    });
+
+    it('nennt Fahrgemeinschaften und Mitfahrten in der Schaetzung', async () => {
+        getRouten({'/api/statistik': {...STATISTIK,
+            fahrtkosten: {...STATISTIK.fahrtkosten, fahrgemeinschaft_spiele: 2, mitfahrer_spiele: 1}}});
+        render(<SpesenStatistik saison="26/27"/>);
+
+        expect(await screen.findByText(/2× als Fahrgemeinschaft \(davon 1× fährst du mit, 0 km\), sonst allein/))
+            .toBeInTheDocument();
     });
 
     it('sagt "alle eingetragen", wenn nichts geschaetzt ist', async () => {

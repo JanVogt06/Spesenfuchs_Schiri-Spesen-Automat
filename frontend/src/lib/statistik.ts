@@ -29,6 +29,10 @@ export interface Statistik {
         geschaetzt_km: number;
         ohne_schaetzung: number;
         luftlinie_spiele: number;
+        /** Estimated matches that follow a carpool suggestion */
+        fahrgemeinschaft_spiele: number;
+        /** ... of those, the ones where you ride along (0 km) */
+        mitfahrer_spiele: number;
     };
     gesamt: number;
     monate: StatistikMonat[];

@@ -25,7 +25,7 @@ function statistik(saison: string) {
         ohne_rolle: 0, ohne_satz: 0, ohne_ansetzung: 0,
         spesen: saison === '26/27' ? 90 : 25,
         fahrtkosten: {erfasst: 0, erfasst_spiele: 0, geschaetzt: 0, geschaetzt_spiele: 0, geschaetzt_km: 0,
-            ohne_schaetzung: 0, luftlinie_spiele: 0},
+            ohne_schaetzung: 0, luftlinie_spiele: 0, fahrgemeinschaft_spiele: 0, mitfahrer_spiele: 0},
         gesamt: 0, monate: [], rollen: [], offen: 0,
     };
 }
