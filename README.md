@@ -177,8 +177,11 @@ into the fields; saving works as usual. To do this, it asks a route planner for
 the road kilometres between the places of residence and the venue; only
 coordinates are transmitted. The venue's coordinate is supplied by DFBnet
 itself, which is more accurate than an address search. The statistics in the
-*Statistik* tab use the same routes to estimate travel costs where none have been
-entered (alone from your own place of residence, round trip). Each route, too,
+*Statistik* tab use the same planning to estimate travel costs where none have
+been entered: per match the suggestion with the fewest total kilometres for
+the whole crew, and from it your own share – the whole trip as driver, 0 km as
+passenger, otherwise the round trip alone. Matches without a stored
+appointment (no crew known) are estimated as a trip alone. Each route, too,
 is only asked for once and then kept in `app.db`; evaluations over many matches
 only query for a few seconds per call and fetch the rest on the next one.
 
