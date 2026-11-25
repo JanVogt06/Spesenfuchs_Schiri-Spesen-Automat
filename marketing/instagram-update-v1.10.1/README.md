@@ -1,5 +1,7 @@
 # Instagram story: update since the introduction
 
+Made at version v1.10.1 (shows the app as of that release).
+
 Five story slides in 9:16 format (1080 × 1920) about everything that has been
 added since the introduction post in September. Upload as a story in this
 order:
@@ -26,5 +28,5 @@ slide, `&f=story` for the story format; without `f` the same is rendered in
 To export again while `npm run dev` is running in `frontend`:
 
 ```bash
-marketing/instagram-update/export.sh
+marketing/instagram-update-v1.10.1/export.sh
 ```

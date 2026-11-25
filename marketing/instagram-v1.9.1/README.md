@@ -1,5 +1,7 @@
 # Instagram post: introducing Spesenfuchs
 
+Made at version v1.9.1 (shows the app as of that release).
+
 Five slides in 3:4 format (1080 × 1440), to be uploaded in this order:
 
 1. `01-ankuendigung.png` – Final whistle for the paperwork (announcement)
@@ -22,7 +24,7 @@ not part of the build.
 To export again while `npm run dev` is running in `frontend`:
 
 ```bash
-marketing/instagram/export.sh
+marketing/instagram-v1.9.1/export.sh
 ```
 
 ## Post caption (suggestion)
