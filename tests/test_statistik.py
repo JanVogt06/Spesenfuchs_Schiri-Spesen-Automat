@@ -132,8 +132,9 @@ class TestFahrtkosten:
         fahrt = auswerten(user["id"])["fahrtkosten"]
         assert (fahrt["erfasst"], fahrt["erfasst_spiele"], fahrt["geschaetzt_spiele"]) == (0, 1, 0)
 
-    def test_schaetzt_hin_und_zurueck_vom_eigenen_wohnort(self, user, dienste):
-        anlegen(user["id"], "2026-09-05", selbst=1)   # Route 2: 22.2 km from the pitch
+    def test_als_fahrer_der_fahrgemeinschaft(self, user, dienste):
+        # SRA 1 (Weg 2, 22.2 km out) passes SR (Weg 1) on the way and picks them up
+        anlegen(user["id"], "2026-09-05", selbst=1)
         anlegen(user["id"], "2026-09-12", selbst=1, heim="FC Zwei")
 
         ergebnis = auswerten(user["id"])
@@ -142,10 +143,45 @@ class TestFahrtkosten:
         assert fahrt["geschaetzt_spiele"] == 2
         assert fahrt["geschaetzt_km"] == 2 * 44
         assert fahrt["geschaetzt"] == pytest.approx(2 * 44 * 0.30)
+        assert (fahrt["fahrgemeinschaft_spiele"], fahrt["mitfahrer_spiele"]) == (2, 0)
         assert ergebnis["monate"][0]["fahrt_geschaetzt"] == pytest.approx(26.4)
         assert ergebnis["gesamt"] == pytest.approx(40 + 26.4)
-        # One home town, one pitch: one query each way
-        assert dienste == [([(50.2, 11.0)], [(50.0, 11.0)]), ([(50.0, 11.0)], [(50.2, 11.0)])]
+        # All points of all matches in one distance table
+        assert len(dienste) == 1
+        assert set(dienste[0][0]) == {(50.0, 11.0), (50.1, 11.0), (50.2, 11.0)}
+
+    def test_als_mitfahrer_null_kilometer(self, user, dienste):
+        # SR lives on SRA 1's way: SRA 1 drives, SR rides along
+        anlegen(user["id"], "2026-09-05", selbst=0)
+
+        fahrt = auswerten(user["id"])["fahrtkosten"]
+
+        assert (fahrt["geschaetzt_spiele"], fahrt["geschaetzt_km"], fahrt["geschaetzt"]) == (1, 0, 0)
+        assert (fahrt["fahrgemeinschaft_spiele"], fahrt["mitfahrer_spiele"]) == (1, 1)
+
+    def test_allein_wenn_die_fahrgemeinschaft_nichts_spart(self, user, dienste):
+        ORTE["Weg 9, 99999 Irgendwo"] = (49.9, 11.0)
+        try:
+            # SRA 1 lives on the other side of the pitch
+            anlegen(user["id"], "2026-09-05", selbst=0, schiedsrichter=[
+                {"rolle": "SR", "name": "Erika Pfeife", "strasse": "Weg 1", "plz_ort": "99999 Irgendwo"},
+                {"rolle": "SRA 1", "name": "Max Fahne", "strasse": "Weg 9", "plz_ort": "99999 Irgendwo"},
+            ])
+            fahrt = auswerten(user["id"])["fahrtkosten"]
+        finally:
+            del ORTE["Weg 9, 99999 Irgendwo"]
+
+        assert (fahrt["geschaetzt_km"], fahrt["fahrgemeinschaft_spiele"]) == (22, 0)
+
+    def test_allein_ohne_auffindbare_kollegen(self, user, dienste):
+        anlegen(user["id"], "2026-09-05", selbst=0, schiedsrichter=[
+            {"rolle": "SR", "name": "Erika Pfeife", "strasse": "Weg 1", "plz_ort": "99999 Irgendwo"},
+            {"rolle": "SRA 1", "name": "Max Fahne", "strasse": "", "plz_ort": ""},
+            {"rolle": "SRA 2", "name": "Moritz Fahne", "strasse": "Weg 7", "plz_ort": "11111 Nirgends"},
+        ])
+
+        fahrt = auswerten(user["id"])["fahrtkosten"]
+        assert (fahrt["geschaetzt_km"], fahrt["fahrgemeinschaft_spiele"]) == (22, 0)
 
     def test_dfbnet_koordinate_des_platzes_hat_vorrang(self, user, dienste):
         daten = spiel(tag="2026-09-05")
@@ -165,11 +201,12 @@ class TestFahrtkosten:
         def kaputt(*a, **kw):
             raise RoutingNichtErreichbar("weg")
         monkeypatch.setattr(modul, "entfernungen", kaputt)
-        anlegen(user["id"], "2026-09-05", selbst=0)
+        anlegen(user["id"], "2026-09-05", selbst=1)
 
         fahrt = auswerten(user["id"])["fahrtkosten"]
         assert fahrt["luftlinie_spiele"] == 1
-        assert fahrt["geschaetzt_km"] == pytest.approx(29, abs=1)
+        # SRA 1 picks up SR on the way: 2 x 22.2 km straight line x 1.3
+        assert fahrt["geschaetzt_km"] == pytest.approx(58, abs=1)
 
     def test_nicht_nachgeschlagene_strecke_ist_offen(self, user, dienste, monkeypatch):
         monkeypatch.setattr(modul, "entfernungen",

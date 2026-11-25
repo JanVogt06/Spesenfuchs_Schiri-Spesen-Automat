@@ -14,9 +14,14 @@ entered kilometres and public transport, and the venue. Without an
 appointment the rate is computed from the league DFBnet names for the
 match, and the venue comes from the match report.
 
-Travel costs where nothing was entered for the own role are estimated:
-alone from the own home to the venue and back, by road kilometres. The
-answer keeps entered and estimated amounts apart.
+Travel costs where nothing was entered for the own role are estimated the
+way the mileage suggestions on a match card work (utils.fahrten): with the
+whole crew of the appointment, taking the suggestion with the fewest total
+kilometres - a carpool where one saves kilometres, otherwise everyone alone.
+The own kilometres are those of that suggestion: as driver the whole trip
+with pick-ups, as passenger 0. Without an appointment (no crew known) the
+estimate is the trip alone from the own home. The answer keeps entered and
+estimated amounts apart.
 """
 import re
 import time
@@ -30,7 +35,7 @@ from db.spielberichte import get_spielorte, gleiches_team
 from db.stammdaten import get_stammdaten
 from generator.spesen_calculator import calculate_spesen
 from utils.eigene_spiele import STANDARD_FRIST_SEKUNDEN, Ortsuche, eigene_person, wohnadresse
-from utils.fahrten import spielort_aus
+from utils.fahrten import personen_mit_anschrift, planen, spielort_aus
 from utils.routing import UMWEGFAKTOR, RoutingNichtErreichbar, entfernungen, luftlinie_m
 from utils.saison_utils import saison_fuer_datum
 
@@ -124,6 +129,8 @@ def _einsaetze_aus_dfbnet(geleitete: List[Dict], ansetzungen: List[Dict], user_i
             eintrag["oevm"] = kosten.get(f"{praefix}_oevm") if praefix else None
             eintrag["wohnort"] = wohnadresse(person) if person else heim_der_stammdaten
             eintrag["platz"] = ("ansetzung", match)
+            eintrag["eigen"] = praefix
+            eintrag["gespann"] = personen_mit_anschrift(match)
         else:
             klasse, art = klasse_und_art(spiel.get("liga") or "")
             sr, sra = calculate_spesen(klasse, art, "", spiel.get("heim") or "", spiel.get("gast") or "")
@@ -131,6 +138,8 @@ def _einsaetze_aus_dfbnet(geleitete: List[Dict], ansetzungen: List[Dict], user_i
             eintrag["km_satz"] = STANDARD_KM_SATZ
             eintrag["km"] = eintrag["oevm"] = None
             eintrag["wohnort"] = heim_der_stammdaten
+            eintrag["eigen"] = None
+            eintrag["gespann"] = []
             if berichte is None:
                 berichte = [b for b in get_spielorte(user_id) if not b["ausgefallen"]]
             bericht = _zum_bericht(spiel, berichte)
@@ -167,6 +176,8 @@ def _einsaetze_aus_ansetzungen(ansetzungen: List[Dict], stammdaten: Dict) -> Tup
             "oevm": kosten.get(f"{praefix}_oevm") if praefix else None,
             "wohnort": wohnadresse(person),
             "platz": ("ansetzung", match),
+            "eigen": praefix,
+            "gespann": personen_mit_anschrift(match),
         })
     return einsaetze, ohne_rolle
 
@@ -205,8 +216,10 @@ def statistik(user_id: int, saison: Optional[str] = None, frist: Optional[float]
     rollen: Dict[str, Dict] = defaultdict(lambda: {"spiele": 0, "spesen": 0.0})
     summe = {"spiele": 0, "ohne_satz": 0, "ohne_ansetzung": 0, "spesen": 0.0}
     fahrt = {"erfasst": 0.0, "erfasst_spiele": 0, "geschaetzt": 0.0, "geschaetzt_spiele": 0,
-             "geschaetzt_km": 0, "ohne_schaetzung": 0, "luftlinie_spiele": 0}
-    zu_schaetzen = []  # (month, km rate, home, venue)
+             "geschaetzt_km": 0, "ohne_schaetzung": 0, "luftlinie_spiele": 0,
+             # Of the estimated: how many follow a carpool, and in how many you ride along
+             "fahrgemeinschaft_spiele": 0, "mitfahrer_spiele": 0}
+    zu_schaetzen = []
 
     for einsatz in einsaetze:
         monat = monate[einsatz["datum"][:7]]
@@ -239,7 +252,21 @@ def statistik(user_id: int, saison: Optional[str] = None, frist: Optional[float]
         if wohnort is None or platz is None:
             fahrt["ohne_schaetzung"] += 1
             continue
-        zu_schaetzen.append((einsatz["datum"][:7], einsatz["km_satz"], wohnort, platz))
+
+        # The others of the crew whose home can be found; anyone else simply
+        # does not take part in the carpool, like on the match card
+        kollegen = []
+        for person in einsatz["gespann"]:
+            if person["praefix"] == einsatz["eigen"] or not person["plz_ort"]:
+                continue
+            adresse_k = f"{person['strasse']}, {person['plz_ort']}" if person["strasse"] else person["plz_ort"]
+            punkt = ortsuche.punkt(adresse_k, person["plz_ort"])
+            if punkt:
+                kollegen.append((person["praefix"], punkt))
+
+        zu_schaetzen.append({"monat": einsatz["datum"][:7], "km_satz": einsatz["km_satz"], "platz": platz,
+                             "wohnort": wohnort, "eigen": einsatz["eigen"] if kollegen else None,
+                             "kollegen": kollegen if einsatz["eigen"] else []})
 
     offen_strecken = _schaetzen(zu_schaetzen, frist, monate, fahrt)
 
@@ -270,35 +297,52 @@ def statistik(user_id: int, saison: Optional[str] = None, frist: Optional[float]
     }
 
 
-def _schaetzen(zu_schaetzen, frist, monate, fahrt) -> int:
-    """Adds the estimated travel costs; returns the number of matches still open."""
+def _schaetzen(zu_schaetzen: List[Dict], frist: float, monate, fahrt) -> int:
+    """
+    Adds the estimated travel costs; returns the number of matches still open.
+
+    All points of all matches go into one distance table - homes of the
+    colleagues and venues repeat over a season, so this is a handful of
+    requests to the route planner instead of one per match.
+    """
+    punkte = list(dict.fromkeys(
+        p for e in zu_schaetzen for p in (e["platz"], e["wohnort"], *(k[1] for k in e["kollegen"]))))
+    if not punkte:
+        return 0
+
+    luftlinie = False
+    try:
+        meter = entfernungen(punkte, punkte, frist).meter
+    except RoutingNichtErreichbar:
+        luftlinie = True
+        meter = [[luftlinie_m(a, b) * UMWEGFAKTOR for b in punkte] for a in punkte]
+    index = {p: i for i, p in enumerate(punkte)}
+
     offen = 0
-    nach_wohnort = defaultdict(list)
-    for eintrag in zu_schaetzen:
-        nach_wohnort[eintrag[2]].append(eintrag)
+    for e in zu_schaetzen:
+        # Planner indices: 0 venue, 1 own home, then the colleagues
+        lokal = [e["platz"], e["wohnort"], *(k[1] for k in e["kollegen"])]
 
-    for wohnort, eintraege in nach_wohnort.items():
-        plaetze = list(dict.fromkeys(e[3] for e in eintraege))
-        luftlinie = False
-        try:
-            hin = entfernungen([wohnort], plaetze, frist)
-            zurueck = entfernungen(plaetze, [wohnort], frist)
-            meter = {p: (hin.meter[0][i], zurueck.meter[i][0]) for i, p in enumerate(plaetze)}
-        except RoutingNichtErreichbar:
-            luftlinie = True
-            meter = {p: (luftlinie_m(wohnort, p) * UMWEGFAKTOR,) * 2 for p in plaetze}
+        def weg(i: int, j: int, lokal=lokal) -> Optional[float]:
+            return meter[index[lokal[i]]][index[lokal[j]]]
 
-        for monat, km_satz, _, platz in eintraege:
-            hin_m, zurueck_m = meter[platz]
-            if hin_m is None or zurueck_m is None:
-                offen += 1
-                continue
-            km = int((hin_m + zurueck_m) / 1000 + 0.5)
-            betrag = km * km_satz
-            fahrt["geschaetzt"] += betrag
-            fahrt["geschaetzt_spiele"] += 1
-            fahrt["geschaetzt_km"] += km
-            fahrt["luftlinie_spiele"] += 1 if luftlinie else 0
-            monate[monat]["fahrt_geschaetzt"] += betrag
+        eigen = e["eigen"] or "selbst"
+        personen = [eigen, *(k[0] for k in e["kollegen"])]
+        plan = planen(personen, weg)
+        vorschlag = plan["fahrgemeinschaften"][0] if plan["fahrgemeinschaften"] else None
+        km = vorschlag["km"][eigen] if vorschlag else plan["einzeln"]["km"].get(eigen)
+        if km is None:
+            offen += 1
+            continue
+
+        if vorschlag:
+            fahrt["fahrgemeinschaft_spiele"] += 1
+            fahrt["mitfahrer_spiele"] += 1 if km == 0 else 0
+        betrag = km * e["km_satz"]
+        fahrt["geschaetzt"] += betrag
+        fahrt["geschaetzt_spiele"] += 1
+        fahrt["geschaetzt_km"] += km
+        fahrt["luftlinie_spiele"] += 1 if luftlinie else 0
+        monate[e["monat"]]["fahrt_geschaetzt"] += betrag
 
     return offen

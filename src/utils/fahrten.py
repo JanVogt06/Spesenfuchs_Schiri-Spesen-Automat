@@ -224,7 +224,7 @@ def treffpunkt_kandidaten(von: Tuple[float, float], nach: Tuple[float, float]) -
             for k in range(1, anzahl + 1)]
 
 
-def _personen_mit_anschrift(match: Dict) -> List[Dict]:
+def personen_mit_anschrift(match: Dict) -> List[Dict]:
     """The persons in the form roles with name and place, in form order."""
     gespann = match.get("schiedsrichter") or []
     personen = []
@@ -311,7 +311,7 @@ def vorschlaege_fuer_spiel(match: Dict) -> Dict:
             return antwort
 
         personen, punkte = [], [ort]
-        for person in _personen_mit_anschrift(match):
+        for person in personen_mit_anschrift(match):
             treffer = None
             if person["plz_ort"]:
                 adresse = f"{person['strasse']}, {person['plz_ort']}" if person["strasse"] else person["plz_ort"]
