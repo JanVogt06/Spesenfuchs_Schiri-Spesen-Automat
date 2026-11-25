@@ -37,7 +37,7 @@ import {ADRESSE, Beitrag, Etikett, Folie, Kachel, Leucht, STORY, Titel} from './
 const ANZAHL = 5;
 
 /** Opaque card like the statement on the landing page */
-function Karte({className = '', children}: { className?: string; children: ReactNode }) {
+export function Karte({className = '', children}: { className?: string; children: ReactNode }) {
     return (
         <div className={`overflow-hidden rounded-2xl border border-white/15 bg-[oklch(0.215_0.03_158)] text-white shadow-2xl shadow-black/60 ${className}`}>
             {children}
@@ -56,7 +56,7 @@ const KLASSEN = [
 ];
 
 /** The new tab "Beobachtungen": average per role, for the men's leagues per league class */
-function Beobachtungstafel({klassen = true}: { klassen?: boolean }) {
+export function Beobachtungstafel({klassen = true, saisons = ['25/26', '24/25', '23/24']}: { klassen?: boolean; saisons?: string[] }) {
     return (
         <Karte>
             <div className="flex items-center justify-between gap-2 border-b border-white/10 px-4 py-2.5">
@@ -70,7 +70,7 @@ function Beobachtungstafel({klassen = true}: { klassen?: boolean }) {
 
             <div className="grid gap-3 p-4">
                 <div className="flex gap-1.5">
-                    {['25/26', '24/25', '23/24'].map((saison, index) => (
+                    {saisons.map((saison, index) => (
                         <span
                             key={saison}
                             className={`rounded-md px-2.5 py-1 text-[12px] font-medium ${index === 0 ? 'bg-flutlicht/15 text-flutlicht' : 'text-white/45'}`}
